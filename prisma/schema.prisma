@@ -14,4 +14,28 @@ model User {
   password String 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  budgets Budget[]
+}
+
+model Budget {
+  id String @id @default(uuid())
+  name String
+  limit Float
+  createdAt DateTime @default(now())
+
+  userId String
+  user User @relation(fields: [userId], references: [id])
+
+  expenses Expense[]
+}
+
+model Expense {
+  id String @id @default(uuid())
+  title String
+  amount Float
+  createdAt DateTime @default(now())
+
+  budgetId String
+  user Budget @relation(fields: [budgetId], references: [id])
 }
