@@ -37,5 +37,5 @@ model Expense {
   createdAt DateTime @default(now())
 
   budgetId String
-  user Budget @relation(fields: [budgetId], references: [id])
+  user Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 }

@@ -1,4 +1,4 @@
-import { IsNumber, IsString } from "class-validator";
+import { IsNumber, IsString, Min } from "class-validator";
 
 export class CreateBudgetDto {
 
@@ -6,5 +6,6 @@ export class CreateBudgetDto {
     name: string
 
     @IsNumber()
+    @Min(0)
     limit: number
 }

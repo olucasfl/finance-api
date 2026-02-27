@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateBudgetDto } from './dto/create-budget.dto';
-import { NotFoundError } from 'rxjs';
+import { UpdateBudgetDto } from './dto/update-budget.dto';
 
 @Injectable()
 export class BudgetsService {
@@ -78,6 +78,25 @@ export class BudgetsService {
 
         return this.prisma.budget.delete({
             where: { id: budgetId },
+        });
+    }
+
+    async update(userId: string, budgetId: string, data: UpdateBudgetDto) {
+        const budget = await this.prisma.budget.findUnique({
+            where: { id: budgetId },
+        });
+
+        if (!budget) {
+            throw new NotFoundException('Budget not found');
+        }
+
+        if (budget.userId !== userId) {
+            throw new ForbiddenException('Not allowed');
+        }
+
+        return this.prisma.budget.update({
+            where: { id: budgetId },
+            data,
         });
     }
 }

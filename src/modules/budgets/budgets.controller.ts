@@ -1,7 +1,8 @@
-import { Body, Controller, UseGuards, Post, Req, Get, Param, Delete } from '@nestjs/common';
+import { Body, Controller, UseGuards, Post, Req, Get, Param, Delete, Put } from '@nestjs/common';
 import { BudgetsService } from './budgets.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateBudgetDto } from './dto/create-budget.dto';
+import { UpdateBudgetDto } from './dto/update-budget.dto';
 
 @Controller('budgets')
 export class BudgetsController {
@@ -30,5 +31,11 @@ export class BudgetsController {
     @UseGuards(JwtAuthGuard)
     delete(@Req() req: any,@Param('id') id: string,) {
         return this.budgetService.delete(req.user.userId, id);
+    }
+
+    @Put(':id')
+    @UseGuards(JwtAuthGuard)
+    update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateBudgetDto) {
+        return this.budgetService.update(req.user.userId, id, body);
     }
 }
