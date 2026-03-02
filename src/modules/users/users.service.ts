@@ -9,10 +9,14 @@ export class UsersService {
 
     async create(data: CreateUserDto) {
 
+        if (data.password !== data.confirmPassword) {
+            throw new ConflictException('Passwords do not match');
+        }
+
         const emailExists = await this.prisma.user.findUnique({
             where: { email: data.email }
-        })
-        
+        });
+
         if (emailExists) {
             throw new ConflictException('Email already registered');
         }

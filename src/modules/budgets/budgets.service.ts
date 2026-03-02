@@ -20,10 +20,32 @@ export class BudgetsService {
     }
 
     async findAll(userId: string) {
-        return this.prisma.budget.findMany({
+        const budgets = await this.prisma.budget.findMany({
             where: { userId },
             orderBy: { createdAt: 'desc' }
-        })
+        });
+
+        const budgetsWithTotals = await Promise.all(
+            budgets.map(async (budget) => {
+            const expenseSum = await this.prisma.expense.aggregate({
+                where: { budgetId: budget.id },
+                _sum: { amount: true },
+            });
+
+            const totalSpent = expenseSum._sum.amount ?? 0;
+            const remaining = budget.limit - totalSpent;
+
+                return {
+                    id: budget.id,
+                    name: budget.name,
+                    limit: budget.limit,
+                    totalSpent,
+                    remaining,
+                };
+            })
+        );
+
+        return budgetsWithTotals;
     }
 
     async findOne(userId: string, budgetId: string) {

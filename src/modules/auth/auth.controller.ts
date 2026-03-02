@@ -9,4 +9,11 @@ export class AuthController {
     login(@Body() body: {email: string, password: string}) {
         return this.authService.login(body.email, body.password);
     }
+
+    @Post('refresh')
+    refresh(@Body() body: { refresh_token: string }) {
+        const decoded: any = this.authService['jwtService'].decode(body.refresh_token);
+
+        return this.authService.refresh(decoded.sub, body.refresh_token);
+    }
 }
