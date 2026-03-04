@@ -1,9 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateExpenseDto } from './dto/create-expense.dto';
-import { UpdateBudgetDto } from '../budgets/dto/update-budget.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';
-import { title } from 'process';
 
 @Injectable()
 export class ExpensesService {
@@ -23,11 +21,14 @@ export class ExpensesService {
             throw new ForbiddenException('Not Allowed')
         }
 
-        return this.prisma.expense.create({
+            return this.prisma.expense.create({
             data: {
                 title: data.title,
                 amount: data.amount,
                 budgetId,
+                createdAt: data.date
+                ? new Date(`${data.date}T12:00:00`)
+                : new Date()
             },
         })
     }
@@ -80,6 +81,7 @@ export class ExpensesService {
     }
 
     async update(userId: string, budgetId: string, expenseId: string, data: UpdateExpenseDto) {
+
         const budget = await this.prisma.budget.findUnique({
             where: { id: budgetId },
         });
@@ -103,8 +105,11 @@ export class ExpensesService {
         return this.prisma.expense.update({
             where: { id: expenseId },
             data: {
-                title: data.title,
-                amount: data.amount
+            title: data.title,
+            amount: data.amount,
+            createdAt: data.date
+                ? new Date(`${data.date}T12:00:00`)
+                : new Date()
             }
         });
     }

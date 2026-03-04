@@ -1,4 +1,4 @@
-import { IsString, IsNumber, Min, IsOptional } from 'class-validator';
+import { IsString, IsNumber, Min, IsOptional, IsDateString } from 'class-validator';
 
 export class UpdateExpenseDto {
   @IsString()
@@ -9,4 +9,8 @@ export class UpdateExpenseDto {
   @IsNumber()
   @Min(0)
   amount?: number;
+
+    @IsOptional()
+    @IsDateString()
+    date?: string
 }
