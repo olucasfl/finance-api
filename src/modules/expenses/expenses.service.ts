@@ -26,8 +26,8 @@ export class ExpensesService {
                 title: data.title,
                 amount: data.amount,
                 budgetId,
-                createdAt: data.date
-                ? new Date(`${data.date}T12:00:00`)
+                createdAt: data.expenseDate
+                ? new Date(`${data.expenseDate}T12:00:00`)
                 : new Date()
             },
         })
@@ -107,8 +107,8 @@ export class ExpensesService {
             data: {
             title: data.title,
             amount: data.amount,
-            createdAt: data.date
-                ? new Date(`${data.date}T12:00:00`)
+            createdAt: data.expenseDate
+                ? new Date(`${data.expenseDate}T12:00:00`)
                 : new Date()
             }
         });
