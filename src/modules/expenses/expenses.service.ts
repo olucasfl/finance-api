@@ -26,7 +26,7 @@ export class ExpensesService {
                 title: data.title,
                 amount: data.amount,
                 budgetId,
-                createdAt: data.expenseDate
+                expenseDate: data.expenseDate
                 ? new Date(`${data.expenseDate}T12:00:00`)
                 : new Date()
             },
