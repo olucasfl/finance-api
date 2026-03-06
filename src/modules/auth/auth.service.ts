@@ -5,12 +5,14 @@ import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AuthService {
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
   ) {}
 
   async login(email: string, password: string) {
+
     const user = await this.prisma.user.findUnique({
       where: { email },
     });
@@ -25,10 +27,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    if (!user.emailVerified) {
+      throw new UnauthorizedException('Please verify your email before logging in');
+    }
+
     return this.generateTokens(user.id, user.email);
+
   }
 
   async generateTokens(userId: string, email: string) {
+
     const payload = { sub: userId, email };
 
     const access_token = this.jwtService.sign(payload, {
@@ -50,9 +58,11 @@ export class AuthService {
       access_token,
       refresh_token,
     };
+
   }
 
   async refresh(userId: string, refreshToken: string) {
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -68,5 +78,33 @@ export class AuthService {
     }
 
     return this.generateTokens(user.id, user.email);
+
   }
+
+  async verifyEmail(token: string) {
+
+    const user = await this.prisma.user.findFirst({
+      where: {
+        emailVerificationToken: token,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid verification token');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerified: true,
+        emailVerificationToken: null,
+      },
+    });
+
+    return {
+      message: 'Email verified successfully',
+    };
+
+  }
+
 }
