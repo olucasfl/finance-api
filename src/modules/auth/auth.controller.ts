@@ -1,4 +1,5 @@
-import { Body, Controller, Post, Get, Query } from '@nestjs/common';
+import { Body, Controller, Post, Get, Query, Res } from '@nestjs/common';
+import type { Response } from "express";
 import { AuthService } from './auth.service';
 
 @Controller('auth')
@@ -20,9 +21,9 @@ export class AuthController {
 
   }
 
-  @Get('verify-email')
-  verifyEmail(@Query('token') token: string) {
-    return this.authService.verifyEmail(token);
+  @Get("verify-email")
+  verifyEmail(@Query("token") token: string, @Res() res: Response) {
+    return this.authService.verifyEmail(token, res);
   }
 
   @Post('resend-verification')
@@ -33,5 +34,6 @@ export class AuthController {
   @Get("check-verification")
   checkVerification(@Query("email") email: string) {
     return this.authService.checkVerification(email);
-    }
+  }
+
 }

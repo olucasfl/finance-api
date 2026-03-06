@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { MailService } from '../mail/mail.service';
+import { Response } from 'express';
 
 @Injectable()
 export class AuthService {
@@ -84,7 +85,7 @@ export class AuthService {
 
   }
 
-  async verifyEmail(token: string) {
+  async verifyEmail(token: string, res: Response) {
 
     const user = await this.prisma.user.findFirst({
       where: {
@@ -104,9 +105,7 @@ export class AuthService {
       },
     });
 
-    return {
-      message: 'Email verified successfully',
-    };
+    return res.redirect("https://finance-api-front.vercel.app/login");
 
   }
 
