@@ -2,6 +2,8 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'crypto';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class AuthService {
@@ -9,6 +11,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async login(email: string, password: string) {
@@ -103,6 +106,37 @@ export class AuthService {
 
     return {
       message: 'Email verified successfully',
+    };
+
+  }
+
+  async resendVerification(email: string) {
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return { message: 'If this email exists, a verification email was sent.' };
+    }
+
+    if (user.emailVerified) {
+      return { message: 'Email already verified.' };
+    }
+
+    const token = randomBytes(32).toString('hex');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: token,
+      },
+    });
+
+    await this.mailService.sendVerificationEmail(user.email, token);
+
+    return {
+      message: 'Verification email resent successfully',
     };
 
   }
