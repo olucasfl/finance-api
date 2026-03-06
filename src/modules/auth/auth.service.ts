@@ -141,4 +141,16 @@ export class AuthService {
 
   }
 
+  async checkVerification(email: string) {
+
+  const user = await this.prisma.user.findUnique({
+    where: { email },
+  });
+
+  return {
+    verified: user?.emailVerified || false
+  };
+
+}
+
 }

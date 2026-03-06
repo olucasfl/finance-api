@@ -30,4 +30,8 @@ export class AuthController {
     return this.authService.resendVerification(body.email);
   }
 
+  @Get("check-verification")
+  checkVerification(@Query("email") email: string) {
+    return this.authService.checkVerification(email);
+    }
 }
