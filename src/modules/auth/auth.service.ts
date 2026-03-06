@@ -152,4 +152,56 @@ export class AuthService {
 
 }
 
+async requestPasswordReset(email: string) {
+
+  const user = await this.prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) return;
+
+  const token = randomBytes(32).toString("hex");
+
+  const expires = new Date(Date.now() + 1000 * 60 * 30);
+
+  await this.prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetToken: token,
+      passwordResetExpires: expires
+    }
+  });
+
+  await this.mailService.sendPasswordResetEmail(user.email, token);
+
+}
+
+async resetPassword(token: string, password: string) {
+
+  const user = await this.prisma.user.findFirst({
+    where: {
+      passwordResetToken: token,
+      passwordResetExpires: {
+        gt: new Date()
+      }
+    }
+  });
+
+  if (!user) {
+    throw new UnauthorizedException("Invalid or expired token");
+  }
+
+  const hashed = await bcrypt.hash(password, 10);
+
+  await this.prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashed,
+      passwordResetToken: null,
+      passwordResetExpires: null
+    }
+  });
+
+}
+
 }

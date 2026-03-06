@@ -8,16 +8,15 @@ export class MailService {
 
   private readonly apiUrl = "https://api.brevo.com/v3/smtp/email";
 
-  async sendVerificationEmail(email: string, token: string) {
+  private buildTemplate(
+    title: string,
+    message: string,
+    buttonText: string,
+    link: string,
+    footer: string
+  ) {
 
-    if (!process.env.BREVO_API_KEY) {
-      this.logger.error("BREVO_API_KEY is not defined");
-      return;
-    }
-
-    const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}`;
-
-    const htmlContent = `
+    return `
 <div style="
   background:#0f172a;
   padding:40px 20px;
@@ -56,7 +55,7 @@ export class MailService {
       margin-bottom:12px;
       font-weight:600;
     ">
-      Verify your email
+      ${title}
     </h2>
 
     <p style="
@@ -65,8 +64,7 @@ export class MailService {
       line-height:1.6;
       margin-bottom:30px;
     ">
-      Welcome to <b>Smart Finance</b>.<br>
-      Click the button below to confirm your email address and activate your account.
+      ${message}
     </p>
 
     <a href="${link}"
@@ -81,7 +79,7 @@ export class MailService {
       font-size:15px;
       box-shadow:0 6px 20px rgba(37,99,235,0.35);
     ">
-      Verify Email
+      ${buttonText}
     </a>
 
     <p style="
@@ -90,7 +88,7 @@ export class MailService {
       margin-top:28px;
       line-height:1.5;
     ">
-      If you did not create an account, you can safely ignore this email.
+      ${footer}
     </p>
 
     <p style="
@@ -99,7 +97,7 @@ export class MailService {
       color:#64748b;
       word-break:break-all;
     ">
-      If the button doesn't work, copy and paste this link into your browser:<br>
+      Se o botão não funcionar, copie e cole este link no navegador:<br>
       <span style="color:#3b82f6">${link}</span>
     </p>
 
@@ -117,6 +115,59 @@ export class MailService {
 </div>
 `;
 
+  }
+
+  async sendVerificationEmail(email: string, token: string) {
+
+    if (!process.env.BREVO_API_KEY) {
+      this.logger.error("BREVO_API_KEY is not defined");
+      return;
+    }
+
+    const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}`;
+
+    const htmlContent = this.buildTemplate(
+      "Confirme seu email",
+      "Bem-vindo ao <b>Smart Finance</b>.<br>Clique no botão abaixo para confirmar seu email e ativar sua conta.",
+      "Confirmar email",
+      link,
+      "Se você não criou uma conta, pode ignorar este email."
+    );
+
+    await this.sendEmail(
+      email,
+      "Smart Finance • Confirme seu email",
+      htmlContent
+    );
+
+  }
+
+  async sendPasswordResetEmail(email: string, token: string) {
+
+    const link = `https://finance-api-front.vercel.app/login?resetToken=${token}`;
+
+    const htmlContent = this.buildTemplate(
+      "Redefinir sua senha",
+      "Recebemos uma solicitação para redefinir sua senha.<br>Clique no botão abaixo para criar uma nova senha.",
+      "Redefinir senha",
+      link,
+      "Este link expira em 30 minutos por segurança."
+    );
+
+    await this.sendEmail(
+      email,
+      "Smart Finance • Redefinir senha",
+      htmlContent
+    );
+
+  }
+
+  private async sendEmail(
+    email: string,
+    subject: string,
+    htmlContent: string
+  ) {
+
     try {
 
       await axios.post(
@@ -127,7 +178,7 @@ export class MailService {
             email: "lucasfariasleandro@gmail.com"
           },
           to: [{ email }],
-          subject: "Smart Finance • Verify your email",
+          subject,
           htmlContent
         },
         {
@@ -139,11 +190,11 @@ export class MailService {
         }
       );
 
-      this.logger.log(`Verification email sent to ${email}`);
+      this.logger.log(`Email enviado para ${email}`);
 
     } catch (error: any) {
 
-      this.logger.error("Error sending verification email");
+      this.logger.error("Erro ao enviar email");
 
       if (error.response) {
         this.logger.error(error.response.data);
