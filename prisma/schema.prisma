@@ -7,6 +7,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  BANK_TRANSFER
+  PIX
+  OTHER
+}
+
+enum Category {
+  FOOD
+  TRANSPORT
+  ENTERTAINMENT
+  HEALTH
+  BILLS
+  EDUCATION
+  TRAVEL
+  RENT
+  SHOPPING
+  INVESTMENTS
+  SUBSCRIPTIONS
+  OTHER
+}
+
 model User {
   id String @id @default(uuid())
   name String 
@@ -36,6 +60,10 @@ model Expense {
   id String @id @default(uuid())
   title String
   amount Float
+
+  category Category
+  paymentMethod PaymentMethod
+
   expenseDate DateTime @default(now())
   createdAt DateTime @default(now())
 

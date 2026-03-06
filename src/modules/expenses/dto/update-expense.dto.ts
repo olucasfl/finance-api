@@ -1,4 +1,6 @@
-import { IsString, IsNumber, Min, IsOptional, IsDateString } from 'class-validator';
+import { IsString, IsNumber, Min, IsOptional, IsDateString, IsEnum } from 'class-validator';
+import { Category, PaymentMethod } from '@prisma/client';
+import { Type } from 'class-transformer';
 
 export class UpdateExpenseDto {
   @IsString()
@@ -6,6 +8,7 @@ export class UpdateExpenseDto {
   title?: string;
 
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   amount?: number;
@@ -13,4 +16,10 @@ export class UpdateExpenseDto {
     @IsOptional()
     @IsDateString()
     expenseDate?: string
+
+  @IsEnum(Category)
+  category: Category;
+
+  @IsEnum(PaymentMethod)
+  paymentMethod: PaymentMethod;
 }

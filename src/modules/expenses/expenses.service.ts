@@ -26,6 +26,8 @@ export class ExpensesService {
                 title: data.title,
                 amount: data.amount,
                 budgetId,
+                category: data.category,
+                paymentMethod: data.paymentMethod,
                 expenseDate: data.expenseDate
                 ? new Date(`${data.expenseDate}T12:00:00`)
                 : new Date()
@@ -107,6 +109,8 @@ export class ExpensesService {
             data: {
             title: data.title,
             amount: data.amount,
+            category: data.category,
+            paymentMethod: data.paymentMethod,
             expenseDate: data.expenseDate
                 ? new Date(`${data.expenseDate}T12:00:00`)
                 : new Date()
