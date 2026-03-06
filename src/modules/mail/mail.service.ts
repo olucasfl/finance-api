@@ -15,7 +15,7 @@ export class MailService {
       return;
     }
 
-    const link = `https://finance-api.onrender.com/auth/verify-email?token=${token}`;
+    const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}`;
 
     const htmlContent = `
 <div style="
