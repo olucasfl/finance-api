@@ -1,25 +1,17 @@
-import { Injectable } from '@nestjs/common';
-import * as nodemailer from "nodemailer";
+import { Injectable } from "@nestjs/common";
+import { Resend } from "resend";
 
 @Injectable()
 export class MailService {
 
-  private transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS
-    }
-  });
+  private resend = new Resend(process.env.RESEND_API_KEY);
 
   async sendVerificationEmail(email: string, token: string) {
 
     const link = `https://finance-api-front.vercel.app/verify-email?token=${token}`;
 
-    await this.transporter.sendMail({
-      from: `"Smart Finance" <${process.env.EMAIL_USER}>`,
+    await this.resend.emails.send({
+      from: "Smart Finance <onboarding@resend.dev>",
       to: email,
       subject: "Confirm your email",
       html: `
