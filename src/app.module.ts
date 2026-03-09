@@ -8,6 +8,7 @@ import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { BudgetsModule } from './modules/smart-finance/budgets/budgets.module';
 import { ExpensesModule } from './modules/smart-finance/expenses/expenses.module';
+import { ConsecrationModule } from './modules/oratio/consecration/consecration.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { ExpensesModule } from './modules/smart-finance/expenses/expenses.module
     AuthModule,
     BudgetsModule,
     ExpensesModule,
+    ConsecrationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

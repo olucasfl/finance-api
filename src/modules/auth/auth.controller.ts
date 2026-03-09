@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Get, Query, Res } from '@nestjs/common';
+import { Body, Controller, Post, Get, Query, Res, Headers } from '@nestjs/common';
 import type { Response } from "express";
 import { AuthService } from './auth.service';
 
@@ -27,8 +27,8 @@ export class AuthController {
   }
 
   @Post('resend-verification')
-  resendVerification(@Body() body: { email: string }) {
-    return this.authService.resendVerification(body.email);
+  resendVerification(@Body() body: { email: string }, @Headers('x-app') app?: string) {
+    return this.authService.resendVerification(body.email, app);
   }
 
   @Get("check-verification")
@@ -37,8 +37,8 @@ export class AuthController {
   }
 
   @Post("forgot-password")
-  forgotPassword(@Body() body: { email: string }) {
-    return this.authService.requestPasswordReset(body.email);
+  forgotPassword(@Body() body: { email: string }, @Headers('x-app') app?: string) {
+    return this.authService.requestPasswordReset(body.email, app);
   }
 
   @Post("reset-password")

@@ -117,6 +117,113 @@ export class MailService {
 
   }
 
+  private buildOratioTemplate(
+    title: string,
+    message: string,
+    buttonText: string,
+    link: string,
+    footer: string
+  ) {
+
+  return `
+  <div style="
+    background:#FBF6EE;
+    padding:40px 20px;
+    font-family:Georgia,serif;
+  ">
+
+    <div style="
+      max-width:520px;
+      margin:auto;
+      background:white;
+      border-radius:14px;
+      padding:40px;
+      text-align:center;
+      border:1px solid rgba(0,0,0,0.08);
+    ">
+
+      <h1 style="
+        margin:0;
+        font-size:28px;
+        color:#7B1113;
+        letter-spacing:1px;
+      ">
+        ORATIO
+      </h1>
+
+      <div style="
+        height:2px;
+        width:60px;
+        margin:18px auto 28px auto;
+        background:#7B1113;
+        border-radius:4px;
+      "></div>
+
+      <h2 style="
+        color:#1e293b;
+        margin-bottom:12px;
+        font-weight:600;
+      ">
+        ${title}
+      </h2>
+
+      <p style="
+        color:#475569;
+        font-size:15px;
+        line-height:1.6;
+        margin-bottom:30px;
+      ">
+        ${message}
+      </p>
+
+      <a href="${link}"
+      style="
+        display:inline-block;
+        padding:14px 26px;
+        background:#7B1113;
+        color:white;
+        font-weight:600;
+        border-radius:8px;
+        text-decoration:none;
+        font-size:15px;
+      ">
+        ${buttonText}
+      </a>
+
+      <p style="
+        color:#64748b;
+        font-size:13px;
+        margin-top:28px;
+        line-height:1.5;
+      ">
+        ${footer}
+      </p>
+
+      <p style="
+        margin-top:18px;
+        font-size:12px;
+        color:#64748b;
+        word-break:break-all;
+      ">
+        Se o botão não funcionar, copie este link:<br>
+        <span style="color:#7B1113">${link}</span>
+      </p>
+
+    </div>
+
+    <p style="
+      text-align:center;
+      margin-top:20px;
+      color:#64748b;
+      font-size:12px;
+    ">
+      © ${new Date().getFullYear()} Oratio
+    </p>
+
+  </div>
+  `;
+  }
+
   async sendVerificationEmail(email: string, token: string) {
 
     if (!process.env.BREVO_API_KEY) {
@@ -203,6 +310,46 @@ export class MailService {
       }
 
     }
+
+  }
+
+  async sendOratioVerificationEmail(email: string, token: string) {
+
+    const link = `https://oratio-api.com/auth/verify-email?token=${token}`;
+
+    const htmlContent = this.buildOratioTemplate(
+      "Confirme seu email",
+      "Bem-vindo ao <b>Oratio</b>.<br>Confirme seu email para começar sua caminhada espiritual.",
+      "Confirmar email",
+      link,
+      "Se você não criou uma conta, ignore este email."
+    );
+
+    await this.sendEmail(
+      email,
+      "Oratio • Confirme seu email",
+      htmlContent
+    );
+
+  }
+
+  async sendOratioPasswordResetEmail(email: string, token: string) {
+
+    const link = `https://oratio-front.vercel.app/login?resetToken=${token}`;
+
+    const htmlContent = this.buildOratioTemplate(
+      "Redefinir senha",
+      "Recebemos um pedido para redefinir sua senha no <b>Oratio</b>.",
+      "Criar nova senha",
+      link,
+      "Este link expira em 30 minutos."
+    );
+
+    await this.sendEmail(
+      email,
+      "Oratio • Redefinir senha",
+      htmlContent
+    );
 
   }
 

@@ -8,6 +8,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 import { MailService } from '../mail/mail.service';
+import { AppType } from 'src/enums/app-type.enum';
 
 @Injectable()
 export class UsersService {
@@ -23,7 +24,7 @@ export class UsersService {
   =============================
   */
 
-  async create(data: CreateUserDto) {
+  async create(data: CreateUserDto, app?: string) {
 
     if (data.password !== data.confirmPassword) {
       throw new ConflictException('Passwords do not match');
@@ -50,7 +51,21 @@ export class UsersService {
       },
     });
 
-    await this.mailService.sendVerificationEmail(user.email, token);
+    if (app === AppType.ORATIO) {
+
+      await this.mailService.sendOratioVerificationEmail(
+        user.email,
+        token
+      );
+
+    } else {
+
+      await this.mailService.sendVerificationEmail(
+        user.email,
+        token
+      );
+
+    }
 
     const { password, refreshToken, ...userWithoutPassword } = user;
 

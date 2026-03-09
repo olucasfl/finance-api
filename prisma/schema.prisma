@@ -96,7 +96,6 @@ model ConsecrationStage {
   description String?
 
   order Int
-
   days Int
 
   daysContent ConsecrationDay[]
@@ -106,24 +105,31 @@ model ConsecrationDay {
   id String @id @default(uuid())
 
   dayNumber Int
-
   title String?
 
   stageId String
   stage ConsecrationStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
 
-  prayers ConsecrationPrayer[]
+  prayers DayPrayer[]
 }
 
-model ConsecrationPrayer {
+model Prayer {
   id String @id @default(uuid())
 
   title String
-
   content String
+
+  days DayPrayer[]
+}
+
+model DayPrayer {
+  id String @id @default(uuid())
 
   order Int
 
   dayId String
   day ConsecrationDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+
+  prayerId String
+  prayer Prayer @relation(fields: [prayerId], references: [id])
 }

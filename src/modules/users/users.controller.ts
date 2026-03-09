@@ -7,6 +7,7 @@ import {
   Delete,
   Req,
   UseGuards,
+  Headers,
 } from '@nestjs/common';
 
 import { UsersService } from './users.service';
@@ -25,8 +26,8 @@ export class UsersController {
   */
 
   @Post()
-  create(@Body() body: CreateUserDto) {
-    return this.userService.create(body);
+  create(@Body() body: CreateUserDto, @Headers('x-app') app?: string) {
+    return this.userService.create(body, app);
   }
 
   /*

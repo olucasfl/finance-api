@@ -5,6 +5,7 @@ import { JwtService } from '@nestjs/jwt';
 import { randomBytes } from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { Response } from 'express';
+import { AppType } from 'src/enums/app-type.enum';
 
 @Injectable()
 export class AuthService {
@@ -109,7 +110,7 @@ export class AuthService {
 
   }
 
-  async resendVerification(email: string) {
+  async resendVerification(email: string, app?: string) {
 
     const user = await this.prisma.user.findUnique({
       where: { email },
@@ -132,7 +133,21 @@ export class AuthService {
       },
     });
 
-    await this.mailService.sendVerificationEmail(user.email, token);
+    if (app === AppType.ORATIO) {
+
+      await this.mailService.sendOratioVerificationEmail(
+        user.email,
+        token
+      );
+      
+    } else {
+
+      await this.mailService.sendVerificationEmail(
+        user.email,
+        token
+      );
+
+    }
 
     return {
       message: 'Verification email resent successfully',
@@ -152,7 +167,7 @@ export class AuthService {
 
 }
 
-async requestPasswordReset(email: string) {
+async requestPasswordReset(email: string, app?: string) {
 
   const user = await this.prisma.user.findUnique({
     where: { email },
@@ -172,7 +187,21 @@ async requestPasswordReset(email: string) {
     }
   });
 
-  await this.mailService.sendPasswordResetEmail(user.email, token);
+  if (app === AppType.ORATIO) {
+
+    await this.mailService.sendOratioPasswordResetEmail(
+      user.email,
+      token
+    );
+
+  } else {
+
+    await this.mailService.sendPasswordResetEmail(
+      user.email,
+      token
+    );
+
+  }
 
 }
 
