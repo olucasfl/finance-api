@@ -22,7 +22,7 @@ export class AuthController {
   }
 
   @Get("verify-email")
-  verifyEmail(@Query("token") token: string, @Headers('x-app') app: string, @Res() res: Response) {
+  verifyEmail(@Query("token") token: string, @Query("app") app: string, @Res() res: Response) {
     return this.authService.verifyEmail(token, app, res);
   }
 
