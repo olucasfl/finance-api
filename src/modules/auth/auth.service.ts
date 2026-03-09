@@ -86,7 +86,7 @@ export class AuthService {
 
   }
 
-  async verifyEmail(token: string, res: Response) {
+  async verifyEmail(token: string, app: string, res: Response) {
 
     const user = await this.prisma.user.findFirst({
       where: {
@@ -95,7 +95,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid verification token');
+      throw new UnauthorizedException("Invalid verification token");
     }
 
     await this.prisma.user.update({
@@ -106,8 +106,17 @@ export class AuthService {
       },
     });
 
-    return res.redirect("https://finance-api-front.vercel.app/login");
+    let redirectUrl = "https://finance-api-front.vercel.app/login";
 
+    if (app === "oratio") {
+      redirectUrl = "https://oratio.vercel.app/login";
+    }
+
+    if (app === "smart-finance") {
+      redirectUrl = "https://finance-api-front.vercel.app/login";
+    }
+
+    return res.redirect(redirectUrl);
   }
 
   async resendVerification(email: string, app?: string) {
