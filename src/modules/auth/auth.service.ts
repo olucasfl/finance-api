@@ -109,7 +109,7 @@ export class AuthService {
     let redirectUrl = "https://finance-api-front.vercel.app/login";
 
     if (app === "oratio") {
-      redirectUrl = "https://oratio.vercel.app/login";
+      redirectUrl = "https://oratio-phi.vercel.app/login";
     }
 
     if (app === "smart-finance") {
