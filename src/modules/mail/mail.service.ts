@@ -315,7 +315,7 @@ export class MailService {
 
   async sendOratioVerificationEmail(email: string, token: string) {
 
-    const link = `https://oratio-api.com/auth/verify-email?token=${token}`;
+    const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}`;
 
     const htmlContent = this.buildOratioTemplate(
       "Confirme seu email",
@@ -335,7 +335,7 @@ export class MailService {
 
   async sendOratioPasswordResetEmail(email: string, token: string) {
 
-    const link = `https://oratio-front.vercel.app/login?resetToken=${token}`;
+    const link = `https://oratio-phi.vercel.app/login/login?resetToken=${token}`;
 
     const htmlContent = this.buildOratioTemplate(
       "Redefinir senha",
