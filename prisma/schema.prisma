@@ -48,6 +48,7 @@ model User {
   passwordResetExpires DateTime?
 
   budgets Budget[]
+  consecrations ConsecrationProgress[]
 }
 
 model Budget {
@@ -75,4 +76,54 @@ model Expense {
 
   budgetId String
   budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+}
+
+model ConsecrationProgress {
+  id String @id @default(uuid())
+
+  startDate DateTime
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model ConsecrationStage {
+  id String @id @default(uuid())
+
+  title String
+  description String?
+
+  order Int
+
+  days Int
+
+  daysContent ConsecrationDay[]
+}
+
+model ConsecrationDay {
+  id String @id @default(uuid())
+
+  dayNumber Int
+
+  title String?
+
+  stageId String
+  stage ConsecrationStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  prayers ConsecrationPrayer[]
+}
+
+model ConsecrationPrayer {
+  id String @id @default(uuid())
+
+  title String
+
+  content String
+
+  order Int
+
+  dayId String
+  day ConsecrationDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
 }

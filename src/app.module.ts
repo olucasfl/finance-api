@@ -6,8 +6,8 @@ import { AppService } from './app.service';
 
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { BudgetsModule } from './modules/budgets/budgets.module';
-import { ExpensesModule } from './modules/expenses/expenses.module';
+import { BudgetsModule } from './modules/smart-finance/budgets/budgets.module';
+import { ExpensesModule } from './modules/smart-finance/expenses/expenses.module';
 
 @Module({
   imports: [
