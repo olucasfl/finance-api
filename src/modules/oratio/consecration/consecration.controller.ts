@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
@@ -122,5 +123,12 @@ export class ConsecrationController {
 
     return this.service.getStageDays(stageId)
 
+  }
+
+  @Delete("complete/:day")
+  @UseGuards(JwtAuthGuard)
+  uncompleteDay(@Req() req:any, @Param("day") day:string){
+
+    return this.service.uncompleteDay(req.user.userId, Number(day))
   }
 }

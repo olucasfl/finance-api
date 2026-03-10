@@ -258,10 +258,16 @@ export class ConsecrationService {
     throw new NotFoundException("Consagração não iniciada")
   }
 
-  return this.prisma.consecrationProgress.update({
+  await this.prisma.consecrationProgress.update({
     where:{id:progress.id},
     data:{startDate}
   })
+
+  await this.prisma.consecrationCompletedDay.deleteMany({
+    where:{userId}
+  })
+
+  return { success:true }
 
   }
 
@@ -275,4 +281,24 @@ export class ConsecrationService {
   return days
 
   }
+
+  async uncompleteDay(userId: string, dayNumber: number){
+
+  const day = await this.prisma.consecrationCompletedDay.findFirst({
+    where:{
+    userId,
+    dayNumber
+    }
+  })
+
+  if(!day){
+    throw new NotFoundException("Dia não está marcado como concluído")
+  }
+
+  return this.prisma.consecrationCompletedDay.delete({
+    where:{ id: day.id }
+  })
+
+  }
+  
 }
