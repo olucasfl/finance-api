@@ -230,4 +230,21 @@ export class ConsecrationService {
     });
 
   }
+
+  async updateStartDate(userId: string, startDate: Date) {
+
+  const progress = await this.prisma.consecrationProgress.findFirst({
+    where:{userId}
+  })
+
+  if(!progress){
+    throw new NotFoundException("Consagração não iniciada")
+  }
+
+  return this.prisma.consecrationProgress.update({
+    where:{id:progress.id},
+    data:{startDate}
+  })
+
+  }
 }

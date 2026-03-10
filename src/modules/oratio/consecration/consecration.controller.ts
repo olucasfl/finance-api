@@ -109,4 +109,11 @@ export class ConsecrationController {
   complete(@Req() req:any, @Param("day") day:string){
     return this.service.completeDay(req.user.userId,Number(day))
   }
+
+  @Put("start-date")
+  @UseGuards(JwtAuthGuard)
+  updateStartDate(@Req() req:any, @Body() body:{startDate:string}){
+
+    return this.service.updateStartDate(req.user.userId, new Date(body.startDate));
+  }
 }
