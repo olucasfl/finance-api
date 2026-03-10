@@ -24,37 +24,54 @@ export class ConsecrationService {
     });
   }
 
-  async progress(userId:string){
+  async progress(userId: string) {
 
   const progress = await this.prisma.consecrationProgress.findFirst({
-    where:{userId}
-  })
+    where: { userId }
+  });
 
-  if(!progress){
-    return {started:false}
+  const stages = await this.prisma.consecrationStage.findMany({
+    orderBy: { order: "asc" }
+  });
+
+  if (!progress) {
+    return {
+    started: false,
+    stages
+    };
   }
 
-  const completed = await this.prisma.consecrationCompletedDay.count({
-    where:{userId}
-  })
+  const today = new Date();
+  const start = new Date(progress.startDate);
 
   const diff =
     Math.floor(
-    (Date.now() - progress.startDate.getTime()) /
-    (1000*60*60*24)
-    ) + 1
+    (today.getTime() - start.getTime()) /
+    (1000 * 60 * 60 * 24)
+    ) + 1;
 
-  return{
+  const startedToday = diff >= 1;
 
-    started:true,
+  const daysUntilStart =
+    diff < 1 ? Math.abs(diff) + 1 : 0;
 
-    currentDay:diff,
+  const completedDays = await this.prisma.consecrationCompletedDay.count({
+    where: { userId }
+  });
 
-    completedDays:completed,
+  const progressPercent =
+    Math.floor((completedDays / 33) * 100);
 
-    progress:Math.floor((completed/33)*100)
-
-  }
+  return {
+    started: true,
+    startDate: progress.startDate,
+    currentDay: diff,
+    startedToday,
+    daysUntilStart,
+    completedDays,
+    progress: progressPercent,
+    stages
+  };
 
   }
 
