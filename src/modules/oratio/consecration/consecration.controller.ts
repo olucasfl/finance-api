@@ -116,4 +116,11 @@ export class ConsecrationController {
 
     return this.service.updateStartDate(req.user.userId, new Date(body.startDate));
   }
+
+  @Get("stage/:stageId/days")
+  getStageDays(@Param("stageId") stageId: string) {
+
+    return this.service.getStageDays(stageId)
+
+  }
 }

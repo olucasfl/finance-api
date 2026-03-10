@@ -264,4 +264,15 @@ export class ConsecrationService {
   })
 
   }
+
+  async getStageDays(stageId: string) {
+
+  const days = await this.prisma.consecrationDay.findMany({
+    where: { stageId },
+    orderBy: { dayNumber: "asc" }
+  })
+
+  return days
+
+  }
 }
