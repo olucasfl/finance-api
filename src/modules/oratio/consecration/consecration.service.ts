@@ -202,9 +202,15 @@ export class ConsecrationService {
 
   async reset(userId: string) {
 
-    return this.prisma.consecrationProgress.deleteMany({
+    await this.prisma.consecrationCompletedDay.deleteMany({
       where: { userId }
     });
+
+    await this.prisma.consecrationProgress.deleteMany({
+      where: { userId }
+    });
+
+    return { success: true };
 
   }
 
@@ -300,5 +306,5 @@ export class ConsecrationService {
   })
 
   }
-  
+
 }
