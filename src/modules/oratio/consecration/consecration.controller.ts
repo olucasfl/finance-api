@@ -103,4 +103,10 @@ export class ConsecrationController {
   reset(@Req() req: any) {
     return this.service.reset(req.user.userId);
   }
+
+  @Post("complete/:day")
+  @UseGuards(JwtAuthGuard)
+  complete(@Req() req:any, @Param("day") day:string){
+    return this.service.completeDay(req.user.userId,Number(day))
+  }
 }

@@ -24,25 +24,38 @@ export class ConsecrationService {
     });
   }
 
-  async progress(userId: string) {
+  async progress(userId:string){
 
-    const progress = await this.prisma.consecrationProgress.findFirst({
-      where: { userId }
-    });
+  const progress = await this.prisma.consecrationProgress.findFirst({
+    where:{userId}
+  })
 
-    if (!progress) {
-      return { started: false };
-    }
+  if(!progress){
+    return {started:false}
+  }
 
-    const today = new Date();
-    const diff = today.getTime() - progress.startDate.getTime();
-    const currentDay = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+  const completed = await this.prisma.consecrationCompletedDay.count({
+    where:{userId}
+  })
 
-    return {
-      started: true,
-      startDate: progress.startDate,
-      currentDay
-    };
+  const diff =
+    Math.floor(
+    (Date.now() - progress.startDate.getTime()) /
+    (1000*60*60*24)
+    ) + 1
+
+  return{
+
+    started:true,
+
+    currentDay:diff,
+
+    completedDays:completed,
+
+    progress:Math.floor((completed/33)*100)
+
+  }
+
   }
 
   async findDay(dayNumber: number) {
@@ -174,6 +187,46 @@ export class ConsecrationService {
 
     return this.prisma.consecrationProgress.deleteMany({
       where: { userId }
+    });
+
+  }
+
+  async completeDay(userId: string, dayNumber: number) {
+
+    const progress = await this.prisma.consecrationProgress.findFirst({
+      where: { userId }
+    });
+
+    if (!progress) {
+      throw new Error("Consagração não iniciada");
+    }
+
+    const diff =
+      Math.floor(
+        (Date.now() - progress.startDate.getTime()) /
+        (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    if (dayNumber > diff) {
+      throw new Error("Dia ainda não liberado");
+    }
+
+    const previous = await this.prisma.consecrationCompletedDay.findFirst({
+      where: {
+        userId,
+        dayNumber: dayNumber - 1
+      }
+    });
+
+    if (dayNumber !== 1 && !previous) {
+      throw new Error("Complete o dia anterior primeiro");
+    }
+
+    return this.prisma.consecrationCompletedDay.create({
+      data: {
+        userId,
+        dayNumber
+      }
     });
 
   }

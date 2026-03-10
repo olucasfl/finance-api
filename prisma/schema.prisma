@@ -49,6 +49,7 @@ model User {
 
   budgets Budget[]
   consecrations ConsecrationProgress[]
+  completedConsecrationDays ConsecrationCompletedDay[]
 }
 
 model Budget {
@@ -132,4 +133,17 @@ model DayPrayer {
 
   prayerId String
   prayer Prayer @relation(fields: [prayerId], references: [id])
+}
+
+model ConsecrationCompletedDay {
+
+  id String @id @default(uuid())
+
+  dayNumber Int
+
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
 }
