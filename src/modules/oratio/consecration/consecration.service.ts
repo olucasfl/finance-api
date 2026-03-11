@@ -307,4 +307,22 @@ export class ConsecrationService {
 
   }
 
+  async getAllDays(){
+
+  return this.prisma.consecrationDay.findMany({
+    include:{
+    prayers:{
+      include:{
+      prayer:true
+      }
+    },
+    stage:true
+    },
+    orderBy:{
+    dayNumber:"asc"
+    }
+  })
+
+  }
+
 }

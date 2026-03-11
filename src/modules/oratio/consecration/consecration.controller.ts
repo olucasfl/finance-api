@@ -131,4 +131,9 @@ export class ConsecrationController {
 
     return this.service.uncompleteDay(req.user.userId, Number(day))
   }
+
+  @Get("/all-days")
+  getAllDays(){
+    return this.service.getAllDays()
+  }
 }
