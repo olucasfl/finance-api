@@ -49,7 +49,7 @@ export class AuthService {
     });
 
     const refresh_token = this.jwtService.sign(payload, {
-      expiresIn: '7d',
+      expiresIn: '30d',
     });
 
     const hashedRefresh = await bcrypt.hash(refresh_token, 10);
