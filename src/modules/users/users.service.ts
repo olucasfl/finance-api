@@ -80,49 +80,52 @@ export class UsersService {
 
   async getProfile(userId: string) {
 
-    const user = await this.prisma.user.findUnique({
+  const user = await this.prisma.user.findUnique({
 
-      where: { id: userId },
+    where: { id: userId },
 
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        createdAt: true,
-        emailVerified: true,
-        spiritualStats:true,
-
-        consecrations: true,
-
-        completedConsecrationDays: {
-          select: {
-            id: true
-          }
-        }
-
-      }
-
-    });
-
-    if (!user) {
-      throw new NotFoundException('User not found');
+    select: {
+    id: true,
+    name: true,
+    email: true,
+    createdAt: true,
+    emailVerified: true,
+    spiritualStats: true,
+    consecrations: true,
+    completedConsecrationDays: {
+      select: { id: true }
+    }
     }
 
-    return {
+  })
 
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      createdAt: user.createdAt,
-      emailVerified: user.emailVerified,
+  if (!user) {
+    throw new NotFoundException("User not found")
+  }
 
-      spiritualProgress: {
-        consecrationStarted: user.consecrations.length > 0,
-        daysCompleted: user.completedConsecrationDays.length,
-        prayersPrayed: user.spiritualStats?.prayersPrayed || 0,
-      }
+  return {
 
-    };
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    createdAt: user.createdAt,
+    emailVerified: user.emailVerified,
+
+    spiritualProgress: {
+
+    consecrationStarted: user.consecrations.length > 0,
+
+    daysCompleted: user.completedConsecrationDays.length,
+
+    prayersPrayed: user.spiritualStats?.prayersPrayed || 0,
+
+    rosariesPrayed: user.spiritualStats?.rosariesPrayed || 0,
+
+    lastPrayerDate: user.spiritualStats?.lastPrayerDate || null
+
+    }
+
+  }
 
   }
 
