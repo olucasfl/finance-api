@@ -10,11 +10,16 @@ async function bootstrap() {
     CORS GLOBAL
  ========================= */
 
- app.enableCors({
+app.enableCors({
   origin: "*",
   methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
-  allowedHeaders: ["Content-Type","Authorization"],
- })
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-App"
+  ],
+  exposedHeaders: ["Authorization"]
+})
 
  /* =========================
     VALIDAÇÃO GLOBAL
