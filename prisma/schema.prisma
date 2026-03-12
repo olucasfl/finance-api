@@ -31,6 +31,8 @@ enum Category {
   OTHER
 }
 
+// User Management
+
 model User {
   id String @id @default(uuid())
   name String 
@@ -48,9 +50,15 @@ model User {
   passwordResetExpires DateTime?
 
   budgets Budget[]
+
   consecrations ConsecrationProgress[]
   completedConsecrationDays ConsecrationCompletedDay[]
+
+  rosarySessions RosarySession[]
+  spiritualStats SpiritualStats?
 }
+
+// Smart Finance Management
 
 model Budget {
   id String @id @default(uuid())
@@ -78,6 +86,8 @@ model Expense {
   budgetId String
   budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 }
+
+// Consecration Management
 
 model ConsecrationProgress {
   id String @id @default(uuid())
@@ -145,5 +155,66 @@ model ConsecrationCompletedDay {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+
+}
+
+// General Prayers Management
+
+model PrayerCategory {
+
+  id String @id @default(uuid())
+
+  name String
+  slug String @unique
+
+  prayers GeneralPrayer[]
+
+  createdAt DateTime @default(now())
+
+}
+
+model GeneralPrayer {
+
+  id String @id @default(uuid())
+
+  title String
+  content String
+
+  categoryId String
+  category PrayerCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+}
+
+model RosarySession {
+
+  id String @id @default(uuid())
+
+  userId String
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+
+  currentStep Int @default(0)
+
+  completed Boolean @default(false)
+
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+
+}
+
+model SpiritualStats {
+
+  id String @id @default(uuid())
+
+  userId String @unique
+  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
+
+  rosariesPrayed Int @default(0)
+  prayersPrayed Int @default(0)
+
+  prayerStreak Int @default(0)
+
+  lastPrayerDate DateTime?
 
 }

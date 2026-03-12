@@ -90,6 +90,7 @@ export class UsersService {
         email: true,
         createdAt: true,
         emailVerified: true,
+        spiritualStats:true,
 
         consecrations: true,
 
@@ -117,7 +118,8 @@ export class UsersService {
 
       spiritualProgress: {
         consecrationStarted: user.consecrations.length > 0,
-        daysCompleted: user.completedConsecrationDays.length
+        daysCompleted: user.completedConsecrationDays.length,
+        prayersPrayed: user.spiritualStats?.prayersPrayed || 0,
       }
 
     };

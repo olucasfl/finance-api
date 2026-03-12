@@ -11,6 +11,7 @@ import { ExpensesModule } from './modules/smart-finance/expenses/expenses.module
 import { ConsecrationModule } from './modules/oratio/consecration/consecration.module';
 import { LiturgiaModule } from './modules/oratio/liturgia/liturgia.module';
 import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
+import { PrayersModule } from './modules/oratio/prayers/prayers.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
     ConsecrationModule,
     LiturgiaModule,
     VoxAiModule,
+    PrayersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
