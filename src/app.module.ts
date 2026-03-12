@@ -12,6 +12,7 @@ import { ConsecrationModule } from './modules/oratio/consecration/consecration.m
 import { LiturgiaModule } from './modules/oratio/liturgia/liturgia.module';
 import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
 import { PrayersModule } from './modules/oratio/prayers/prayers.module';
+import { RosaryModule } from './modules/rosary/rosary.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { PrayersModule } from './modules/oratio/prayers/prayers.module';
     LiturgiaModule,
     VoxAiModule,
     PrayersModule,
+    RosaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],
