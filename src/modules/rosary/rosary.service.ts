@@ -74,60 +74,64 @@ export class RosaryService{
  FINISH
  ========================= */
 
- async finish(userId:string){
+async finish(userId:string){
 
-  const session = await this.getSession(userId)
+ const session = await this.getSession(userId)
 
-  if(!session){
-   throw new NotFoundException("Rosary session not found")
+ if(!session){
+  throw new NotFoundException("Rosary session not found")
+ }
+
+ const now = new Date()
+
+ await this.prisma.rosarySession.update({
+
+  where:{ id:session.id },
+
+  data:{
+   completed:true,
+   finishedAt:now
   }
 
-  await this.prisma.rosarySession.update({
+ })
 
-   where:{ id:session.id },
+ /* atualizar stats */
+
+ const stats = await this.prisma.spiritualStats.findUnique({
+  where:{ userId }
+ })
+
+ if(!stats){
+
+  await this.prisma.spiritualStats.create({
 
    data:{
-    completed:true,
-    finishedAt:new Date()
+    userId,
+    rosariesPrayed:1,
+    lastPrayerDate:now
    }
 
   })
 
-  /* atualizar stats */
+ }else{
 
-  const stats = await this.prisma.spiritualStats.findUnique({
-   where:{ userId }
+  await this.prisma.spiritualStats.update({
+
+   where:{ userId },
+
+   data:{
+    rosariesPrayed:{
+     increment:1
+    },
+    lastPrayerDate:now
+   }
+
   })
 
-  if(!stats){
-
-   await this.prisma.spiritualStats.create({
-
-    data:{
-     userId,
-     rosariesPrayed:1
-    }
-
-   })
-
-  }else{
-
-   await this.prisma.spiritualStats.update({
-
-    where:{ userId },
-
-    data:{
-     rosariesPrayed:{
-      increment:1
-     }
-    }
-
-   })
-
-  }
-
-  return { success:true }
-
  }
+
+ return { success:true }
+
+}
 
 }
