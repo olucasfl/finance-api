@@ -81,16 +81,47 @@ export class UsersService {
   async getProfile(userId: string) {
 
     const user = await this.prisma.user.findUnique({
+
       where: { id: userId },
+
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        emailVerified: true,
+
+        consecrations: true,
+
+        completedConsecrationDays: {
+          select: {
+            id: true
+          }
+        }
+
+      }
+
     });
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    const { password, refreshToken, ...safeUser } = user;
+    return {
 
-    return safeUser;
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+      emailVerified: user.emailVerified,
+
+      spiritualProgress: {
+        consecrationStarted: user.consecrations.length > 0,
+        daysCompleted: user.completedConsecrationDays.length
+      }
+
+    };
+
   }
 
   /*

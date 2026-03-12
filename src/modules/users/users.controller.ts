@@ -8,6 +8,7 @@ import {
   Req,
   UseGuards,
   Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 
 import { UsersService } from './users.service';
@@ -40,7 +41,13 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   getProfile(@Req() req: any) {
 
-    return this.userService.getProfile(req.user.sub);
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getProfile(userId);
   }
 
   /*
@@ -56,8 +63,14 @@ export class UsersController {
     @Body() body: { name: string },
   ) {
 
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
     return this.userService.updateProfile(
-      req.user.sub,
+      userId,
       body.name,
     );
   }
@@ -72,7 +85,13 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   deleteAccount(@Req() req: any) {
 
-    return this.userService.deleteAccount(req.user.sub);
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.deleteAccount(userId);
   }
 
 }
