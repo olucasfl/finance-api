@@ -11,11 +11,17 @@ export class RosaryService{
  START
  ========================= */
 
- getRosary(type:string){
+getRosary(type:string){
 
-  return buildRosary(type)
+ const valid = ["gozosos","dolorosos","gloriosos","luminosos"]
 
+ if(!valid.includes(type)){
+  throw new NotFoundException("Invalid rosary type")
  }
+
+ return buildRosary(type)
+
+}
 
  async start(userId:string){
 
