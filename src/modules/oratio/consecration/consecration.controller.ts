@@ -18,57 +18,81 @@ export class ConsecrationController {
 
   constructor(private readonly service: ConsecrationService) {}
 
+  /* ============================= */
+  /* START CONSECRATION */
+  /* ============================= */
+
   @Post('start')
   @UseGuards(JwtAuthGuard)
-  start(@Req() req: any, @Body() body: { startDate: string }) {
+  start(
+    @Req() req: any,
+    @Body() body: { consecrationDate: string }
+  ) {
+
+    const consecrationDate = new Date(body.consecrationDate)
+
+    const startDate = new Date(consecrationDate)
+    startDate.setDate(startDate.getDate() - 33)
 
     return this.service.start(
       req.user.userId,
-      new Date(body.startDate)
-    );
+      startDate
+    )
 
   }
+
+  /* ============================= */
+  /* PROGRESS */
+  /* ============================= */
 
   @Get('progress')
   @UseGuards(JwtAuthGuard)
   progress(@Req() req: any) {
 
-    return this.service.progress(req.user.userId);
+    return this.service.progress(req.user.userId)
 
   }
+
+  /* ============================= */
+  /* GET DAY */
+  /* ============================= */
 
   @Get('day/:day')
   getDay(@Param('day') day: string) {
 
-    return this.service.findDay(Number(day));
+    return this.service.findDay(Number(day))
 
   }
+
+  /* ============================= */
+  /* ADMIN - CREATE DATA */
+  /* ============================= */
 
   @Post('stage')
   createStage(@Body() body: any) {
 
-    return this.service.createStage(body);
+    return this.service.createStage(body)
 
   }
 
   @Post('day')
   createDay(@Body() body: any) {
 
-    return this.service.createDay(body);
+    return this.service.createDay(body)
 
   }
 
   @Post('prayer')
   createPrayer(@Body() body: any) {
 
-    return this.service.createPrayer(body);
+    return this.service.createPrayer(body)
 
   }
 
   @Post('day-prayer')
   addPrayerToDay(@Body() body: any) {
 
-    return this.service.addPrayerToDay(body);
+    return this.service.addPrayerToDay(body)
 
   }
 
@@ -77,7 +101,9 @@ export class ConsecrationController {
     @Param('id') id: string,
     @Body() body: { order: number }
   ) {
-    return this.service.updateDayPrayer(id, body.order);
+
+    return this.service.updateDayPrayer(id, body.order)
+
   }
 
   @Put('prayer/:id')
@@ -85,38 +111,90 @@ export class ConsecrationController {
     @Param('id') id: string,
     @Body() body: { title?: string; content?: string }
   ) {
-    return this.service.updatePrayer(id, body);
+
+    return this.service.updatePrayer(id, body)
+
   }
+
+  /* ============================= */
+  /* GET FULL CONSECRATION */
+  /* ============================= */
 
   @Get()
   getAll() {
-    return this.service.getFullConsecration();
+
+    return this.service.getFullConsecration()
+
   }
+
+  /* ============================= */
+  /* TODAY */
+  /* ============================= */
 
   @Get('today')
   @UseGuards(JwtAuthGuard)
   today(@Req() req: any) {
-    return this.service.today(req.user.userId);
+
+    return this.service.today(req.user.userId)
+
   }
-  
+
+  /* ============================= */
+  /* RESET */
+  /* ============================= */
+
   @Post('reset')
   @UseGuards(JwtAuthGuard)
   reset(@Req() req: any) {
-    return this.service.reset(req.user.userId);
+
+    return this.service.reset(req.user.userId)
+
   }
+
+  /* ============================= */
+  /* COMPLETE DAY */
+  /* ============================= */
 
   @Post("complete/:day")
   @UseGuards(JwtAuthGuard)
-  complete(@Req() req:any, @Param("day") day:string){
-    return this.service.completeDay(req.user.userId,Number(day))
+  complete(
+    @Req() req:any,
+    @Param("day") day:string
+  ){
+
+    return this.service.completeDay(
+      req.user.userId,
+      Number(day)
+    )
+
   }
 
-  @Put("start-date")
+  /* ============================= */
+  /* UPDATE CONSECRATION DATE */
+  /* ============================= */
+
+  @Put("consecration-date")
   @UseGuards(JwtAuthGuard)
-  updateStartDate(@Req() req:any, @Body() body:{startDate:string}){
+  updateStartDate(
+    @Req() req:any,
+    @Body() body:{consecrationDate:string}
+  ){
 
-    return this.service.updateStartDate(req.user.userId, new Date(body.startDate));
+    const consecrationDate = new Date(body.consecrationDate)
+
+    const startDate = new Date(consecrationDate)
+    startDate.setDate(startDate.getDate() - 33)
+
+    return this.service.updateStartDate(
+      req.user.userId,
+      startDate
+    )
+
   }
+
+  /* ============================= */
+  /* STAGE DAYS */
+  /* ============================= */
 
   @Get("stage/:stageId/days")
   getStageDays(@Param("stageId") stageId: string) {
@@ -125,15 +203,33 @@ export class ConsecrationController {
 
   }
 
+  /* ============================= */
+  /* UNCOMPLETE DAY */
+  /* ============================= */
+
   @Delete("complete/:day")
   @UseGuards(JwtAuthGuard)
-  uncompleteDay(@Req() req:any, @Param("day") day:string){
+  uncompleteDay(
+    @Req() req:any,
+    @Param("day") day:string
+  ){
 
-    return this.service.uncompleteDay(req.user.userId, Number(day))
+    return this.service.uncompleteDay(
+      req.user.userId,
+      Number(day)
+    )
+
   }
+
+  /* ============================= */
+  /* PRELOAD ALL DAYS */
+  /* ============================= */
 
   @Get("/all-days")
   getAllDays(){
+
     return this.service.getAllDays()
+
   }
+
 }
