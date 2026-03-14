@@ -29,9 +29,11 @@ export class ConsecrationController {
     @Body() body: { consecrationDate: string }
   ) {
 
-    const consecrationDate = new Date(body.consecrationDate)
+    const [y,m,d] = body.consecrationDate.split("-").map(Number)
 
-    const startDate = new Date(consecrationDate)
+    const consecrationDate = new Date(y, m - 1, d)
+
+    const startDate = new Date(y, m - 1, d)
     startDate.setDate(startDate.getDate() - 33)
 
     return this.service.start(
@@ -180,9 +182,11 @@ export class ConsecrationController {
     @Body() body:{consecrationDate:string}
   ){
 
-    const consecrationDate = new Date(body.consecrationDate)
+    const [y,m,d] = body.consecrationDate.split("-").map(Number)
 
-    const startDate = new Date(consecrationDate)
+    const consecrationDate = new Date(y, m - 1, d)
+
+    const startDate = new Date(y, m - 1, d)
     startDate.setDate(startDate.getDate() - 33)
 
     return this.service.updateStartDate(
