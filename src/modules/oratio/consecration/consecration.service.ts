@@ -26,52 +26,62 @@ export class ConsecrationService {
 
   async progress(userId: string) {
 
-  const progress = await this.prisma.consecrationProgress.findFirst({
-    where: { userId }
-  });
+    const progress = await this.prisma.consecrationProgress.findFirst({
+      where: { userId }
+    });
 
-  const stages = await this.prisma.consecrationStage.findMany({
-    orderBy: { order: "asc" }
-  });
+    const stages = await this.prisma.consecrationStage.findMany({
+      orderBy: { order: "asc" }
+    });
 
-  if (!progress) {
+    if (!progress) {
+      return {
+        started: false,
+        stages
+      };
+    }
+
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const startRaw = new Date(progress.startDate);
+
+    const start = new Date(
+      startRaw.getFullYear(),
+      startRaw.getMonth(),
+      startRaw.getDate()
+    );
+
+    const diff =
+      Math.floor(
+        (today.getTime() - start.getTime()) /
+        (1000 * 60 * 60 * 24)
+      ) + 1;
+
+    const currentDay = Math.min(diff, 33);
+
+    const startedToday = diff >= 1;
+
+    const daysUntilStart =
+      diff < 1 ? Math.abs(diff) + 1 : 0;
+
+    const completedDays = await this.prisma.consecrationCompletedDay.count({
+      where: { userId }
+    });
+
+    const progressPercent =
+      Math.floor((completedDays / 33) * 100);
+
     return {
-    started: false,
-    stages
+      started: true,
+      startDate: progress.startDate,
+      currentDay,
+      startedToday,
+      daysUntilStart,
+      completedDays,
+      progress: progressPercent,
+      stages
     };
-  }
-
-  const today = new Date();
-  const start = new Date(progress.startDate);
-
-  const diff =
-    Math.floor(
-    (today.getTime() - start.getTime()) /
-    (1000 * 60 * 60 * 24)
-    ) + 1;
-
-  const startedToday = diff >= 1;
-
-  const daysUntilStart =
-    diff < 1 ? Math.abs(diff) + 1 : 0;
-
-  const completedDays = await this.prisma.consecrationCompletedDay.count({
-    where: { userId }
-  });
-
-  const progressPercent =
-    Math.floor((completedDays / 33) * 100);
-
-  return {
-    started: true,
-    startDate: progress.startDate,
-    currentDay: diff,
-    startedToday,
-    daysUntilStart,
-    completedDays,
-    progress: progressPercent,
-    stages
-  };
 
   }
 
@@ -187,9 +197,20 @@ export class ConsecrationService {
       return null;
     }
 
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const startRaw = new Date(progress.startDate);
+
+    const start = new Date(
+      startRaw.getFullYear(),
+      startRaw.getMonth(),
+      startRaw.getDate()
+    );
+
     const diff =
       Math.floor(
-        (Date.now() - progress.startDate.getTime()) /
+        (today.getTime() - start.getTime()) /
         (1000 * 60 * 60 * 24)
       ) + 1;
 
@@ -224,14 +245,36 @@ export class ConsecrationService {
       throw new Error("Consagração não iniciada");
     }
 
+    const today = new Date();
+    today.setHours(0,0,0,0);
+
+    const startRaw = new Date(progress.startDate);
+
+    const start = new Date(
+      startRaw.getFullYear(),
+      startRaw.getMonth(),
+      startRaw.getDate()
+    );
+
     const diff =
       Math.floor(
-        (Date.now() - progress.startDate.getTime()) /
+        (today.getTime() - start.getTime()) /
         (1000 * 60 * 60 * 24)
       ) + 1;
 
     if (dayNumber > diff) {
       throw new Error("Dia ainda não liberado");
+    }
+
+    const existing = await this.prisma.consecrationCompletedDay.findFirst({
+      where:{
+        userId,
+        dayNumber
+      }
+    });
+
+    if(existing){
+      return existing;
     }
 
     const previous = await this.prisma.consecrationCompletedDay.findFirst({
@@ -256,72 +299,72 @@ export class ConsecrationService {
 
   async updateStartDate(userId: string, startDate: Date) {
 
-  const progress = await this.prisma.consecrationProgress.findFirst({
-    where:{userId}
-  })
+    const progress = await this.prisma.consecrationProgress.findFirst({
+      where:{userId}
+    })
 
-  if(!progress){
-    throw new NotFoundException("Consagração não iniciada")
-  }
+    if(!progress){
+      throw new NotFoundException("Consagração não iniciada")
+    }
 
-  await this.prisma.consecrationProgress.update({
-    where:{id:progress.id},
-    data:{startDate}
-  })
+    await this.prisma.consecrationProgress.update({
+      where:{id:progress.id},
+      data:{startDate}
+    })
 
-  await this.prisma.consecrationCompletedDay.deleteMany({
-    where:{userId}
-  })
+    await this.prisma.consecrationCompletedDay.deleteMany({
+      where:{userId}
+    })
 
-  return { success:true }
+    return { success:true }
 
   }
 
   async getStageDays(stageId: string) {
 
-  const days = await this.prisma.consecrationDay.findMany({
-    where: { stageId },
-    orderBy: { dayNumber: "asc" }
-  })
+    const days = await this.prisma.consecrationDay.findMany({
+      where: { stageId },
+      orderBy: { dayNumber: "asc" }
+    })
 
-  return days
+    return days
 
   }
 
   async uncompleteDay(userId: string, dayNumber: number){
 
-  const day = await this.prisma.consecrationCompletedDay.findFirst({
-    where:{
-    userId,
-    dayNumber
+    const day = await this.prisma.consecrationCompletedDay.findFirst({
+      where:{
+        userId,
+        dayNumber
+      }
+    })
+
+    if(!day){
+      throw new NotFoundException("Dia não está marcado como concluído")
     }
-  })
 
-  if(!day){
-    throw new NotFoundException("Dia não está marcado como concluído")
-  }
-
-  return this.prisma.consecrationCompletedDay.delete({
-    where:{ id: day.id }
-  })
+    return this.prisma.consecrationCompletedDay.delete({
+      where:{ id: day.id }
+    })
 
   }
 
   async getAllDays(){
 
-  return this.prisma.consecrationDay.findMany({
-    include:{
-    prayers:{
+    return this.prisma.consecrationDay.findMany({
       include:{
-      prayer:true
+        prayers:{
+          include:{
+            prayer:true
+          }
+        },
+        stage:true
+      },
+      orderBy:{
+        dayNumber:"asc"
       }
-    },
-    stage:true
-    },
-    orderBy:{
-    dayNumber:"asc"
-    }
-  })
+    })
 
   }
 
