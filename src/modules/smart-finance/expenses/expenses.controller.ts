@@ -1,6 +1,6 @@
 import { Body, Controller, Post, UseGuards, Req, Param, Get, Delete, Put } from '@nestjs/common';
 import { ExpensesService } from './expenses.service';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { CreateExpenseDto } from './dto/create-expense.dto';
 import { UpdateBudgetDto } from '../budgets/dto/update-budget.dto';
 import { UpdateExpenseDto } from './dto/update-expense.dto';

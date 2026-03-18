@@ -6,8 +6,13 @@ import { AppService } from './app.service';
 
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { BudgetsModule } from './modules/budgets/budgets.module';
-import { ExpensesModule } from './modules/expenses/expenses.module';
+import { BudgetsModule } from './modules/smart-finance/budgets/budgets.module';
+import { ExpensesModule } from './modules/smart-finance/expenses/expenses.module';
+import { ConsecrationModule } from './modules/oratio/consecration/consecration.module';
+import { LiturgiaModule } from './modules/oratio/liturgia/liturgia.module';
+import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
+import { PrayersModule } from './modules/oratio/prayers/prayers.module';
+import { RosaryModule } from './modules/rosary/rosary.module';
 
 @Module({
   imports: [
@@ -18,6 +23,11 @@ import { ExpensesModule } from './modules/expenses/expenses.module';
     AuthModule,
     BudgetsModule,
     ExpensesModule,
+    ConsecrationModule,
+    LiturgiaModule,
+    VoxAiModule,
+    PrayersModule,
+    RosaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

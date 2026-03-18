@@ -18,6 +18,7 @@ export class ConsecrationController {
 
   constructor(private readonly service: ConsecrationService) {}
 
+<<<<<<< HEAD
 @Post('start')
 @UseGuards(JwtAuthGuard)
 start(
@@ -36,6 +37,18 @@ start(
   )
 
 }
+=======
+  @Post('start')
+  @UseGuards(JwtAuthGuard)
+  start(@Req() req: any, @Body() body: { startDate: string }) {
+
+    return this.service.start(
+      req.user.userId,
+      new Date(body.startDate)
+    );
+
+  }
+>>>>>>> 18a4a863f41a4cbe378ab5723b25370ed6b2bb4c
 
   @Get('progress')
   @UseGuards(JwtAuthGuard)
@@ -119,6 +132,7 @@ start(
     return this.service.completeDay(req.user.userId,Number(day))
   }
 
+<<<<<<< HEAD
 @Put("consecration-date")
 updateStartDate(
  @Req() req:any,
@@ -136,6 +150,14 @@ updateStartDate(
  )
 
 }
+=======
+  @Put("start-date")
+  @UseGuards(JwtAuthGuard)
+  updateStartDate(@Req() req:any, @Body() body:{startDate:string}){
+
+    return this.service.updateStartDate(req.user.userId, new Date(body.startDate));
+  }
+>>>>>>> 18a4a863f41a4cbe378ab5723b25370ed6b2bb4c
 
   @Get("stage/:stageId/days")
   getStageDays(@Param("stageId") stageId: string) {

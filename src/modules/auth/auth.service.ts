@@ -2,6 +2,10 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
+import { randomBytes } from 'crypto';
+import { MailService } from '../mail/mail.service';
+import { Response } from 'express';
+import { AppType } from 'src/enums/app-type.enum';
 
 @Injectable()
 export class AuthService {
@@ -9,6 +13,7 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
   ) {}
 
   async login(email: string, password: string) {
@@ -44,7 +49,7 @@ export class AuthService {
     });
 
     const refresh_token = this.jwtService.sign(payload, {
-      expiresIn: '7d',
+      expiresIn: '30d',
     });
 
     const hashedRefresh = await bcrypt.hash(refresh_token, 10);
@@ -81,7 +86,7 @@ export class AuthService {
 
   }
 
-  async verifyEmail(token: string) {
+  async verifyEmail(token: string, app: string, res: Response) {
 
     const user = await this.prisma.user.findFirst({
       where: {
@@ -90,7 +95,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException('Invalid verification token');
+      throw new UnauthorizedException("Invalid verification token");
     }
 
     await this.prisma.user.update({
@@ -101,10 +106,140 @@ export class AuthService {
       },
     });
 
+    let redirectUrl = "https://finance-api-front.vercel.app/login";
+
+    if (app === "oratio") {
+      redirectUrl = "https://oratio-phi.vercel.app/login";
+    }
+
+    if (app === "smart-finance") {
+      redirectUrl = "https://finance-api-front.vercel.app/login";
+    }
+
+    return res.redirect(redirectUrl);
+  }
+
+  async resendVerification(email: string, app?: string) {
+
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return { message: 'If this email exists, a verification email was sent.' };
+    }
+
+    if (user.emailVerified) {
+      return { message: 'Email already verified.' };
+    }
+
+    const token = randomBytes(32).toString('hex');
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationToken: token,
+      },
+    });
+
+    if (app === AppType.ORATIO) {
+
+      await this.mailService.sendOratioVerificationEmail(
+        user.email,
+        token
+      );
+      
+    } else {
+
+      await this.mailService.sendVerificationEmail(
+        user.email,
+        token
+      );
+
+    }
+
     return {
-      message: 'Email verified successfully',
+      message: 'Verification email resent successfully',
     };
 
   }
+
+  async checkVerification(email: string) {
+
+  const user = await this.prisma.user.findUnique({
+    where: { email },
+  });
+
+  return {
+    verified: user?.emailVerified || false
+  };
+
+}
+
+async requestPasswordReset(email: string, app?: string) {
+
+  const user = await this.prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) return;
+
+  const token = randomBytes(32).toString("hex");
+
+  const expires = new Date(Date.now() + 1000 * 60 * 30);
+
+  await this.prisma.user.update({
+    where: { id: user.id },
+    data: {
+      passwordResetToken: token,
+      passwordResetExpires: expires
+    }
+  });
+
+  if (app === AppType.ORATIO) {
+
+    await this.mailService.sendOratioPasswordResetEmail(
+      user.email,
+      token
+    );
+
+  } else {
+
+    await this.mailService.sendPasswordResetEmail(
+      user.email,
+      token
+    );
+
+  }
+
+}
+
+async resetPassword(token: string, password: string) {
+
+  const user = await this.prisma.user.findFirst({
+    where: {
+      passwordResetToken: token,
+      passwordResetExpires: {
+        gt: new Date()
+      }
+    }
+  });
+
+  if (!user) {
+    throw new UnauthorizedException("Invalid or expired token");
+  }
+
+  const hashed = await bcrypt.hash(password, 10);
+
+  await this.prisma.user.update({
+    where: { id: user.id },
+    data: {
+      password: hashed,
+      passwordResetToken: null,
+      passwordResetExpires: null
+    }
+  });
+
+}
 
 }
