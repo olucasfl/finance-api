@@ -30,6 +30,10 @@ export class VoxAiService{
       VALIDAÇÕES
    ========================= */
 
+   if(!this.apiKey){
+    throw new Error("GEMINI_API_KEY not configured")
+   }
+
    if(!data.message){
     return {
      success:false,
@@ -43,6 +47,20 @@ export class VoxAiService{
      success:false,
      error:"MESSAGE_TOO_LONG",
      message:"Mensagem muito longa."
+    }
+   }
+
+   const conversation = await this.prisma.conversation.findFirst({
+    where:{
+     id: data.conversationId
+    }
+   })
+
+   if(!conversation){
+    return {
+     success:false,
+     error:"INVALID_CONVERSATION",
+     message:"Conversa inválida."
     }
    }
 
@@ -66,47 +84,12 @@ export class VoxAiService{
    }
 
    /* =========================
-      SALVAR MENSAGEM DO USER
-   ========================= */
-
-   await this.prisma.message.create({
-    data:{
-     conversationId: data.conversationId,
-     role: "user",
-     content: data.message
-    }
-   })
-
-   /* =========================
-      GERAR TÍTULO (SE PRIMEIRA MSG)
-   ========================= */
-
-   const count = await this.prisma.message.count({
-    where:{ conversationId: data.conversationId }
-   })
-
-   if(count === 1){
-
-    const words = data.message.trim().split(/\s+/).slice(0,5)
-    const title = words.join(" ")
-
-    await this.prisma.conversation.update({
-     where:{ id: data.conversationId },
-     data:{ title }
-    })
-   }
-
-   /* =========================
-      BUSCAR HISTÓRICO (ÚLTIMAS 6)
+      BUSCAR HISTÓRICO
    ========================= */
 
    const historyMessages = await this.prisma.message.findMany({
-    where:{
-     conversationId: data.conversationId
-    },
-    orderBy:{
-     createdAt:"desc"
-    },
+    where:{ conversationId: data.conversationId },
+    orderBy:{ createdAt:"desc" },
     take:6
    })
 
@@ -116,6 +99,29 @@ export class VoxAiService{
      role: m.role,
      content: m.content
     }))
+
+   /* =========================
+      EVITAR DUPLICAÇÃO (ANTI-SPAM)
+   ========================= */
+
+   const existing = await this.prisma.message.findFirst({
+    where:{
+     conversationId: data.conversationId,
+     role:"user",
+     content:data.message,
+     createdAt:{
+      gte: new Date(Date.now() - 5000) // últimos 5 segundos
+     }
+    },
+    orderBy:{ createdAt:"desc" }
+   })
+
+   if(existing){
+    return {
+     success:true,
+     response:"Aguarde, processando sua última mensagem..."
+    }
+   }
 
    /* =========================
       BUILD PROMPT
@@ -147,30 +153,40 @@ export class VoxAiService{
     }
    )
 
-   const text =
-    response.data.candidates?.[0]?.content?.parts?.[0]?.text ||
-    "Não foi possível gerar resposta."
+   const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text
+
+   if(!text){
+    throw new Error("EMPTY_AI_RESPONSE")
+   }
 
    /* =========================
-      SALVAR RESPOSTA DA IA
+      SALVAR TUDO (TRANSAÇÃO)
    ========================= */
 
-   await this.prisma.message.create({
-    data:{
-     conversationId: data.conversationId,
-     role:"assistant",
-     content:text
-    }
-   })
+   await this.prisma.$transaction([
 
-   /* =========================
-      ATUALIZAR CONVERSA (ORDER)
-   ========================= */
+    this.prisma.message.create({
+     data:{
+      conversationId: data.conversationId,
+      role:"user",
+      content:data.message
+     }
+    }),
 
-   await this.prisma.conversation.update({
-    where:{ id: data.conversationId },
-    data:{ updatedAt: new Date() }
-   })
+    this.prisma.message.create({
+     data:{
+      conversationId: data.conversationId,
+      role:"assistant",
+      content:text
+     }
+    }),
+
+    this.prisma.conversation.update({
+     where:{ id: data.conversationId },
+     data:{ updatedAt:new Date() }
+    })
+
+   ])
 
    return {
     success:true,
@@ -179,25 +195,50 @@ export class VoxAiService{
 
   }catch(error:any){
 
-   console.error("Erro VoxAI:",error?.response?.data || error)
+   console.error("Erro VoxAI:", {
+    status: error?.response?.status,
+    data: error?.response?.data,
+    message: error.message
+   })
+
+   if(error?.response?.status === 401){
+    return {
+     success:false,
+     error:"UNAUTHORIZED",
+     message:"Sessão expirada."
+    }
+   }
 
    if(error?.response?.status === 429){
     return {
      success:false,
      error:"LIMIT_EXCEEDED",
-     message:
-      "O VoxAI atingiu o limite diário de mensagens. Tente novamente amanhã."
+     message:"O VoxAI atingiu o limite diário."
+    }
+   }
+
+   if(error.code === "ECONNABORTED"){
+    return {
+     success:false,
+     error:"TIMEOUT",
+     message:"O Vox demorou para responder."
+    }
+   }
+
+   if(error?.response){
+    return {
+     success:false,
+     error:"AI_PROVIDER_ERROR",
+     message:"Erro na comunicação com a IA."
     }
    }
 
    return {
     success:false,
-    error:"AI_ERROR",
-    message:"O VoxAI está temporariamente indisponível."
+    error:"UNKNOWN_ERROR",
+    message:"Erro inesperado no servidor."
    }
 
   }
-
  }
-
 }
