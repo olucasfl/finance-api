@@ -22,6 +22,44 @@ export class VoxAiService{
  private url =
   "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent"
 
+ /* =========================
+    GERAR TÍTULO (🔥 NOVO)
+ ========================= */
+ private generateTitle(text: string){
+  return text
+   .replace(/[^\w\s]/gi, "")
+   .split(" ")
+   .slice(0, 5)
+   .join(" ")
+ }
+
+ /* =========================
+    PEGAR OU CRIAR CONVERSA ATIVA
+ ========================= */
+ async getOrCreateActiveConversation(userId: string){
+
+  const existing = await this.prisma.conversation.findFirst({
+   where:{
+    userId,
+    hasMessages:false
+   },
+   orderBy:{ createdAt:"desc" }
+  })
+
+  if(existing) return existing
+
+  return this.prisma.conversation.create({
+   data:{
+    userId,
+    title:"Nova conversa",
+    hasMessages:false
+   }
+  })
+ }
+
+ /* =========================
+    CHAT (IA)
+ ========================= */
  async chat(data: VoxAiDto){
 
   try{
@@ -50,10 +88,8 @@ export class VoxAiService{
     }
    }
 
-   const conversation = await this.prisma.conversation.findFirst({
-    where:{
-     id: data.conversationId
-    }
+   const conversation = await this.prisma.conversation.findUnique({
+    where:{ id: data.conversationId }
    })
 
    if(!conversation){
@@ -110,7 +146,7 @@ export class VoxAiService{
      role:"user",
      content:data.message,
      createdAt:{
-      gte: new Date(Date.now() - 5000) // últimos 5 segundos
+      gte: new Date(Date.now() - 5000)
      }
     },
     orderBy:{ createdAt:"desc" }
@@ -160,6 +196,12 @@ export class VoxAiService{
    }
 
    /* =========================
+      DETECTAR PRIMEIRA MENSAGEM
+   ========================= */
+
+   const isFirstMessage = !conversation.hasMessages
+
+   /* =========================
       SALVAR TUDO (TRANSAÇÃO)
    ========================= */
 
@@ -183,9 +225,14 @@ export class VoxAiService{
 
     this.prisma.conversation.update({
      where:{ id: data.conversationId },
-     data:{ updatedAt:new Date() }
+     data:{
+      updatedAt:new Date(),
+      hasMessages:true,
+      ...(isFirstMessage && {
+        title: this.generateTitle(data.message)
+      })
+     }
     })
-
    ])
 
    return {

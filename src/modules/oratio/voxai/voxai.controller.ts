@@ -32,20 +32,28 @@ export class VoxAiController{
  }
 
  /* =========================
-    CRIAR NOVA CONVERSA
+    CONVERSA ATIVA (🔥 PRINCIPAL)
+ ========================= */
+
+ @Get("conversation/active")
+ async getActiveConversation(@Req() req){
+
+  const userId = req.user.userId
+
+  return this.voxAiService.getOrCreateActiveConversation(userId)
+ }
+
+ /* =========================
+    NOVA CONVERSA (INTELIGENTE)
  ========================= */
 
  @Post("conversation")
  async createConversation(@Req() req){
 
-  const userId = req.user.userId // 🔥 vem do token
+  const userId = req.user.userId
 
-  return this.prisma.conversation.create({
-   data:{
-    userId,
-    title: "Nova conversa"
-   }
-  })
+  // 🔥 NÃO cria duplicada
+  return this.voxAiService.getOrCreateActiveConversation(userId)
  }
 
  /* =========================
@@ -58,7 +66,7 @@ export class VoxAiController{
   const userId = req.user.userId
 
   return this.prisma.conversation.findMany({
-   where:{ userId }, // 🔥 só do usuário
+   where:{ userId },
    orderBy:{ updatedAt:"desc" }
   })
  }
@@ -75,7 +83,6 @@ export class VoxAiController{
 
   const userId = req.user.userId
 
-  // 🔥 segurança: garante que a conversa é do usuário
   const conversation = await this.prisma.conversation.findUnique({
    where:{ id }
   })
@@ -89,5 +96,4 @@ export class VoxAiController{
    orderBy:{ createdAt:"asc" }
   })
  }
-
 }
