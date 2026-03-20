@@ -64,10 +64,6 @@ export class VoxAiService{
 
   try{
 
-   /* =========================
-      VALIDAÇÕES
-   ========================= */
-
    if(!this.apiKey){
     throw new Error("GEMINI_API_KEY not configured")
    }
@@ -119,10 +115,6 @@ export class VoxAiService{
     }
    }
 
-   /* =========================
-      BUSCAR HISTÓRICO
-   ========================= */
-
    const historyMessages = await this.prisma.message.findMany({
     where:{ conversationId: data.conversationId },
     orderBy:{ createdAt:"desc" },
@@ -135,10 +127,6 @@ export class VoxAiService{
      role: m.role,
      content: m.content
     }))
-
-   /* =========================
-      EVITAR DUPLICAÇÃO (ANTI-SPAM)
-   ========================= */
 
    const existing = await this.prisma.message.findFirst({
     where:{
@@ -159,19 +147,11 @@ export class VoxAiService{
     }
    }
 
-   /* =========================
-      BUILD PROMPT
-   ========================= */
-
    const prompt = buildPrompt(
     VOX_SYSTEM_PROMPT,
     history,
     data.message
    )
-
-   /* =========================
-      CHAMAR IA
-   ========================= */
 
    const response = await axios.post(
     `${this.url}?key=${this.apiKey}`,
@@ -195,15 +175,7 @@ export class VoxAiService{
     throw new Error("EMPTY_AI_RESPONSE")
    }
 
-   /* =========================
-      DETECTAR PRIMEIRA MENSAGEM
-   ========================= */
-
    const isFirstMessage = !conversation.hasMessages
-
-   /* =========================
-      SALVAR TUDO (TRANSAÇÃO)
-   ========================= */
 
    await this.prisma.$transaction([
 
@@ -288,4 +260,53 @@ export class VoxAiService{
 
   }
  }
+
+ /* =========================
+    DELETAR CONVERSA
+ ========================= */
+ async deleteConversation(userId: string, conversationId: string){
+
+  const conversation = await this.prisma.conversation.findUnique({
+   where:{ id: conversationId }
+  })
+
+  if(!conversation || conversation.userId !== userId){
+   throw new Error("CONVERSATION_NOT_FOUND")
+  }
+
+  await this.prisma.message.deleteMany({
+   where:{ conversationId }
+  })
+
+  await this.prisma.conversation.delete({
+   where:{ id: conversationId }
+  })
+
+  // 🔥 pega ou cria nova ativa automaticamente
+  return this.getOrCreateActiveConversation(userId)
+ }
+
+ /* =========================
+    RENOMEAR CONVERSA
+ ========================= */
+ async renameConversation(
+  userId: string,
+  conversationId: string,
+  title: string
+ ){
+
+  const conversation = await this.prisma.conversation.findUnique({
+   where:{ id: conversationId }
+  })
+
+  if(!conversation || conversation.userId !== userId){
+   throw new Error("CONVERSATION_NOT_FOUND")
+  }
+
+  return this.prisma.conversation.update({
+   where:{ id: conversationId },
+   data:{ title }
+  })
+ }
+
 }

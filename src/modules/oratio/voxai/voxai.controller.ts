@@ -5,7 +5,9 @@ import {
  Param,
  Body,
  UseGuards,
- Req
+ Req,
+ Delete,
+ Patch
 } from "@nestjs/common"
 
 import { VoxAiService } from "./voxai.service"
@@ -96,4 +98,33 @@ export class VoxAiController{
    orderBy:{ createdAt:"asc" }
   })
  }
+
+ /* =========================
+   DELETAR CONVERSA
+========================= */
+
+    @Delete("conversation/:id")
+    async deleteConversation(
+    @Param("id") id: string,
+    @Req() req
+    ){
+    const userId = req.user.userId
+
+    return this.voxAiService.deleteConversation(userId, id)
+    }
+
+    /* =========================
+   RENOMEAR CONVERSA
+========================= */
+
+    @Patch("conversation/:id")
+    async renameConversation(
+    @Param("id") id: string,
+    @Body("title") title: string,
+    @Req() req
+    ){
+    const userId = req.user.userId
+
+    return this.voxAiService.renameConversation(userId, id, title)
+    }
 }
