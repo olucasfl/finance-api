@@ -178,10 +178,34 @@ export class UsersService {
     }
   }
 
-  async getAllUsers(userId: string) {
+  async getAllUsers(userId: string, filters?: { search?: string; isAdmin?: boolean; emailVerified?: boolean; activeLastDays?: number }) {
     await this.assertAdmin(userId);
 
+    const where: any = {};
+
+    if (filters?.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { email: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (filters?.isAdmin !== undefined) {
+      where.isAdmin = filters.isAdmin;
+    }
+
+    if (filters?.emailVerified !== undefined) {
+      where.emailVerified = filters.emailVerified;
+    }
+
+    if (filters?.activeLastDays) {
+      const daysAgo = new Date();
+      daysAgo.setDate(daysAgo.getDate() - filters.activeLastDays);
+      where.updatedAt = { gte: daysAgo };
+    }
+
     return this.prisma.user.findMany({
+      where,
       select: {
         id: true,
         name: true,
@@ -195,6 +219,180 @@ export class UsersService {
         createdAt: 'desc',
       },
     });
+  }
+
+  async getUserDetail(userId: string, targetUserId: string) {
+    await this.assertAdmin(userId);
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        emailVerified: true,
+        isAdmin: true,
+        spiritualStats: {
+          select: {
+            prayersPrayed: true,
+            rosariesPrayed: true,
+            prayerStreak: true,
+            lastPrayerDate: true,
+          },
+        },
+        consecrations: true,
+        completedConsecrationDays: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    return {
+      ...user,
+      consecration: {
+        started: user.consecrations.length > 0,
+        daysCompleted: user.completedConsecrationDays.length,
+      },
+      consecrations: undefined,
+      completedConsecrationDays: undefined,
+    };
+  }
+
+  async deleteUserAdmin(userId: string, targetUserId: string) {
+    await this.assertAdmin(userId);
+
+    if (userId === targetUserId) {
+      throw new ForbiddenException('Cannot delete your own account');
+    }
+
+    await this.prisma.user.delete({
+      where: { id: targetUserId },
+    });
+
+    return { message: 'User deleted successfully' };
+  }
+
+  async getUserActivity(userId: string, targetUserId: string) {
+    await this.assertAdmin(userId);
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const activities: any[] = [];
+
+    // Rosário sessions
+    const rosarySessions = await this.prisma.rosarySession.findMany({
+      where: {
+        userId: targetUserId,
+        startedAt: { gte: sevenDaysAgo },
+      },
+      select: {
+        startedAt: true,
+        completed: true,
+      },
+    });
+
+    rosarySessions.forEach((session) => {
+      activities.push({
+        type: 'rosary',
+        action: session.completed ? 'Terço concluído' : 'Terço iniciado',
+        timestamp: session.startedAt,
+      });
+    });
+
+    // Orações rezadas (via spiritualStats)
+    const spiritualStats = await this.prisma.spiritualStats.findUnique({
+      where: { userId: targetUserId },
+      select: {
+        lastPrayerDate: true,
+        prayersPrayed: true,
+      },
+    });
+
+    if (spiritualStats?.lastPrayerDate) {
+      const lastPrayerTime = new Date(spiritualStats.lastPrayerDate);
+      if (lastPrayerTime >= sevenDaysAgo) {
+        activities.push({
+          type: 'prayer',
+          action: 'Oração rezada',
+          timestamp: lastPrayerTime,
+        });
+      }
+    }
+
+    // Consagração iniciada
+    const consecration = await this.prisma.consecrationProgress.findFirst({
+      where: {
+        userId: targetUserId,
+        startDate: { gte: sevenDaysAgo },
+      },
+      select: {
+        startDate: true,
+      },
+      orderBy: {
+        startDate: 'desc',
+      },
+    });
+
+    if (consecration) {
+      activities.push({
+        type: 'consecration',
+        action: 'Consagração iniciada',
+        timestamp: consecration.startDate,
+      });
+    }
+
+    // Dias de consagração completados
+    const completedDays = await this.prisma.consecrationCompletedDay.findMany({
+      where: {
+        userId: targetUserId,
+        createdAt: { gte: sevenDaysAgo },
+      },
+      select: {
+        dayNumber: true,
+        createdAt: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    completedDays.forEach((day) => {
+      activities.push({
+        type: 'consecration_day',
+        action: `Dia ${day.dayNumber}/33 concluído`,
+        timestamp: day.createdAt,
+      });
+    });
+
+    // Intenção de logins (pela atualização do updatedAt)
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { updatedAt: true },
+    });
+
+    if (user && user.updatedAt >= sevenDaysAgo) {
+      activities.push({
+        type: 'login',
+        action: 'Atividade no app',
+        timestamp: user.updatedAt,
+      });
+    }
+
+    // Ordenar por timestamp decrescente (mais recentes primeiro)
+    activities.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    return {
+      targetUserId,
+      activities,
+      total: activities.length,
+    };
   }
 
   async getAdminStats(userId: string) {

@@ -9,6 +9,8 @@ import {
   UseGuards,
   Headers,
   UnauthorizedException,
+  Param,
+  Query,
 } from '@nestjs/common';
 
 import { UsersService } from './users.service';
@@ -52,15 +54,53 @@ export class UsersController {
 
   @Get('admin/users')
   @UseGuards(JwtAuthGuard)
-  getAllUsers(@Req() req: any) {
+  getAllUsers(
+    @Req() req: any,
+    @Query('search') search?: string,
+    @Query('isAdmin') isAdmin?: string,
+    @Query('emailVerified') emailVerified?: string,
+    @Query('activeLastDays') activeLastDays?: string,
+  ) {
     const userId = req?.user?.userId;
 
     if (!userId) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    return this.userService.getAllUsers(userId);
+    const filters = {
+      search: search || undefined,
+      isAdmin: isAdmin === 'true' ? true : isAdmin === 'false' ? false : undefined,
+      emailVerified: emailVerified === 'true' ? true : emailVerified === 'false' ? false : undefined,
+      activeLastDays: activeLastDays ? parseInt(activeLastDays) : undefined,
+    };
+
+    return this.userService.getAllUsers(userId, filters);
   }
+
+  @Get('admin/users/:id')
+  @UseGuards(JwtAuthGuard)
+  getUserDetail(@Req() req: any, @Param('id') userId: string) {
+    const adminId = req?.user?.userId;
+
+    if (!adminId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getUserDetail(adminId, userId);
+  }
+
+  @Delete('admin/users/:id')
+  @UseGuards(JwtAuthGuard)
+  deleteUser(@Req() req: any, @Param('id') userId: string) {
+    const adminId = req?.user?.userId;
+
+    if (!adminId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.deleteUserAdmin(adminId, userId);
+  }
+
 
   @Get('admin/stats')
   @UseGuards(JwtAuthGuard)
@@ -84,6 +124,18 @@ export class UsersController {
     }
 
     return this.userService.setAdminStatus(userId, req.params.id, body.isAdmin);
+  }
+
+  @Get('admin/users/:id/activity')
+  @UseGuards(JwtAuthGuard)
+  getUserActivity(@Req() req: any, @Param('id') userId: string) {
+    const adminId = req?.user?.userId;
+
+    if (!adminId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getUserActivity(adminId, userId);
   }
 
   /*
