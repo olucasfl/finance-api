@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -90,6 +91,7 @@ export class UsersService {
     email: true,
     createdAt: true,
     emailVerified: true,
+    isAdmin: true,
     spiritualStats: true,
     consecrations: true,
     completedConsecrationDays: {
@@ -110,6 +112,7 @@ export class UsersService {
     email: user.email,
     createdAt: user.createdAt,
     emailVerified: user.emailVerified,
+    isAdmin: user.isAdmin,
 
     spiritualProgress: {
 
@@ -162,6 +165,67 @@ export class UsersService {
     return {
       message: 'Account deleted successfully',
     };
+  }
+
+  async assertAdmin(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { isAdmin: true },
+    });
+
+    if (!user?.isAdmin) {
+      throw new ForbiddenException('Admin access required');
+    }
+  }
+
+  async getAllUsers(userId: string) {
+    await this.assertAdmin(userId);
+
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        emailVerified: true,
+        isAdmin: true,
+        spiritualStats: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
+  async getAdminStats(userId: string) {
+    await this.assertAdmin(userId);
+
+    const totalUsers = await this.prisma.user.count();
+    const totalVerified = await this.prisma.user.count({
+      where: { emailVerified: true },
+    });
+    const consecrationStarted = await this.prisma.consecrationProgress.count();
+    const totalPrayers = await this.prisma.spiritualStats.aggregate({
+      _sum: { prayersPrayed: true, rosariesPrayed: true },
+    });
+
+    return {
+      totalUsers,
+      totalVerified,
+      consecrationStarted,
+      prayersPrayed: totalPrayers._sum.prayersPrayed || 0,
+      rosariesPrayed: totalPrayers._sum.rosariesPrayed || 0,
+    };
+  }
+
+  async setAdminStatus(userId: string, targetUserId: string, isAdmin: boolean) {
+    await this.assertAdmin(userId);
+
+    return this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { isAdmin },
+      select: { id: true, isAdmin: true },
+    });
   }
 
 }

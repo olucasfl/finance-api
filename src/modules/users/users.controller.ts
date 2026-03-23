@@ -50,6 +50,42 @@ export class UsersController {
     return this.userService.getProfile(userId);
   }
 
+  @Get('admin/users')
+  @UseGuards(JwtAuthGuard)
+  getAllUsers(@Req() req: any) {
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getAllUsers(userId);
+  }
+
+  @Get('admin/stats')
+  @UseGuards(JwtAuthGuard)
+  getAdminStats(@Req() req: any) {
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getAdminStats(userId);
+  }
+
+  @Patch('admin/users/:id')
+  @UseGuards(JwtAuthGuard)
+  setAdminStatus(@Req() req: any, @Body() body: { isAdmin: boolean },) {
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.setAdminStatus(userId, req.params.id, body.isAdmin);
+  }
+
   /*
   =============================
   UPDATE PROFILE

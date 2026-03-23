@@ -7,6 +7,156 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                        String                     @id @default(uuid())
+  name                      String
+  email                     String                     @unique
+  password                  String
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+  refreshToken              String?
+  emailVerificationToken    String?
+  emailVerified             Boolean                    @default(false)
+  isAdmin                   Boolean                    @default(false)
+  passwordResetExpires      DateTime?
+  passwordResetToken        String?
+  budgets                   Budget[]
+  completedConsecrationDays ConsecrationCompletedDay[]
+  consecrations             ConsecrationProgress[]
+  conversations             Conversation[]
+  rosarySessions            RosarySession[]
+  spiritualStats            SpiritualStats?
+}
+
+model Budget {
+  id        String    @id @default(uuid())
+  name      String
+  limit     Float
+  createdAt DateTime  @default(now())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expenses  Expense[]
+}
+
+model Expense {
+  id            String        @id @default(uuid())
+  title         String
+  amount        Float
+  createdAt     DateTime      @default(now())
+  budgetId      String
+  expenseDate   DateTime      @default(now())
+  category      Category
+  paymentMethod PaymentMethod
+  budget        Budget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+}
+
+model ConsecrationProgress {
+  id        String   @id @default(uuid())
+  startDate DateTime
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ConsecrationStage {
+  id          String            @id @default(uuid())
+  title       String
+  description String?
+  order       Int
+  days        Int
+  daysContent ConsecrationDay[]
+}
+
+model ConsecrationDay {
+  id        String            @id @default(uuid())
+  dayNumber Int
+  title     String?
+  stageId   String
+  stage     ConsecrationStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  prayers   DayPrayer[]
+}
+
+model Prayer {
+  id      String      @id @default(uuid())
+  title   String
+  content String
+  days    DayPrayer[]
+}
+
+model DayPrayer {
+  id       String          @id @default(uuid())
+  order    Int
+  dayId    String
+  prayerId String
+  day      ConsecrationDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  prayer   Prayer          @relation(fields: [prayerId], references: [id])
+}
+
+model ConsecrationCompletedDay {
+  id        String   @id @default(uuid())
+  dayNumber Int
+  userId    String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PrayerCategory {
+  id        String          @id @default(uuid())
+  name      String
+  slug      String          @unique
+  createdAt DateTime        @default(now())
+  prayers   GeneralPrayer[]
+}
+
+model GeneralPrayer {
+  id         String         @id @default(uuid())
+  title      String
+  content    String
+  categoryId String
+  createdAt  DateTime       @default(now())
+  category   PrayerCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+model RosarySession {
+  id          String    @id @default(uuid())
+  userId      String
+  currentStep Int       @default(0)
+  completed   Boolean   @default(false)
+  startedAt   DateTime  @default(now())
+  finishedAt  DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SpiritualStats {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  rosariesPrayed Int       @default(0)
+  prayersPrayed  Int       @default(0)
+  prayerStreak   Int       @default(0)
+  lastPrayerDate DateTime?
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id          String    @id @default(uuid())
+  userId      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  title       String?
+  hasMessages Boolean   @default(false)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    Message[]
+}
+
+model Message {
+  id             String       @id @default(uuid())
+  role           String
+  content        String
+  conversationId String
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
 enum PaymentMethod {
   CASH
   CREDIT_CARD
@@ -29,222 +179,4 @@ enum Category {
   INVESTMENTS
   SUBSCRIPTIONS
   OTHER
-}
-
-// User Management
-
-model User {
-  id String @id @default(uuid())
-  name String 
-  email String @unique
-  password String 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  refreshToken String?
-
-  emailVerificationToken String?
-  emailVerified Boolean @default(false)
-
-  passwordResetToken String?
-  passwordResetExpires DateTime?
-
-  budgets Budget[]
-
-  consecrations ConsecrationProgress[]
-  completedConsecrationDays ConsecrationCompletedDay[]
-
-  rosarySessions RosarySession[]
-  spiritualStats SpiritualStats?
-
-  conversations Conversation[]
-}
-
-// Smart Finance Management
-
-model Budget {
-  id String @id @default(uuid())
-  name String
-  limit Float
-  createdAt DateTime @default(now())
-
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  expenses Expense[]
-}
-
-model Expense {
-  id String @id @default(uuid())
-  title String
-  amount Float
-
-  category Category
-  paymentMethod PaymentMethod
-
-  expenseDate DateTime @default(now())
-  createdAt DateTime @default(now())
-
-  budgetId String
-  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
-}
-
-// Consecration Management
-
-model ConsecrationProgress {
-  id String @id @default(uuid())
-
-  startDate DateTime
-
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-}
-
-model ConsecrationStage {
-  id String @id @default(uuid())
-
-  title String
-  description String?
-
-  order Int
-  days Int
-
-  daysContent ConsecrationDay[]
-}
-
-model ConsecrationDay {
-  id String @id @default(uuid())
-
-  dayNumber Int
-  title String?
-
-  stageId String
-  stage ConsecrationStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
-
-  prayers DayPrayer[]
-}
-
-model Prayer {
-  id String @id @default(uuid())
-
-  title String
-  content String
-
-  days DayPrayer[]
-}
-
-model DayPrayer {
-  id String @id @default(uuid())
-
-  order Int
-
-  dayId String
-  day ConsecrationDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
-
-  prayerId String
-  prayer Prayer @relation(fields: [prayerId], references: [id])
-}
-
-model ConsecrationCompletedDay {
-
-  id String @id @default(uuid())
-
-  dayNumber Int
-
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-}
-
-// General Prayers Management
-
-model PrayerCategory {
-
-  id String @id @default(uuid())
-
-  name String
-  slug String @unique
-
-  prayers GeneralPrayer[]
-
-  createdAt DateTime @default(now())
-
-}
-
-model GeneralPrayer {
-
-  id String @id @default(uuid())
-
-  title String
-  content String
-
-  categoryId String
-  category PrayerCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-
-}
-
-model RosarySession {
-
-  id String @id @default(uuid())
-
-  userId String
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
-
-  currentStep Int @default(0)
-
-  completed Boolean @default(false)
-
-  startedAt DateTime @default(now())
-  finishedAt DateTime?
-
-}
-
-model SpiritualStats {
-
-  id String @id @default(uuid())
-
-  userId String @unique
-  user User @relation(fields:[userId], references:[id], onDelete: Cascade)
-
-  rosariesPrayed Int @default(0)
-  prayersPrayed Int @default(0)
-
-  prayerStreak Int @default(0)
-
-  lastPrayerDate DateTime?
-
-}
-
-model Conversation {
-  id String @id @default(uuid())
-
-  userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  title String?
-
-  hasMessages Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  messages Message[]
-}
-
-model Message {
-  id String @id @default(uuid())
-
-  role String
-  content String
-
-  conversationId String
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
 }
