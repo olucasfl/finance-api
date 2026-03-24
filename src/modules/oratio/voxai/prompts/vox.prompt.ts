@@ -201,6 +201,13 @@ Sempre que possível:
 - comece direto
 - depois explique
 
+⚠️ EXCEÇÃO IMPORTANTE:
+
+Se a resposta envolver uma data litúrgica específica:
+
+- comece obrigatoriamente confirmando a data
+- depois continue com a explicação
+
 ---
 
 # Aplicação prática

@@ -43,6 +43,7 @@ export class VoxAiService{
   const evangelho = data?.leituras?.evangelho?.[0]
   const primeira = data?.leituras?.primeiraLeitura?.[0]
   const segunda = data?.leituras?.segundaLeitura?.[0]
+  const salmo = data?.leituras?.salmo?.[0]
 
   return `
 📅 Data: ${data.data}
@@ -51,6 +52,10 @@ export class VoxAiService{
 
 📜 Primeira Leitura: ${primeira?.referencia}
 ${primeira?.texto?.slice(0, 300)}
+
+📜 Salmo: ${salmo?.referencia}
+Refrao: ${salmo?.refrao}
+${salmo?.texto?.slice(0, 600)}
 
 📜 Segunda Leitura: ${segunda?.referencia || "—"}
 ${segunda?.texto?.slice(0, 300) || ""}
