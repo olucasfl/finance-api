@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
+import { ActivityService } from '../activity/activity.service'
 
 @Injectable()
 export class PrayersService {
 
- constructor(private readonly prisma: PrismaService) {}
+ constructor(private readonly prisma: PrismaService,
+   private activityService: ActivityService
+ ) {}
 
  /* =========================
     CATEGORIES
@@ -74,36 +77,30 @@ export class PrayersService {
 
  }
 
-   async completePrayer(userId:string){
+   async completePrayer(userId: string){
 
-   const stats = await this.prisma.spiritualStats.findUnique({
-   where:{ userId }
-   })
+   const now = new Date()
 
-   if(!stats){
-
-   return this.prisma.spiritualStats.create({
-      data:{
-      userId,
-      prayersPrayed:1,
-      lastPrayerDate:new Date()
+   await this.prisma.spiritualStats.upsert({
+      where:{ userId },
+      update:{
+         prayersPrayed:{ increment:1 },
+         lastPrayerDate:now
+      },
+      create:{
+         userId,
+         prayersPrayed:1,
+         lastPrayerDate:now
       }
    })
 
-   }
+   await this.activityService.log(
+      userId,
+      "PRAYER",
+      "Oração rezada"
+   )
 
-   return this.prisma.spiritualStats.update({
-   where:{ userId },
-   data:{
-      prayersPrayed:{
-      increment:1
-      },
-      lastPrayerDate:new Date()
-   }
-   })
-
-   }
-
-   
+   return { success:true }
+   }  
 
 }

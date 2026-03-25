@@ -10,6 +10,7 @@ import { contentFilter } from "./filters/vox.content-filter"
 import { VoxRateLimiter } from "./guards/vox.rate-limiter"
 import { LiturgicalCalendarService } from "./services/liturgical-calendar.service"
 import { parseNaturalDate } from "./utils/date-parser"
+import { ActivityService } from '../activity/activity.service'
 
 @Injectable()
 export class VoxAiService{
@@ -17,7 +18,8 @@ export class VoxAiService{
  constructor(
   private rateLimiter: VoxRateLimiter,
   private prisma: PrismaService,
-  private liturgicalCalendarService: LiturgicalCalendarService
+  private liturgicalCalendarService: LiturgicalCalendarService,
+  private activityService: ActivityService
  ){}
 
  private apiKey = process.env.GEMINI_API_KEY
@@ -356,6 +358,12 @@ ${liturgySummarized}
      }
     })
    ])
+
+   await this.activityService.log(
+      conversation.userId,
+      "VOX",
+      "Conversou com o Vox"
+   )
 
    return {
     success:true,

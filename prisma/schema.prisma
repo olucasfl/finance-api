@@ -26,6 +26,17 @@ model User {
   conversations             Conversation[]
   rosarySessions            RosarySession[]
   spiritualStats            SpiritualStats?
+  activities                UserActivity[]
+}
+
+model UserActivity {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  action    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Budget {
@@ -134,6 +145,7 @@ model SpiritualStats {
   prayersPrayed  Int       @default(0)
   prayerStreak   Int       @default(0)
   lastPrayerDate DateTime?
+  lastLoginDate  DateTime?
   user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

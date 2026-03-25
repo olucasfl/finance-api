@@ -1,10 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ActivityService } from '../activity/activity.service'
 
 @Injectable()
 export class ConsecrationService {
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,
+    private activityService: ActivityService
+  ) {}
 
   async start(userId: string, startDate: Date) {
 
@@ -16,12 +19,20 @@ export class ConsecrationService {
       return existing;
     }
 
-    return this.prisma.consecrationProgress.create({
-      data: {
+    const result = await this.prisma.consecrationProgress.create({
+        data: {
+          userId,
+          startDate
+        }
+      })
+
+      await this.activityService.log(
         userId,
-        startDate
-      }
-    });
+        "CONSECRATION",
+        "Iniciou a consagração"
+      )
+
+      return result
   }
 
   async progress(userId: string) {
@@ -288,12 +299,21 @@ export class ConsecrationService {
       throw new Error("Complete o dia anterior primeiro");
     }
 
-    return this.prisma.consecrationCompletedDay.create({
-      data: {
+    const result = await this.prisma.consecrationCompletedDay.create({
+        data: {
+          userId,
+          dayNumber
+        }
+      })
+
+      // 🔥 LOG AQUI
+      await this.activityService.log(
         userId,
-        dayNumber
-      }
-    });
+        "CONSECRATION",
+        `Dia ${dayNumber}/33 concluído`
+      )
+
+      return result
 
   }
 

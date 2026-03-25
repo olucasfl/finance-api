@@ -1,11 +1,12 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
 import { PrismaService } from "src/prisma/prisma.service"
 import { buildRosary } from "./rosaryBuilder"
+import { ActivityService } from '../oratio/activity/activity.service'
 
 @Injectable()
 export class RosaryService{
 
- constructor(private prisma:PrismaService){}
+ constructor(private prisma:PrismaService, private activityService: ActivityService){}
 
  /* =========================
  START
@@ -28,6 +29,12 @@ getRosary(type:string){
   const session = await this.prisma.rosarySession.create({
    data:{ userId }
   })
+
+  await this.activityService.log(
+   userId,
+   "ROSARY",
+   "Iniciou o terço"
+ )
 
   return session
 
@@ -135,6 +142,12 @@ async finish(userId:string){
   })
 
  }
+
+ await this.activityService.log(
+  userId,
+  "ROSARY",
+  "Terço concluído"
+)
 
  return { success:true }
 

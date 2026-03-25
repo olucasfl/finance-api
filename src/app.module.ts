@@ -13,6 +13,7 @@ import { LiturgiaModule } from './modules/oratio/liturgia/liturgia.module';
 import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
 import { PrayersModule } from './modules/oratio/prayers/prayers.module';
 import { RosaryModule } from './modules/rosary/rosary.module';
+import { ActivityModule } from './modules/oratio/activity/activity.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { RosaryModule } from './modules/rosary/rosary.module';
     VoxAiModule,
     PrayersModule,
     RosaryModule,
+    ActivityModule,
   ],
   controllers: [AppController],
   providers: [AppService],
