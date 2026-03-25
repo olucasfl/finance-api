@@ -197,14 +197,37 @@ export class UsersService {
     }
 
     if (filters?.emailVerified !== undefined) {
-      where.emailVerified = filters.emailVerified;
-    }
+        where.emailVerified = filters.emailVerified;
+      }
 
-    if (filters?.activeLastDays) {
-      const daysAgo = new Date();
-      daysAgo.setDate(daysAgo.getDate() - filters.activeLastDays);
-      where.updatedAt = { gte: daysAgo };
-    }
+        if (filters?.activeLastDays) {
+    const daysAgo = new Date();
+    daysAgo.setDate(daysAgo.getDate() - filters.activeLastDays);
+
+    where.AND = [
+      ...(where.AND || []),
+      {
+        OR: [
+          {
+            spiritualStats: {
+              lastPrayerDate: {
+                gte: daysAgo,
+              },
+            },
+          },
+          {
+            activities: {
+              some: {
+                createdAt: {
+                  gte: daysAgo,
+                },
+              },
+            },
+          },
+        ],
+      },
+    ];
+  }
 
     return this.prisma.user.findMany({
       where,
