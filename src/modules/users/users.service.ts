@@ -124,7 +124,9 @@ export class UsersService {
 
     rosariesPrayed: user.spiritualStats?.rosariesPrayed || 0,
 
-    lastPrayerDate: user.spiritualStats?.lastPrayerDate || null
+    lastPrayerDate: user.spiritualStats?.lastPrayerDate || null,
+
+    prayerStreak: user.spiritualStats?.prayerStreak || 0
 
     }
 
@@ -281,116 +283,25 @@ export class UsersService {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    const activities: any[] = [];
-
-    // Rosário sessions
-    const rosarySessions = await this.prisma.rosarySession.findMany({
+    const activities = await this.prisma.userActivity.findMany({
       where: {
         userId: targetUserId,
-        startedAt: { gte: sevenDaysAgo },
-      },
-      select: {
-        startedAt: true,
-        completed: true,
-      },
-    });
-
-    rosarySessions.forEach((session) => {
-      activities.push({
-        type: 'rosary',
-        action: session.completed ? 'Terço concluído' : 'Terço iniciado',
-        timestamp: session.startedAt,
-      });
-    });
-
-    // Orações rezadas (via spiritualStats)
-    const spiritualStats = await this.prisma.spiritualStats.findUnique({
-      where: { userId: targetUserId },
-      select: {
-        lastPrayerDate: true,
-        prayersPrayed: true,
-      },
-    });
-
-    if (spiritualStats?.lastPrayerDate) {
-      const lastPrayerTime = new Date(spiritualStats.lastPrayerDate);
-      if (lastPrayerTime >= sevenDaysAgo) {
-        activities.push({
-          type: 'prayer',
-          action: 'Oração rezada',
-          timestamp: lastPrayerTime,
-        });
-      }
-    }
-
-    // Consagração iniciada
-    const consecration = await this.prisma.consecrationProgress.findFirst({
-      where: {
-        userId: targetUserId,
-        startDate: { gte: sevenDaysAgo },
-      },
-      select: {
-        startDate: true,
+        createdAt: {
+          gte: sevenDaysAgo,
+        },
       },
       orderBy: {
-        startDate: 'desc',
+        createdAt: "desc",
       },
     });
-
-    if (consecration) {
-      activities.push({
-        type: 'consecration',
-        action: 'Consagração iniciada',
-        timestamp: consecration.startDate,
-      });
-    }
-
-    // Dias de consagração completados
-    const completedDays = await this.prisma.consecrationCompletedDay.findMany({
-      where: {
-        userId: targetUserId,
-        createdAt: { gte: sevenDaysAgo },
-      },
-      select: {
-        dayNumber: true,
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    completedDays.forEach((day) => {
-      activities.push({
-        type: 'consecration_day',
-        action: `Dia ${day.dayNumber}/33 concluído`,
-        timestamp: day.createdAt,
-      });
-    });
-
-    // Intenção de logins (pela atualização do updatedAt)
-    const user = await this.prisma.user.findUnique({
-      where: { id: targetUserId },
-      select: { updatedAt: true },
-    });
-
-    if (user && user.updatedAt >= sevenDaysAgo) {
-      activities.push({
-        type: 'login',
-        action: 'Atividade no app',
-        timestamp: user.updatedAt,
-      });
-    }
-
-    // Ordenar por timestamp decrescente (mais recentes primeiro)
-    activities.sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    );
 
     return {
       targetUserId,
-      activities,
+      activities: activities.map((a) => ({
+        type: a.type,
+        action: a.action,
+        timestamp: a.createdAt,
+      })),
       total: activities.length,
     };
   }

@@ -16,32 +16,45 @@ export class ActivityService {
 
     let newStreak = 1
 
-    if(stats?.lastLoginDate){
+    if(stats){
+
+        const currentStreak = stats.prayerStreak || 0
+
+        if(stats.lastLoginDate){
 
         const last = new Date(stats.lastLoginDate)
         last.setHours(0,0,0,0)
 
         const diff = Math.floor(
-        (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)
+            (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)
         )
 
         if(diff === 1){
-        newStreak = stats.prayerStreak + 1
-        } else if(diff === 0){
-        newStreak = stats.prayerStreak
+            newStreak = currentStreak + 1
+        } 
+        else if(diff === 0){
+            newStreak = currentStreak > 0 ? currentStreak : 1
+        } 
+        else {
+            newStreak = 1
         }
+
+        } else {
+        newStreak = 1
+        }
+
     }
 
     await this.prisma.spiritualStats.upsert({
         where:{ userId },
         update:{
         prayerStreak: newStreak,
-        lastLoginDate: now
+        lastLoginDate: new Date()
         },
         create:{
         userId,
         prayerStreak: 1,
-        lastLoginDate: now
+        lastLoginDate: new Date()
         }
     })
     }
