@@ -5,24 +5,21 @@ import { PrismaService } from 'src/prisma/prisma.service';
 export class ActivityService {
   constructor(private prisma: PrismaService) {}
 
-  // 🔥 Centraliza timezone (evita repetição e erro)
-  private getBrazilMidnight(date: Date = new Date()): Date {
-    const brDate = new Date(
-      date.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })
-    )
-    brDate.setHours(0, 0, 0, 0)
-    return brDate
+  private getBrazilDateString(date: Date = new Date()): string {
+    return date.toLocaleDateString("en-CA", {
+      timeZone: "America/Sao_Paulo"
+    })
   }
 
   async updateLoginStreak(userId: string) {
 
-    const now = this.getBrazilMidnight()
+    const today = this.getBrazilDateString()
 
     const stats = await this.prisma.spiritualStats.findUnique({
       where: { userId }
     })
 
-    let newStreak = 1
+    let newStreak = 1 // 🔥 sempre começa em 1 ao logar
 
     if (stats) {
 
@@ -30,29 +27,26 @@ export class ActivityService {
 
       if (stats.lastLoginDate) {
 
-        const last = this.getBrazilMidnight(new Date(stats.lastLoginDate))
+        const last = this.getBrazilDateString(new Date(stats.lastLoginDate))
 
         const diff = Math.floor(
-          (now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24)
+          (new Date(today).getTime() - new Date(last).getTime()) /
+          (1000 * 60 * 60 * 24)
         )
 
-        // 🔥 Dia seguinte → incrementa
         if (diff === 1) {
+          // 🔥 continua sequência
           newStreak = currentStreak + 1
         }
-
-        // 🔥 Mesmo dia → NÃO FAZ NADA (evita update inútil)
         else if (diff === 0) {
+          // 🔥 mesmo dia → não muda
           return
         }
-
-        // 🔥 Quebrou streak
         else {
+          // ❄️ quebrou → mas ao entrar vira 1
           newStreak = 1
         }
 
-      } else {
-        newStreak = 1
       }
 
     }
@@ -61,7 +55,7 @@ export class ActivityService {
       where: { userId },
       update: {
         prayerStreak: newStreak,
-        lastLoginDate: new Date() // mantém UTC (boa prática)
+        lastLoginDate: new Date()
       },
       create: {
         userId,
