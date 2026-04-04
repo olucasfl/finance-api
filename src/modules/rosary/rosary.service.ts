@@ -2,6 +2,8 @@ import { Injectable, NotFoundException } from "@nestjs/common"
 import { PrismaService } from "src/prisma/prisma.service"
 import { buildRosary } from "./rosaryBuilder"
 import { ActivityService } from '../oratio/activity/activity.service'
+import { buildSevenSorrows } from "./sevenSorrowsBuilder"
+import { buildDivineMercy } from "./divineMercyBuilder"
 
 @Injectable()
 export class RosaryService{
@@ -14,14 +16,22 @@ export class RosaryService{
 
 getRosary(type:string){
 
- const valid = ["gozosos","dolorosos","gloriosos","luminosos"]
+ const defaultRosaries = ["gozosos","dolorosos","gloriosos","luminosos"]
 
- if(!valid.includes(type)){
-  throw new NotFoundException("Invalid rosary type")
+ if(defaultRosaries.includes(type)){
+  return buildRosary(type)
  }
 
- return buildRosary(type)
+ // 👇 NOVOS TERÇOS
+ if(type === "sete-dores"){
+  return buildSevenSorrows()
+ }
 
+  if(type === "misericordia"){
+    return buildDivineMercy()
+  }
+
+ throw new NotFoundException("Invalid rosary type")
 }
 
  async start(userId:string){
