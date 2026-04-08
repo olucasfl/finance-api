@@ -5,6 +5,7 @@ import { ActivityService } from '../oratio/activity/activity.service'
 import { buildSevenSorrows } from "./sevenSorrowsBuilder"
 import { buildDivineMercy } from "./divineMercyBuilder"
 import { buildSacredHeart } from "./sacredHearthBuilder"
+import { buildStJoseph } from "./StJosephBuilder"
 
 @Injectable()
 export class RosaryService{
@@ -34,6 +35,10 @@ getRosary(type:string){
   
   if(type === "sagrado-coracao"){
     return buildSacredHeart()
+  }
+
+  if(type === "sao-jose"){
+    return buildStJoseph()
   }
 
  throw new NotFoundException("Invalid rosary type")
