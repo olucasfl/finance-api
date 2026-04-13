@@ -9,6 +9,20 @@ export class ConsecrationService {
     private activityService: ActivityService
   ) {}
 
+  private toUtcDate(date: Date) {
+    return new Date(Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate()
+    ));
+  }
+
+  private diffUtcDays(start: Date, end: Date) {
+    const a = this.toUtcDate(start).getTime();
+    const b = this.toUtcDate(end).getTime();
+    return Math.floor((b - a) / (1000 * 60 * 60 * 24));
+  }
+
   async start(userId: string, startDate: Date) {
 
     const existing = await this.prisma.consecrationProgress.findFirst({
@@ -19,10 +33,12 @@ export class ConsecrationService {
       return existing;
     }
 
+    const utcStartDate = this.toUtcDate(startDate);
+
     const result = await this.prisma.consecrationProgress.create({
         data: {
           userId,
-          startDate
+          startDate: utcStartDate
         }
       })
 
@@ -53,21 +69,11 @@ export class ConsecrationService {
     }
 
     const today = new Date();
-    today.setHours(0,0,0,0);
-
     const startRaw = new Date(progress.startDate);
+    const start = this.toUtcDate(startRaw);
+    const utcToday = this.toUtcDate(today);
 
-    const start = new Date(
-      startRaw.getFullYear(),
-      startRaw.getMonth(),
-      startRaw.getDate()
-    );
-
-    const diff =
-      Math.floor(
-        (today.getTime() - start.getTime()) /
-        (1000 * 60 * 60 * 24)
-      ) + 1;
+    const diff = this.diffUtcDays(start, utcToday) + 1;
 
     const currentDay = Math.min(diff, 33);
 
@@ -209,21 +215,11 @@ export class ConsecrationService {
     }
 
     const today = new Date();
-    today.setHours(0,0,0,0);
-
     const startRaw = new Date(progress.startDate);
+    const start = this.toUtcDate(startRaw);
+    const utcToday = this.toUtcDate(today);
 
-    const start = new Date(
-      startRaw.getFullYear(),
-      startRaw.getMonth(),
-      startRaw.getDate()
-    );
-
-    const diff =
-      Math.floor(
-        (today.getTime() - start.getTime()) /
-        (1000 * 60 * 60 * 24)
-      ) + 1;
+    const diff = this.diffUtcDays(start, utcToday) + 1;
 
     if (diff < 1 || diff > 33) {
       return null;
@@ -257,21 +253,11 @@ export class ConsecrationService {
     }
 
     const today = new Date();
-    today.setHours(0,0,0,0);
-
     const startRaw = new Date(progress.startDate);
+    const start = this.toUtcDate(startRaw);
+    const utcToday = this.toUtcDate(today);
 
-    const start = new Date(
-      startRaw.getFullYear(),
-      startRaw.getMonth(),
-      startRaw.getDate()
-    );
-
-    const diff =
-      Math.floor(
-        (today.getTime() - start.getTime()) /
-        (1000 * 60 * 60 * 24)
-      ) + 1;
+    const diff = this.diffUtcDays(start, utcToday) + 1;
 
     if (dayNumber > diff) {
       throw new Error("Dia ainda não liberado");
@@ -327,9 +313,11 @@ export class ConsecrationService {
       throw new NotFoundException("Consagração não iniciada")
     }
 
+    const utcStartDate = this.toUtcDate(startDate);
+
     await this.prisma.consecrationProgress.update({
       where:{id:progress.id},
-      data:{startDate}
+      data:{startDate: utcStartDate}
     })
 
     await this.prisma.consecrationCompletedDay.deleteMany({
