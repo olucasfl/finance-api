@@ -1,11 +1,15 @@
-import { Body, Controller, Post, Get, Query, Res, Headers } from '@nestjs/common';
+import { Body, Controller, Post, Get, Query, Res, Headers, UnauthorizedException } from '@nestjs/common';
 import type { Response } from "express";
 import { AuthService } from './auth.service';
+import { JwtService } from '@nestjs/jwt';
 
 @Controller('auth')
 export class AuthController {
 
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly jwtService: JwtService
+  ) {}
 
   @Post('login')
   login(@Body() body: { email: string; password: string }) {
@@ -15,10 +19,16 @@ export class AuthController {
   @Post('refresh')
   refresh(@Body() body: { refresh_token: string }) {
 
-    const decoded: any = this.authService['jwtService'].decode(body.refresh_token);
+    try {
 
-    return this.authService.refresh(decoded.sub, body.refresh_token);
+      const decoded = this.jwtService.verify(body.refresh_token);
 
+      return this.authService.refresh(decoded.sub, body.refresh_token);
+
+    } catch (err) {
+
+      throw new UnauthorizedException("Invalid or expired refresh token");
+    }
   }
 
   @Get("verify-email")
