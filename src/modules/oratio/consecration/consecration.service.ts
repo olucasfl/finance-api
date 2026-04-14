@@ -10,9 +10,11 @@ export class ConsecrationService {
   ) {}
 
   private toUtcDate(date: Date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
+    return new Date(Date.UTC(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    ));
   }
 
   private diffUtcDays(start: Date, end: Date) {
@@ -69,7 +71,13 @@ export class ConsecrationService {
       };
     }
 
-    const today = new Date();
+    const now = new Date();
+
+    const today = new Date(Date.UTC(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ));
     const startRaw = new Date(progress.startDate);
     const start = this.toUtcDate(startRaw);
     const utcToday = this.toUtcDate(today);
@@ -215,7 +223,13 @@ export class ConsecrationService {
       return null;
     }
 
-    const today = new Date();
+    const now = new Date();
+
+    const today = new Date(Date.UTC(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ));
     const startRaw = new Date(progress.startDate);
     const start = this.toUtcDate(startRaw);
     const utcToday = this.toUtcDate(today);
@@ -253,7 +267,12 @@ export class ConsecrationService {
       throw new Error("Consagração não iniciada");
     }
 
-    const today = new Date();
+    const now = new Date();
+    const today = new Date(Date.UTC(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    ));
     const startRaw = new Date(progress.startDate);
     const start = this.toUtcDate(startRaw);
     const utcToday = this.toUtcDate(today);
