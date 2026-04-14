@@ -10,17 +10,18 @@ export class ConsecrationService {
   ) {}
 
   private toUtcDate(date: Date) {
-    return new Date(Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate()
-    ));
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
   }
 
   private diffUtcDays(start: Date, end: Date) {
-    const a = this.toUtcDate(start).getTime();
-    const b = this.toUtcDate(end).getTime();
-    return Math.floor((b - a) / (1000 * 60 * 60 * 24));
+    const msPerDay = 1000 * 60 * 60 * 24;
+
+    const startTime = this.toUtcDate(start).getTime();
+    const endTime = this.toUtcDate(end).getTime();
+
+    return Math.floor((endTime - startTime) / msPerDay);
   }
 
   async start(userId: string, startDate: Date) {
