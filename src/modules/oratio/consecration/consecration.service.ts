@@ -13,17 +13,28 @@ export class ConsecrationService {
     return new Date(
       date.getFullYear(),
       date.getMonth(),
-      date.getDate()
+      date.getDate(),
+      12, 0, 0
     );
-  }
+}
 
-  private diffUtcDays(start: Date, end: Date) {
+  private diffDays(start: Date, end: Date) {
     const msPerDay = 1000 * 60 * 60 * 24;
 
     const startTime = this.toLocalDate(start).getTime();
     const endTime = this.toLocalDate(end).getTime();
 
-    return Math.floor((endTime - startTime) / msPerDay);
+    return Math.round((endTime - startTime) / msPerDay);
+  }
+
+  private formatLocalDate(date: Date){
+    const local = new Date(date)
+
+    const y = local.getFullYear()
+    const m = String(local.getMonth() + 1).padStart(2, "0")
+    const d = String(local.getDate()).padStart(2, "0")
+
+    return `${y}-${m}-${d}`
   }
 
   async start(userId: string, startDate: Date) {
@@ -82,11 +93,11 @@ export class ConsecrationService {
     const start = this.toLocalDate(startRaw);
     const utcToday = this.toLocalDate(today);
 
-    const diff = this.diffUtcDays(start, utcToday) + 1;
+    const diff = this.diffDays(start, utcToday) + 1;
 
     const currentDay = Math.min(diff, 33);
 
-    const startedToday = diff >= 1;
+    const startedToday = diff === 1;
 
     const daysUntilStart =
       diff < 1 ? Math.abs(diff) + 1 : 0;
@@ -99,12 +110,12 @@ export class ConsecrationService {
       Math.floor((completedDays / 33) * 100);
 
       const consecrationDate = new Date(start)
-      consecrationDate.setDate(consecrationDate.getDate() + 32)
+      consecrationDate.setDate(consecrationDate.getDate() + 33)
 
     return {
       started: true,
-      startDate: progress.startDate.toISOString().split("T")[0],
-      consecrationDate: consecrationDate.toISOString().split("T")[0],
+      startDate: this.formatLocalDate(progress.startDate),
+      consecrationDate: this.formatLocalDate(consecrationDate),
       currentDay,
       startedToday,
       daysUntilStart,
@@ -238,7 +249,7 @@ export class ConsecrationService {
     const start = this.toLocalDate(startRaw);
     const utcToday = this.toLocalDate(today);
 
-    const diff = this.diffUtcDays(start, utcToday) + 1;
+    const diff = this.diffDays(start, utcToday) + 1;
 
     if (diff < 1 || diff > 33) {
       return null;
@@ -282,7 +293,7 @@ export class ConsecrationService {
     const start = this.toLocalDate(startRaw);
     const utcToday = this.toLocalDate(today);
 
-    const diff = this.diffUtcDays(start, utcToday) + 1;
+    const diff = this.diffDays(start, utcToday) + 1;
 
     if (dayNumber > diff) {
       throw new Error("Dia ainda não liberado");
