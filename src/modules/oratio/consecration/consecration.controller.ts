@@ -31,8 +31,8 @@ export class ConsecrationController {
 
     const [y,m,d] = body.consecrationDate.split("-").map(Number)
 
-    const startDate = new Date(Date.UTC(y, m - 1, d))
-    startDate.setUTCDate(startDate.getUTCDate() - 32)
+    const startDate = new Date(y, m - 1, d, 12, 0, 0)
+    startDate.setDate(startDate.getDate() - 32)
 
     return this.service.start(
       req.user.userId,
@@ -182,8 +182,8 @@ export class ConsecrationController {
 
     const [y,m,d] = body.consecrationDate.split("-").map(Number)
 
-    const startDate = new Date(Date.UTC(y, m - 1, d))
-    startDate.setUTCDate(startDate.getUTCDate() - 32)
+    const startDate = new Date(y, m - 1, d, 12, 0, 0)
+    startDate.setDate(startDate.getDate() - 32)
 
     return this.service.updateStartDate(
       req.user.userId,
