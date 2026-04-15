@@ -17,19 +17,9 @@ export class AuthController {
   }
 
   @Post('refresh')
-  refresh(@Body() body: { refresh_token: string }) {
-
-    try {
-
-      const decoded = this.jwtService.verify(body.refresh_token);
-
-      return this.authService.refresh(decoded.sub, body.refresh_token);
-
-    } catch (err) {
-
-      throw new UnauthorizedException("Invalid or expired refresh token");
+    refresh(@Body("refresh_token") refreshToken: string) {
+      return this.authService.refresh(refreshToken);
     }
-  }
 
   @Get("verify-email")
   verifyEmail(@Query("token") token: string, @Query("app") app: string, @Res() res: Response) {
