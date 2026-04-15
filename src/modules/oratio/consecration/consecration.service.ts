@@ -98,16 +98,20 @@ export class ConsecrationService {
     const progressPercent =
       Math.floor((completedDays / 33) * 100);
 
+      const consecrationDate = new Date(start)
+      consecrationDate.setDate(consecrationDate.getDate() + 32)
+
     return {
       started: true,
-      startDate: progress.startDate,
+      startDate: progress.startDate.toISOString().split("T")[0],
+      consecrationDate: consecrationDate.toISOString().split("T")[0],
       currentDay,
       startedToday,
       daysUntilStart,
       completedDays,
       progress: progressPercent,
       stages
-    };
+    }
 
   }
 
