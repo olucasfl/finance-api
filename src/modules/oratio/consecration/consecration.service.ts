@@ -123,13 +123,8 @@ export class ConsecrationService {
 
     return {
       started: true,
-<<<<<<< HEAD
       startDate: format(startZoned, "yyyy-MM-dd"),
       consecrationDate: format(consecrationZoned, "yyyy-MM-dd"),
-=======
-      startDate: this.formatLocalDate(progress.startDate),
-      consecrationDate: this.formatLocalDate(consecrationDate),
->>>>>>> 3b479810d689a3db5402b3514c6bfdbcea1cf146
       currentDay,
       startedToday,
       daysUntilStart,
