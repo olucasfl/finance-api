@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityService } from '../activity/activity.service'
+import { toZonedTime } from 'date-fns-tz'
+import { format } from 'date-fns'
 
 @Injectable()
 export class ConsecrationService {
@@ -8,6 +10,16 @@ export class ConsecrationService {
   constructor(private readonly prisma: PrismaService,
     private activityService: ActivityService
   ) {}
+
+  private getTodayBrazil() {
+    const now = toZonedTime(new Date(), "America/Sao_Paulo")
+
+    return new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    )
+  }
 
   private toLocalDate(date: Date) {
     return new Date(
@@ -71,13 +83,7 @@ export class ConsecrationService {
       };
     }
 
-    const now = new Date();
-
-    const today = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
+    const today = this.getTodayBrazil();
     const startRaw = new Date(progress.startDate);
     const start = this.toLocalDate(startRaw);
     const utcToday = this.toLocalDate(today);
@@ -101,10 +107,13 @@ export class ConsecrationService {
       const consecrationDate = new Date(start)
       consecrationDate.setDate(consecrationDate.getDate() + 32)
 
+      const startZoned = toZonedTime(progress.startDate, "America/Sao_Paulo")
+      const consecrationZoned = toZonedTime(consecrationDate, "America/Sao_Paulo")
+
     return {
       started: true,
-      startDate: progress.startDate.toISOString().split("T")[0],
-      consecrationDate: consecrationDate.toISOString().split("T")[0],
+      startDate: format(startZoned, "yyyy-MM-dd"),
+      consecrationDate: format(consecrationZoned, "yyyy-MM-dd"),
       currentDay,
       startedToday,
       daysUntilStart,
@@ -227,13 +236,7 @@ export class ConsecrationService {
       return null;
     }
 
-    const now = new Date();
-
-    const today = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
+    const today = this.getTodayBrazil();
     const startRaw = new Date(progress.startDate);
     const start = this.toLocalDate(startRaw);
     const utcToday = this.toLocalDate(today);
@@ -271,13 +274,7 @@ export class ConsecrationService {
       throw new Error("Consagração não iniciada");
     }
 
-    const now = new Date();
-
-    const today = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate()
-    );
+    const today = this.getTodayBrazil();
     const startRaw = new Date(progress.startDate);
     const start = this.toLocalDate(startRaw);
     const utcToday = this.toLocalDate(today);
