@@ -1,6 +1,7 @@
 export function buildMissa(data: any) {
 
   const isDomingo = data.leituras.segundaLeitura?.length > 0
+  const oracaoEucaristica = isDomingo ? 3 : 2
 
   return {
     tipo: isDomingo ? "domingo" : "semana",
@@ -192,7 +193,6 @@ Hosana nas alturas.
 Bendito o que vem em nome do Senhor.
 Hosana nas alturas.`,
 
-          /* 🔥 CONSAGRAÇÃO */
 
           consagracao: [
             {
@@ -217,6 +217,128 @@ Fazei isto em memória de mim.`
                 "Anunciamos, Senhor, a vossa morte e proclamamos a vossa ressurreição. Vinde, Senhor Jesus!"
             }
           ],
+          posConsagracao:
+            oracaoEucaristica === 2
+              ? {
+                  anamnese_oblacao: [
+                    {
+                      padre: `Celebrando, pois, a memória da morte e ressurreição do vosso Filho,
+                  nós vos oferecemos, ó Pai, o pão da vida e o cálice da salvação,
+                  e vos agradecemos porque nos tornastes dignos de estar aqui na vossa presença e vos servir.`
+                    },
+                    {
+                      assembleia: "Aceitai, ó Senhor, a nossa oferta!"
+                    }
+                  ],
+
+                  epiclese: [
+                    {
+                      padre: `E nós vos suplicamos que, participando do Corpo e Sangue de Cristo,
+                  sejamos reunidos pelo Espírito Santo num só corpo.`
+                    },
+                    {
+                      assembleia: "O Espírito nos una num só corpo!"
+                    }
+                  ],
+
+                  intercessoes: [
+                    [
+                      {
+                        padre: `Lembrai-vos, ó Pai, da vossa Igreja que se faz presente pelo mundo inteiro;
+                  que ela cresça na caridade com o Papa, o nosso bispo e todos os ministros do vosso povo.`
+                      },
+                      {
+                        assembleia: "Lembrai-vos, ó Pai, da vossa Igreja!"
+                      }
+                    ],
+                    [
+                      {
+                        padre: `Lembrai-vos também dos nossos irmãos e irmãs que morreram na esperança da ressurreição
+                  e de todos os que partiram desta vida; acolhei-os junto a vós na luz da vossa face.`
+                      },
+                      {
+                        assembleia: "Concedei-lhes, ó Senhor, a luz eterna!"
+                      }
+                    ],
+                    [
+                      {
+                        padre: `Enfim, nós vos pedimos, tende piedade de todos nós e dai-nos participar da vida eterna,
+                  com a Virgem Maria, Mãe de Deus, São José, os Apóstolos e todos os santos,
+                  que na vida souberam amar Cristo e seus irmãos.`
+                      },
+                      {
+                        assembleia: "Concedei-nos o convívio dos eleitos!"
+                      }
+                    ]
+                  ]
+                }
+              : {
+                  anamnese_oblacao: [
+                    {
+                      padre: `Celebrando agora, ó Pai, o memorial da paixão redentora do vosso Filho,
+                  da sua gloriosa ressurreição e ascensão ao céu,
+                  e enquanto esperamos sua nova vinda,
+                  nós vos oferecemos em ação de graças este sacrifício vivo e santo.`
+                    },
+                    {
+                      assembleia: "Aceitai, ó Senhor, a nossa oferta!"
+                    }
+                  ],
+
+                  epiclese: [
+                    {
+                      padre: `Olhai com bondade a oblação da vossa Igreja
+                  e reconhecei nela o sacrifício que nos reconciliou convosco;
+                  concedei que, alimentando-nos com o Corpo e o Sangue do vosso Filho,
+                  repletos do Espírito Santo,
+                  nos tornemos em Cristo um só corpo e um só espírito.`
+                    },
+                    {
+                      assembleia: "O Espírito nos una num só corpo!"
+                    }
+                  ],
+
+                  intercessoes: [
+                    [
+                      {
+                        padre: `Que o mesmo Espírito faça de nós uma eterna oferenda
+                  para alcançarmos a herança com os vossos eleitos:
+                  a santíssima Virgem Maria, São José, os Apóstolos e todos os Santos.`
+                      },
+                      {
+                        assembleia: "Fazei de nós uma perfeita oferenda!"
+                      }
+                    ],
+                    [
+                      {
+                        padre: `Nós vos suplicamos, Senhor,
+                  que este sacrifício da nossa reconciliação estenda a paz e a salvação ao mundo inteiro;
+                  confirmai na fé e na caridade a vossa Igreja.`
+                      },
+                      {
+                        assembleia: "Lembrai-vos, ó Pai, da vossa Igreja!"
+                      }
+                    ],
+                    [
+                      {
+                        padre: `Acolhei com bondade no vosso reino os nossos irmãos e irmãs que partiram desta vida
+                  e todos os que morreram na vossa amizade.`
+                      },
+                      {
+                        assembleia: "Concedei-lhes, ó Senhor, a luz eterna!"
+                      }
+                    ],
+                    [
+                      {
+                        padre: `Enfim, concedei também a nós chegarmos à morada eterna,
+                  onde viveremos para sempre convosco e com todos os santos.`
+                      },
+                      {
+                        assembleia: "Concedei-nos o convívio dos eleitos!"
+                      }
+                    ]
+                  ]
+                },
 
           doxologia: [
             {
@@ -224,43 +346,6 @@ Fazei isto em memória de mim.`
                 "Por Cristo, com Cristo e em Cristo, a vós, Deus Pai todo-poderoso, na unidade do Espírito Santo, toda honra e toda glória, agora e para sempre."
             },
             { assembleia: "Amém." }
-          ],
-
-          paiNosso: [
-            {
-              todos: `Pai nosso que estais nos céus,
-santificado seja o vosso nome;
-venha a nós o vosso Reino;
-seja feita a vossa vontade,
-assim na terra como no céu.
-O pão nosso de cada dia nos dai hoje;
-perdoai-nos as nossas ofensas,
-assim como nós perdoamos a quem nos tem ofendido;
-e não nos deixeis cair em tentação,
-mas livrai-nos do mal.`
-            }
-          ],
-
-          embolo: [
-            {
-                padre:
-                "Livrai-nos de todos os males, ó Pai, e dai-nos hoje a vossa paz. Ajudados pela vossa misericórdia, sejamos sempre livres do pecado e protegidos de todos os perigos, enquanto, vivendo a esperança, aguardamos a vinda do Cristo Salvador."
-            },
-            {
-                assembleia:
-                "Vosso é o reino, o poder e a glória para sempre!"
-            }
-            ],
-
-          cordeiro: [
-            {
-              todos: `Cordeiro de Deus, que tirais o pecado do mundo,
-tende piedade de nós.
-Cordeiro de Deus, que tirais o pecado do mundo,
-tende piedade de nós.
-Cordeiro de Deus, que tirais o pecado do mundo,
-dai-nos a paz.`
-            }
           ],
 
         }
@@ -273,6 +358,57 @@ dai-nos a paz.`
       {
         titulo: "Ritos da Comunhão",
         conteudo: {
+
+          convitePaiNosso: [
+            {
+              padre: "Obedientes à palavra do Salvador e formados por seu divino ensinamento, ousamos dizer:"
+            }
+          ],
+
+          paiNosso: [
+                  {
+                    todos: `Pai nosso que estais nos céus,
+      santificado seja o vosso nome;
+      venha a nós o vosso Reino;
+      seja feita a vossa vontade,
+      assim na terra como no céu.
+      O pão nosso de cada dia nos dai hoje;
+      perdoai-nos as nossas ofensas,
+      assim como nós perdoamos a quem nos tem ofendido;
+      e não nos deixeis cair em tentação,
+      mas livrai-nos do mal.`
+                  }
+                ],
+
+          embolo: [
+              {
+                  padre:
+                  "Livrai-nos de todos os males, ó Pai, e dai-nos hoje a vossa paz. Ajudados pela vossa misericórdia, sejamos sempre livres do pecado e protegidos de todos os perigos, enquanto, vivendo a esperança, aguardamos a vinda do Cristo Salvador."
+              },
+              {
+                  assembleia:
+                  "Vosso é o reino, o poder e a glória para sempre!"
+              }
+              ],
+
+              ritoDaPaz: [
+                  { padre: "A paz do Senhor esteja sempre convosco." },
+                  { assembleia: "O amor de Cristo nos uniu." },
+                  { padre: "Dai uns aos outros um sinal de paz." }
+                ],
+
+              cordeiro: [
+                {
+                  todos: `Cordeiro de Deus, que tirais o pecado do mundo,
+    tende piedade de nós.
+    Cordeiro de Deus, que tirais o pecado do mundo,
+    tende piedade de nós.
+    Cordeiro de Deus, que tirais o pecado do mundo,
+    dai-nos a paz.`
+                }
+              ],
+
+
 
           convite: [
             { padre: "Felizes os convidados para a Ceia do Senhor." },
