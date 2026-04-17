@@ -164,7 +164,21 @@ Amém.`
         titulo: "Liturgia Eucarística",
         conteudo: {
 
-          ofertorio: data.oracoes.oferendas,
+            tituloOracaoEucaristica:
+                oracaoEucaristica === 2
+                    ? "Oração Eucarística II"
+                    : "Oração Eucarística III",
+
+          ofertorio: null,
+
+            oracaoSobreOferendas: [
+            {
+                padre: data.oracoes.oferendas
+            },
+            {
+                assembleia: "Amém."
+            }
+            ],
 
           convite: [
             {
@@ -177,14 +191,17 @@ Amém.`
             }
           ],
 
-          prefacio: [
-            { padre: "O Senhor esteja convosco." },
-            { assembleia: "Ele está no meio de nós." },
-            { padre: "Corações ao alto." },
-            { assembleia: "O nosso coração está em Deus." },
-            { padre: "Demos graças ao Senhor, nosso Deus." },
-            { assembleia: "É nosso dever e nossa salvação." }
+          prefacio: {
+            dialogo: [
+                { padre: "O Senhor esteja convosco." },
+                { assembleia: "Ele está no meio de nós." },
+                { padre: "Corações ao alto." },
+                { assembleia: "O nosso coração está em Deus." },
+                { padre: "Demos graças ao Senhor, nosso Deus." },
+                { assembleia: "É nosso dever e nossa salvação." }
             ],
+            texto: null
+            },
 
           santo: `Santo, Santo, Santo,
 Senhor Deus do universo.
@@ -193,22 +210,109 @@ Hosana nas alturas.
 Bendito o que vem em nome do Senhor.
 Hosana nas alturas.`,
 
+            inicioOracaoEucaristica:
+            oracaoEucaristica === 2
+                ? [
+                    {
+                    padre: `Na verdade, ó Pai, vós sois Santo,
+                        fonte de toda santidade.`
+                    }
+                ]
+                : [
+                    {
+                    padre: `Na verdade, vós sois Santo, ó Deus do universo,
+            e tudo o que criastes proclama o vosso louvor,
+            porque, por Jesus Cristo, vosso Filho e Senhor nosso,
+            e pela força do Espírito Santo,
+            dais vida e santidade a todas as coisas
+            e não cessais de reunir para vós um povo
+            que vos ofereça em toda parte,
+            do nascer ao pôr do sol,
+            um sacrifício perfeito.`
+                    }
+                ],
 
-          consagracao: [
-            {
-              padre: `Tomai todos e comei:
-isto é o meu Corpo,
-que será entregue por vós.`
-            },
-            {
-              padre: `Tomai todos e bebei:
-este é o cálice do meu Sangue,
-o Sangue da nova e eterna aliança,
-que será derramado por vós e por todos
-para remissão dos pecados.
-Fazei isto em memória de mim.`
-            }
-          ],
+            epicleseAntesConsagracao:
+                oracaoEucaristica === 2
+                    ? [
+                        {
+                        padre: `Santificai, pois, estas oferendas,
+                derramando sobre elas o vosso Espírito,
+                a fim de que se tornem para nós o Corpo e o Sangue
+                de Jesus Cristo, vosso Filho e Senhor nosso.`
+                        },
+                        {
+                        assembleia: "Enviai o vosso Espírito Santo!"
+                        }
+                    ]
+                    : [
+                        {
+                        padre: `Por isso, ó Pai, nós vos suplicamos:
+                        santificai pelo Espírito Santo
+                as oferendas que vos apresentamos
+                para serem consagradas,
+                a fim de que se tornem o Corpo e o Sangue
+                de vosso Filho, nosso Senhor Jesus Cristo.`
+                        },
+                        {
+                        assembleia: "Enviai o vosso Espírito Santo!"
+                        }
+                    ],
+
+
+          consagracao:
+            oracaoEucaristica === 2
+                ? [
+                    {
+                    padre: `Estando para ser entregue
+            e abraçando livremente a paixão,
+            Jesus tomou o pão,
+            pronunciou a bênção de ação de graças,
+            partiu e o deu a seus discípulos, dizendo:
+
+            TOMAI, TODOS, E COMEI:
+            ISTO É O MEU CORPO,
+            QUE SERÁ ENTREGUE POR VÓS.`
+                    },
+                    {
+                    padre: `Do mesmo modo, no fim da Ceia,
+            ele tomou o cálice em suas mãos
+            e, dando graças novamente,
+            o entregou a seus discípulos, dizendo:
+
+            TOMAI, TODOS, E BEBEI:
+            ESTE É O CÁLICE DO MEU SANGUE,
+            O SANGUE DA NOVA E ETERNA ALIANÇA,
+            QUE SERÁ DERRAMADO POR VÓS E POR TODOS,
+            PARA REMISSÃO DOS PECADOS.
+            FAZEI ISTO EM MEMÓRIA DE MIM.`
+                    }
+                ]
+                : [
+                    {
+                    padre: `Na noite em que ia ser entregue,
+            ele tomou o pão,
+            deu graças e o partiu
+            e o deu a seus discípulos, dizendo:
+
+            TOMAI, TODOS, E COMEI:
+            ISTO É O MEU CORPO,
+            QUE SERÁ ENTREGUE POR VÓS.`
+                    },
+                    {
+                    padre: `Do mesmo modo, ao fim da Ceia,
+            ele tomou o cálice em suas mãos,
+            deu graças novamente
+            e o deu a seus discípulos, dizendo:
+
+            TOMAI, TODOS, E BEBEI:
+            ESTE É O CÁLICE DO MEU SANGUE,
+            O SANGUE DA NOVA E ETERNA ALIANÇA,
+            QUE SERÁ DERRAMADO POR VÓS E POR TODOS
+            PARA REMISSÃO DOS PECADOS.
+            FAZEI ISTO EM MEMÓRIA DE MIM.`
+                    }
+                ],
 
           misterioDaFe: [
             { padre: "Eis o mistério da fé!" },
@@ -233,8 +337,9 @@ Fazei isto em memória de mim.`
 
                   epiclese: [
                     {
-                      padre: `E nós vos suplicamos que, participando do Corpo e Sangue de Cristo,
-                  sejamos reunidos pelo Espírito Santo num só corpo.`
+                      padre: `Suplicantes, vos pedimos que,
+                        participando do Corpo e Sangue de Cristo,
+                        sejamos reunidos pelo Espírito Santo num só corpo.`
                     },
                     {
                       assembleia: "O Espírito nos una num só corpo!"
@@ -320,33 +425,24 @@ Fazei isto em memória de mim.`
                       }
                     ],
                     [
-                      {
-                        padre: `Acolhei com bondade no vosso reino os nossos irmãos e irmãs que partiram desta vida
-                  e todos os que morreram na vossa amizade.`
-                      },
-                      {
-                        assembleia: "Concedei-lhes, ó Senhor, a luz eterna!"
-                      }
-                    ],
-                    [
-                      {
-                        padre: `Enfim, concedei também a nós chegarmos à morada eterna,
-                  onde viveremos para sempre convosco e com todos os santos.`
-                      },
-                      {
-                        assembleia: "Concedei-nos o convívio dos eleitos!"
-                      }
-                    ]
+                        {
+                            padre: `Acolhei com bondade no vosso reino os nossos irmãos e irmãs que partiram desta vida
+                        e todos os que morreram na vossa amizade.
+                        Unidos a eles, esperamos também nós saciar-nos eternamente da vossa glória,
+                        por Cristo, Senhor nosso.
+                        Por ele dais ao mundo todo bem e toda graça.`
+                        }
+                        ],
                   ]
                 },
 
           doxologia: [
             {
-              padre:
-                "Por Cristo, com Cristo e em Cristo, a vós, Deus Pai todo-poderoso, na unidade do Espírito Santo, toda honra e toda glória, agora e para sempre."
+                padre:
+                "Por Cristo, com Cristo e em Cristo, a vós, Deus Pai todo-poderoso, na unidade do Espírito Santo, toda honra e toda glória, por todos os séculos dos séculos."
             },
             { assembleia: "Amém." }
-          ],
+            ],
 
         }
       },
