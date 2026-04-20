@@ -200,7 +200,22 @@ Amém.`
                 { padre: "Demos graças ao Senhor, nosso Deus." },
                 { assembleia: "É nosso dever e nossa salvação." }
             ],
-            texto: null
+            texto: [
+                {
+                    padre: `Na verdade, é digno e justo, é nosso dever e salvação
+dar-vos graças sempre e em todo lugar,
+Senhor, Pai santo, Deus eterno e todo-poderoso,
+por vosso amado Filho, Jesus Cristo.
+Ele é a vossa Palavra, pela qual tudo criastes.
+Ele é o nosso Salvador e Redentor,
+que se encarnou pelo Espírito Santo e nasceu da Virgem Maria.
+Para cumprir a vossa vontade e adquirir para vós um povo santo,
+ele estendeu os braços na hora da sua paixão,
+a fim de vencer a morte e manifestar a ressurreição.
+Por isso, com os Anjos e todos os Santos,
+proclamamos vossa glória, cantando a uma só voz:`
+                }
+            ]
             },
 
           santo: `Santo, Santo, Santo,
@@ -267,7 +282,7 @@ Hosana nas alturas.`,
                     padre: `Estando para ser entregue
             e abraçando livremente a paixão,
             Jesus tomou o pão,
-            pronunciou a bênção de ação de graças,
+            deu graças,
             partiu e o deu a seus discípulos, dizendo:
 
             TOMAI, TODOS, E COMEI:
@@ -292,8 +307,8 @@ Hosana nas alturas.`,
                     {
                     padre: `Na noite em que ia ser entregue,
             ele tomou o pão,
-            deu graças e o partiu
-            e o deu a seus discípulos, dizendo:
+            pronunciou a bênção de ação de graças,
+partiu e o deu a seus discípulos, dizendo:
 
             TOMAI, TODOS, E COMEI:
             ISTO É O MEU CORPO,
@@ -326,7 +341,7 @@ Hosana nas alturas.`,
               ? {
                   anamnese_oblacao: [
                     {
-                      padre: `Celebrando, pois, a memória da morte e ressurreição do vosso Filho,
+                      padre: `Celebrando, pois, o memorial da morte e ressurreição do vosso Filho,
                   nós vos oferecemos, ó Pai, o pão da vida e o cálice da salvação,
                   e vos agradecemos porque nos tornastes dignos de estar aqui na vossa presença e vos servir.`
                     },
@@ -350,7 +365,11 @@ Hosana nas alturas.`,
                     [
                       {
                         padre: `Lembrai-vos, ó Pai, da vossa Igreja que se faz presente pelo mundo inteiro;
-                  que ela cresça na caridade com o Papa, o nosso bispo e todos os ministros do vosso povo.`
+que ela cresça na caridade, em comunhão com o papa (N.),
+com o nosso bispo (N.),
+com os bispos do mundo inteiro,
+os presbíteros, os diáconos
+e todos os ministros do vosso povo.`
                       },
                       {
                         assembleia: "Lembrai-vos, ó Pai, da vossa Igreja!"
@@ -367,13 +386,16 @@ Hosana nas alturas.`,
                     ],
                     [
                       {
-                        padre: `Enfim, nós vos pedimos, tende piedade de todos nós e dai-nos participar da vida eterna,
-                  com a Virgem Maria, Mãe de Deus, São José, os Apóstolos e todos os santos,
-                  que na vida souberam amar Cristo e seus irmãos.`
+                        padre: `Enfim, nós vos pedimos, tende piedade de todos nós
+e dai-nos participar da vida eterna,
+com a Virgem Maria, Mãe de Deus,
+São José, seu esposo,
+os Apóstolos,
+(os santos do dia)
+e todos os santos
+a fim de vos louvarmos e glorificarmos
+por Jesus Cristo, vosso Filho.`
                       },
-                      {
-                        assembleia: "Concedei-nos o convívio dos eleitos!"
-                      }
                     ]
                   ]
                 }
@@ -408,7 +430,12 @@ Hosana nas alturas.`,
                       {
                         padre: `Que o mesmo Espírito faça de nós uma eterna oferenda
                   para alcançarmos a herança com os vossos eleitos:
-                  a santíssima Virgem Maria, São José, os Apóstolos e todos os Santos.`
+                  a santíssima Virgem Maria, Mãe de Deus,
+São José, seu esposo,
+os vossos santos Apóstolos e gloriosos Mártires,
+(os santos do dia)
+e todos os Santos,
+que não cessam de interceder por nós na vossa presença.`
                       },
                       {
                         assembleia: "Fazei de nós uma perfeita oferenda!"
@@ -417,8 +444,18 @@ Hosana nas alturas.`,
                     [
                       {
                         padre: `Nós vos suplicamos, Senhor,
-                  que este sacrifício da nossa reconciliação estenda a paz e a salvação ao mundo inteiro;
-                  confirmai na fé e na caridade a vossa Igreja.`
+que este sacrifício da nossa reconciliação
+estenda a paz e a salvação ao mundo inteiro.
+Confirmai na fé e na caridade a vossa Igreja
+que caminha neste mundo com o vosso servo o Papa (NOME DO PAPA)
+e o nosso Bispo (NOME DO BISPO),
+com os bispos do mundo inteiro,
+os presbíteros e diáconos,
+os outros ministros e o povo por vós redimido.
+Atendei propício às preces desta família,
+que reunistes em vossa presença.
+Reconduzi a vós, Pai de misericórdia,
+todos os vossos filhos e filhas dispersos pelo mundo inteiro.`
                       },
                       {
                         assembleia: "Lembrai-vos, ó Pai, da vossa Igreja!"
@@ -431,7 +468,7 @@ Hosana nas alturas.`,
                         Unidos a eles, esperamos também nós saciar-nos eternamente da vossa glória,
                         por Cristo, Senhor nosso.
                         Por ele dais ao mundo todo bem e toda graça.`
-                        }
+                        },
                         ],
                   ]
                 },
