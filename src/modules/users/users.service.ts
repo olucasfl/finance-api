@@ -350,8 +350,21 @@ export class UsersService {
     };
   }
 
-  async setAdminStatus(userId: string, targetUserId: string, isAdmin: boolean) {
+  async setAdminStatus(
+    userId: string,
+    targetUserId: string,
+    isAdmin: boolean,
+    adminPassword: string
+  ) {
     await this.assertAdmin(userId);
+
+    if (adminPassword !== process.env.ADMIN_PASSWORD) {
+      throw new ForbiddenException("Senha de admin inválida");
+    }
+
+    if (userId === targetUserId && isAdmin === false) {
+      throw new ForbiddenException("Você não pode remover seu próprio admin");
+    }
 
     return this.prisma.user.update({
       where: { id: targetUserId },

@@ -116,14 +116,23 @@ export class UsersController {
 
   @Patch('admin/users/:id')
   @UseGuards(JwtAuthGuard)
-  setAdminStatus(@Req() req: any, @Body() body: { isAdmin: boolean },) {
+  setAdminStatus(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: { isAdmin: boolean; adminPassword: string },
+  ) {
     const userId = req?.user?.userId;
 
     if (!userId) {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    return this.userService.setAdminStatus(userId, req.params.id, body.isAdmin);
+    return this.userService.setAdminStatus(
+      userId,
+      id,
+      body.isAdmin,
+      body.adminPassword
+    );
   }
 
   @Get('admin/users/:id/activity')
