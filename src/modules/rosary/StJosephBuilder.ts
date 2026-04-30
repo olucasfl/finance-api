@@ -6,12 +6,10 @@ export function buildStJoseph(){
  INÍCIO
  ========================= */
 
- steps.push({
-  type:"prayer",
-  title:"Sinal da Cruz",
-  text:`Pelo sinal da Santa Cruz, livrai-nos, Deus, Nosso Senhor, dos nossos inimigos.
-Em nome do Pai e do Filho e do Espírito Santo. Amém.`
- })
+  steps.push({
+    type: "prayer",
+    title: "Sinal da Santa Cruz"
+  })
 
  steps.push({
   type:"prayer",

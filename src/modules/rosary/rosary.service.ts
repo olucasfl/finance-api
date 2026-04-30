@@ -8,6 +8,8 @@ import { buildSacredHeart } from "./sacredHearthBuilder"
 import { buildStJoseph } from "./StJosephBuilder"
 import { buildStMichael } from "./stMichaelBuilder"
 import { buildStBenedict } from "./stBenedictBuilder"
+import { buildHolySpirit } from "./HolySpiritBuilder"
+import { buildTearsMary } from "./tearsMaryBuilder"
 
 @Injectable()
 export class RosaryService{
@@ -49,6 +51,14 @@ getRosary(type:string){
 
   if(type === "sao-bento"){
     return buildStBenedict()
+  }
+
+  if(type === "espirito-santo"){
+    return buildHolySpirit()
+  }
+
+  if(type === "coroa-lagrimas"){
+    return buildTearsMary()
   }
 
  throw new NotFoundException("Invalid rosary type")

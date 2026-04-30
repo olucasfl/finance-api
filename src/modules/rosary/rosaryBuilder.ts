@@ -8,6 +8,8 @@ export function buildRosary(type:string){
 
  /* início */
 
+ steps.push({ type:"prayer", title:"Sinal da Santa Cruz" })
+
  steps.push({ type:"prayer", title:"Credo" })
 
  steps.push({ type:"prayer", title:"Pai Nosso" })
@@ -18,14 +20,16 @@ export function buildRosary(type:string){
 
  steps.push({ type:"prayer", title:"Glória ao Pai" })
 
+ steps.push({ type:"prayer", title:"Jaculatória de Fátima" })
+
  /* dezenas */
 
  mysteries.forEach((mystery,index)=>{
 
   steps.push({
-   type:"mystery",
-   title:`${index+1}º Mistério`,
-   text:mystery
+    type: "mystery",
+    title: `${index+1}º Mistério - ${mystery.title}`,
+    text: mystery.meditation
   })
 
   steps.push({ type:"prayer", title:"Pai Nosso" })
@@ -38,6 +42,8 @@ export function buildRosary(type:string){
   }
 
   steps.push({ type:"prayer", title:"Glória ao Pai" })
+
+ steps.push({ type:"prayer", title:"Jaculatória de Fátima" })
 
  })
 
