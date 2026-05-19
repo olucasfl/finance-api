@@ -10,11 +10,16 @@ import { buildStMichael } from "./stMichaelBuilder"
 import { buildStBenedict } from "./stBenedictBuilder"
 import { buildHolySpirit } from "./HolySpiritBuilder"
 import { buildTearsMary } from "./tearsMaryBuilder"
+import { JourneyService } from "../oratio/journey/journey.service"
 
 @Injectable()
 export class RosaryService{
 
- constructor(private prisma:PrismaService, private activityService: ActivityService){}
+  constructor(
+    private prisma: PrismaService,
+    private activityService: ActivityService,
+    private journeyService: JourneyService
+  ){}
 
  /* =========================
  START
@@ -182,6 +187,17 @@ async finish(userId:string){
   })
 
  }
+
+ try {
+
+  await this.journeyService
+    .incrementWeeklyProgress(userId)
+
+} catch(error){
+
+  console.log(error)
+
+}
 
  await this.activityService.log(
   userId,
