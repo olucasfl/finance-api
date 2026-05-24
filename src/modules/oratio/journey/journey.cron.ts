@@ -6,7 +6,7 @@ from "@nestjs/schedule"
 import { PrismaService }
 from "src/prisma/prisma.service"
 
-import { getCurrentWeekKey }
+import { getCurrentWeekKey, getWeekKey }
 from "./utils/week.util"
 
 @Injectable()
@@ -25,7 +25,14 @@ export class JourneyCron {
   @Cron("0 0 * * 0")
   async handleWeeklyJourney() {
 
-    const weekKey = getCurrentWeekKey()
+    const previousWeek = new Date()
+
+    previousWeek.setDate(
+      previousWeek.getDate() - 7
+    )
+
+    const weekKey =
+      getWeekKey(previousWeek)
 
     const progressList =
       await this.prisma.weeklyJourneyProgress.findMany({
