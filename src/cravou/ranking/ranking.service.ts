@@ -1,0 +1,68 @@
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+
+@Injectable()
+export class RankingService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async getGlobalRanking() {
+    const predictions = await this.prisma.cravouPrediction.findMany({
+      where: { points: { not: null } },
+      select: { userId: true, points: true },
+    });
+
+    const totals = new Map<string, number>();
+    for (const p of predictions) {
+      totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
+    }
+
+    const userIds = Array.from(totals.keys());
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, email: true },
+    });
+
+    const ranking = users
+      .map((u) => ({ userId: u.id, name: u.name, email: u.email, points: totals.get(u.id) ?? 0 }))
+      .sort((a, b) => b.points - a.points)
+      .map((entry, index) => ({ position: index + 1, ...entry }));
+
+    return ranking;
+  }
+
+  async getGroupRanking(groupId: string, userId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+
+    const isMember = group.members.some((m) => m.userId === userId);
+    if (!isMember) throw new ForbiddenException('Você não faz parte deste grupo');
+
+    const memberUserIds = group.members.map((m) => m.userId);
+
+    const predictions = await this.prisma.cravouPrediction.findMany({
+      where: { userId: { in: memberUserIds }, points: { not: null } },
+      select: { userId: true, points: true },
+    });
+
+    const totals = new Map<string, number>();
+    for (const p of predictions) {
+      totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: memberUserIds } },
+      select: { id: true, name: true, email: true },
+    });
+
+    const ranking = users
+      .map((u) => ({ userId: u.id, name: u.name, email: u.email, points: totals.get(u.id) ?? 0 }))
+      .sort((a, b) => b.points - a.points)
+      .map((entry, index) => ({ position: index + 1, ...entry }));
+
+    return { group: { id: group.id, name: group.name }, ranking };
+  }
+}

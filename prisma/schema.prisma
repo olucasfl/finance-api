@@ -282,3 +282,59 @@ enum Category {
   SUBSCRIPTIONS
   OTHER
 }
+
+// ============================================================
+// CRAVOU! — Bolão Copa do Mundo 2026
+// ============================================================
+
+model CravouMatch {
+  id                String             @id @default(uuid())
+  externalId        String             @unique
+  phase             String
+  groupName         String?
+  homeTeam          String
+  awayTeam          String
+  homeScore         Int?
+  awayScore         Int?
+  matchDate         DateTime
+  stadium           String?
+  status            String             @default("upcoming")
+  predictionsLocked Boolean            @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  predictions       CravouPrediction[]
+}
+
+model CravouPrediction {
+  id        String      @id @default(uuid())
+  userId    String
+  matchId   String
+  homeScore Int
+  awayScore Int
+  points    Int?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  match     CravouMatch @relation(fields: [matchId], references: [id])
+
+  @@unique([userId, matchId])
+}
+
+model CravouGroup {
+  id          String              @id @default(uuid())
+  name        String
+  description String?
+  inviteCode  String              @unique @default(cuid())
+  ownerId     String
+  createdAt   DateTime            @default(now())
+  members     CravouGroupMember[]
+}
+
+model CravouGroupMember {
+  id       String      @id @default(uuid())
+  groupId  String
+  userId   String
+  joinedAt DateTime    @default(now())
+  group    CravouGroup @relation(fields: [groupId], references: [id])
+
+  @@unique([groupId, userId])
+}
