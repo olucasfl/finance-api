@@ -43,29 +43,25 @@ export class UsersService {
 
     const token = randomBytes(32).toString('hex');
 
+    // Cravou: auto-verifica sem precisar de e-mail
+    const isCravou = app === 'cravou';
+
     const user = await this.prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
         password: hashedPassword,
-        emailVerificationToken: token,
+        emailVerified: isCravou,
+        emailVerificationToken: isCravou ? null : token,
       },
     });
 
-    if (app === AppType.ORATIO) {
-
-      await this.mailService.sendOratioVerificationEmail(
-        user.email,
-        token
-      );
-
-    } else {
-
-      await this.mailService.sendVerificationEmail(
-        user.email,
-        token
-      );
-
+    if (!isCravou) {
+      if (app === AppType.ORATIO) {
+        await this.mailService.sendOratioVerificationEmail(user.email, token);
+      } else {
+        await this.mailService.sendVerificationEmail(user.email, token);
+      }
     }
 
     const { password, refreshToken, ...userWithoutPassword } = user;
@@ -92,6 +88,7 @@ export class UsersService {
     createdAt: true,
     emailVerified: true,
     isAdmin: true,
+    bolaoPoints: true,
     spiritualStats: true,
     consecrations: true,
     completedConsecrationDays: {
@@ -113,6 +110,7 @@ export class UsersService {
     createdAt: user.createdAt,
     emailVerified: user.emailVerified,
     isAdmin: user.isAdmin,
+    bolaoPoints: user.bolaoPoints,
 
     spiritualProgress: {
 

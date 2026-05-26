@@ -20,6 +20,7 @@ model User {
   passwordResetExpires      DateTime?
   passwordResetToken        String?
   isAdmin                   Boolean                    @default(false)
+  bolaoPoints               Int                        @default(0)
   budgets                   Budget[]
   completedConsecrationDays ConsecrationCompletedDay[]
   consecrations             ConsecrationProgress[]
@@ -292,10 +293,12 @@ model CravouMatch {
   externalId        String             @unique
   phase             String
   groupName         String?
+  groupRound        Int?               // 1, 2 ou 3 (fase de grupos)
   homeTeam          String
   awayTeam          String
   homeScore         Int?
   awayScore         Int?
+  penaltyWinner     String?            // time vencedor nos pênaltis (mata-mata)
   matchDate         DateTime
   stadium           String?
   status            String             @default("upcoming")
@@ -303,6 +306,47 @@ model CravouMatch {
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
   predictions       CravouPrediction[]
+}
+
+// ─── Classificação da Fase de Grupos ────────────────────────────────────────
+
+model CravouGroupStanding {
+  id             String   @id @default(uuid())
+  group          String   // "A" até "L"
+  teamName       String
+  matchesPlayed  Int      @default(0)
+  wins           Int      @default(0)
+  draws          Int      @default(0)
+  losses         Int      @default(0)
+  goalsFor       Int      @default(0)
+  goalsAgainst   Int      @default(0)
+  goalDifference Int      @default(0)
+  points         Int      @default(0)
+  position       Int?     // 1-4, preenchido quando o grupo termina
+  isQualified    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([group, teamName])
+}
+
+// ─── Chaveamento do Mata-Mata ────────────────────────────────────────────────
+
+model CravouBracketSlot {
+  id         String   @id @default(uuid())
+  round      String   // "round_of_32"|"round_of_16"|"quarterfinal"|"semifinal"|"third_place"|"final"
+  slotNumber Int      // sequencial por fase (1-16 no R32, 1-8 no R16, etc.)
+  homeDesc   String   // descrição da origem: "1º Grupo A"
+  awayDesc   String   // "Melhor Terceiro (C, E ou H)"
+  homeTeam   String?  // preenchido quando conhecido
+  awayTeam   String?  // preenchido quando conhecido
+  winnerTeam String?  // preenchido após o jogo
+  loserTeam  String?  // preenchido nas semis (perdedor → disputa 3º lugar)
+  matchId    String?  // FK para CravouMatch quando a partida for criada
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([round, slotNumber])
 }
 
 model CravouPrediction {

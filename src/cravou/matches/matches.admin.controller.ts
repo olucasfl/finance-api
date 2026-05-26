@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -10,6 +11,7 @@ import {
 import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
 import { ScoringService } from '../scoring/scoring.service';
+import { CreateMatchDto } from './dto/create-match.dto';
 import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
 import { UpdateMatchStatusDto } from './dto/update-match-status.dto';
 import { MatchesService } from './matches.service';
@@ -25,6 +27,16 @@ export class MatchesAdminController {
   @Post('import-matches')
   importMatches() {
     return this.matchesService.importMatches();
+  }
+
+  @Post('matches')
+  create(@Body() dto: CreateMatchDto) {
+    return this.matchesService.createMatch(dto);
+  }
+
+  @Post('matches/bulk')
+  createBulk(@Body() body: { matches: CreateMatchDto[] }) {
+    return this.matchesService.createMatchesBulk(body.matches);
   }
 
   @Get('matches')
@@ -50,5 +62,10 @@ export class MatchesAdminController {
   @Post('matches/:id/lock')
   lock(@Param('id') id: string) {
     return this.matchesService.lockMatch(id);
+  }
+
+  @Delete('matches/:id')
+  remove(@Param('id') id: string) {
+    return this.matchesService.removeMatch(id);
   }
 }

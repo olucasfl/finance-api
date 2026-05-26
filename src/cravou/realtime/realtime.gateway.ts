@@ -6,6 +6,8 @@ export class RealtimeGateway {
   @WebSocketServer()
   server: Server;
 
+  // ─── Bolão ────────────────────────────────────────────────────────────────
+
   emitMatchUpdated(match: object) {
     this.server.emit('match:updated', match);
   }
@@ -16,5 +18,23 @@ export class RealtimeGateway {
 
   emitRankingUpdated() {
     this.server.emit('ranking:updated', {});
+  }
+
+  // ─── Torneio ──────────────────────────────────────────────────────────────
+
+  emitGroupClassified(group: string, standings: object[]) {
+    this.server.emit('group:classified', { group, standings });
+  }
+
+  emitAllGroupsComplete() {
+    this.server.emit('tournament:all-groups-complete', {});
+  }
+
+  emitThirdsSelected(qualifiers: object[]) {
+    this.server.emit('bracket:thirds-selected', { qualifiers });
+  }
+
+  emitBracketUpdated(round: string, slots: object[]) {
+    this.server.emit('bracket:updated', { round, slots });
   }
 }
