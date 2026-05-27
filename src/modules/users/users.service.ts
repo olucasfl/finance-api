@@ -77,30 +77,32 @@ export class UsersService {
 
   async getProfile(userId: string) {
 
-  const user = await this.prisma.user.findUnique({
-
-    where: { id: userId },
-
-    select: {
-    id: true,
-    name: true,
-    email: true,
-    createdAt: true,
-    emailVerified: true,
-    isAdmin: true,
-    bolaoPoints: true,
-    spiritualStats: true,
-    consecrations: true,
-    completedConsecrationDays: {
-      select: { id: true }
-    }
-    }
-
-  })
+  const [user, pointsAgg] = await Promise.all([
+    this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        createdAt: true,
+        emailVerified: true,
+        isAdmin: true,
+        spiritualStats: true,
+        consecrations: true,
+        completedConsecrationDays: { select: { id: true } },
+      },
+    }),
+    this.prisma.cravouPrediction.aggregate({
+      where: { userId, points: { not: null } },
+      _sum: { points: true },
+    }),
+  ]);
 
   if (!user) {
     throw new NotFoundException("User not found")
   }
+
+  const bolaoPoints = pointsAgg._sum.points ?? 0;
 
   return {
 
@@ -110,7 +112,7 @@ export class UsersService {
     createdAt: user.createdAt,
     emailVerified: user.emailVerified,
     isAdmin: user.isAdmin,
-    bolaoPoints: user.bolaoPoints,
+    bolaoPoints,
 
     spiritualProgress: {
 

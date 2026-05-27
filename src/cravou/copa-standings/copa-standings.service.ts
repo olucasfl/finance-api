@@ -178,30 +178,33 @@ export class CopaStandingsService {
     }
 
     return ALL_GROUPS.map((g) => {
-      const standings = standingsByGroup[g] ?? [];
-      if (standings.length > 0) return { group: g, standings };
+      const fromDB = standingsByGroup[g] ?? [];
+      const allTeams = teamsByGroup[g] ?? new Set<string>();
+      const dbTeamNames = new Set(fromDB.map((s) => s.teamName));
 
-      // No standings yet — return placeholder rows derived from matches
-      const teams = Array.from(teamsByGroup[g] ?? []).sort();
-      const placeholders = teams.map((teamName) => ({
-        id: `ph-${g}-${teamName}`,
-        group: g,
-        teamName,
-        matchesPlayed: 0,
-        wins: 0,
-        draws: 0,
-        losses: 0,
-        goalsFor: 0,
-        goalsAgainst: 0,
-        goalDifference: 0,
-        points: 0,
-        position: null,
-        isQualified: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
+      // Teams not yet in DB get a placeholder row with zeroed stats
+      const placeholders = Array.from(allTeams)
+        .filter((t) => !dbTeamNames.has(t))
+        .sort()
+        .map((teamName) => ({
+          id: `ph-${g}-${teamName}`,
+          group: g,
+          teamName,
+          matchesPlayed: 0,
+          wins: 0,
+          draws: 0,
+          losses: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+          goalDifference: 0,
+          points: 0,
+          position: null,
+          isQualified: false,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }));
 
-      return { group: g, standings: placeholders };
+      return { group: g, standings: [...fromDB, ...placeholders] };
     });
   }
 

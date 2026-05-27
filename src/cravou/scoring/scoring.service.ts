@@ -47,6 +47,19 @@ export class ScoringService {
       });
     }
 
+    // Recalcula e persiste o total de pontos de cada usuário afetado
+    const affectedUserIds = [...new Set(predictions.map((p) => p.userId))];
+    for (const userId of affectedUserIds) {
+      const agg = await this.prisma.cravouPrediction.aggregate({
+        where: { userId, points: { not: null } },
+        _sum: { points: true },
+      });
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { bolaoPoints: agg._sum.points ?? 0 },
+      });
+    }
+
     this.gateway.emitRankingUpdated();
   }
 }

@@ -10,6 +10,8 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ScoringService } from '../scoring/scoring.service';
 import { CopaStandingsService } from '../copa-standings/copa-standings.service';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { FinalizeMatchDto } from './dto/finalize-match.dto';
+import { UpdateMatchDateDto } from './dto/update-match-date.dto';
 import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
 import { UpdateMatchStatusDto } from './dto/update-match-status.dto';
 
@@ -319,6 +321,12 @@ export class MatchesService {
     });
 
     this.gateway.emitMatchUpdated(updated);
+
+    // Se a partida já está finalizada, reprocessa pontos automaticamente
+    if (match.status === 'finished') {
+      await this.scoring.reprocessMatch(id);
+    }
+
     return updated;
   }
 
@@ -362,6 +370,64 @@ export class MatchesService {
     });
 
     this.gateway.emitMatchLocked(id);
+    this.gateway.emitMatchUpdated(updated);
+    return updated;
+  }
+
+  // ─── Finalizar com resultado (score + finished + reprocess em um passo) ─────
+
+  async finalizeMatch(id: string, dto: FinalizeMatchDto) {
+    const match = await this.prisma.cravouMatch.findUnique({ where: { id } });
+    if (!match) throw new NotFoundException('Jogo não encontrado');
+
+    const updated = await this.prisma.cravouMatch.update({
+      where: { id },
+      data: {
+        homeScore: dto.homeScore,
+        awayScore: dto.awayScore,
+        status: 'finished',
+        predictionsLocked: true,
+      },
+    });
+
+    this.gateway.emitMatchUpdated(updated);
+    await this.scoring.reprocessMatch(id);
+
+    if (match.phase === 'group_stage') {
+      await this.standings.updateFromMatch(id);
+    }
+
+    return updated;
+  }
+
+  // ─── Alterar data/hora (para testes e correções) ──────────────────────────
+
+  async updateMatchDate(id: string, dto: UpdateMatchDateDto) {
+    const match = await this.prisma.cravouMatch.findUnique({ where: { id } });
+    if (!match) throw new NotFoundException('Jogo não encontrado');
+
+    if (match.status === 'finished') {
+      throw new BadRequestException('Não é possível alterar a data de uma partida já encerrada');
+    }
+
+    const newDate = new Date(dto.matchDate);
+    const now = new Date();
+
+    // Recalcula o status baseado na nova data
+    let newStatus = match.status;
+    let newLocked = match.predictionsLocked;
+
+    // Se a nova data ainda está no futuro (> 30min), volta para upcoming aberto
+    if (newDate.getTime() - now.getTime() > 30 * 60 * 1000) {
+      newStatus = 'upcoming';
+      newLocked = false;
+    }
+
+    const updated = await this.prisma.cravouMatch.update({
+      where: { id },
+      data: { matchDate: newDate, status: newStatus, predictionsLocked: newLocked },
+    });
+
     this.gateway.emitMatchUpdated(updated);
     return updated;
   }

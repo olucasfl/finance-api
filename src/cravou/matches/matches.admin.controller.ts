@@ -12,6 +12,8 @@ import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
 import { AdminGuard } from '../admin/admin.guard';
 import { ScoringService } from '../scoring/scoring.service';
 import { CreateMatchDto } from './dto/create-match.dto';
+import { FinalizeMatchDto } from './dto/finalize-match.dto';
+import { UpdateMatchDateDto } from './dto/update-match-date.dto';
 import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
 import { UpdateMatchStatusDto } from './dto/update-match-status.dto';
 import { MatchesService } from './matches.service';
@@ -62,6 +64,18 @@ export class MatchesAdminController {
   @Post('matches/:id/lock')
   lock(@Param('id') id: string) {
     return this.matchesService.lockMatch(id);
+  }
+
+  // Registra resultado final: define placar + muda para finished + calcula pontos
+  @Post('matches/:id/finalize')
+  finalize(@Param('id') id: string, @Body() dto: FinalizeMatchDto) {
+    return this.matchesService.finalizeMatch(id, dto);
+  }
+
+  // Altera data/hora da partida (para testes e correções)
+  @Patch('matches/:id/date')
+  updateDate(@Param('id') id: string, @Body() dto: UpdateMatchDateDto) {
+    return this.matchesService.updateMatchDate(id, dto);
   }
 
   @Delete('matches/:id')
