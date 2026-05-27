@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
-import { QF_BRACKET, R16_BRACKET, R32_SLOT_DEFINITIONS, SF_BRACKET } from './r32-mapping.data';
+import { QF_BRACKET, R16_BRACKET, R32_SLOT_DEFINITIONS, SF_BRACKET, FINAL_BRACKET } from './r32-mapping.data';
 import { ThirdPlaceService } from './third-place.service';
 
 @Injectable()
@@ -138,7 +138,8 @@ export class BracketService {
     const nextRoundMap: Record<string, { nextRound: string; bracket: any[] }> = {
       round_of_32: { nextRound: 'round_of_16', bracket: R16_BRACKET },
       round_of_16: { nextRound: 'quarterfinal', bracket: QF_BRACKET },
-      quarterfinal: { nextRound: 'semifinal', bracket: SF_BRACKET },
+      quarterfinal: { nextRound: 'semifinal',   bracket: SF_BRACKET },
+      semifinal:    { nextRound: 'final',        bracket: FINAL_BRACKET },
     };
 
     const nextConfig = nextRoundMap[currentRound];
@@ -149,9 +150,11 @@ export class BracketService {
       (b) => b.homeFromR32 === slotNumber ||
               b.homeFromR16 === slotNumber ||
               b.homeFromQF === slotNumber ||
+              b.homeFromSF === slotNumber ||
               b.awayFromR32 === slotNumber ||
               b.awayFromR16 === slotNumber ||
-              b.awayFromQF === slotNumber,
+              b.awayFromQF === slotNumber ||
+              b.awayFromSF === slotNumber,
     );
 
     if (!nextSlotDef) return;
@@ -159,7 +162,8 @@ export class BracketService {
     const isHome =
       nextSlotDef.homeFromR32 === slotNumber ||
       nextSlotDef.homeFromR16 === slotNumber ||
-      nextSlotDef.homeFromQF === slotNumber;
+      nextSlotDef.homeFromQF === slotNumber ||
+      nextSlotDef.homeFromSF === slotNumber;
 
     const nextSlot = await this.prisma.cravouBracketSlot.findUnique({
       where: { round_slotNumber: { round: nextConfig.nextRound, slotNumber: nextSlotDef.slot } },
@@ -167,12 +171,18 @@ export class BracketService {
 
     if (!nextSlot) {
       // Cria o slot da próxima fase se ainda não existir
+      const roundShort: Record<string, string> = {
+        round_of_32: 'R32', round_of_16: 'R16', quarterfinal: 'QF', semifinal: 'SF',
+      };
+      const tag = roundShort[currentRound] ?? currentRound;
+      const homeNum = nextSlotDef.homeFromR32 ?? nextSlotDef.homeFromR16 ?? nextSlotDef.homeFromQF ?? nextSlotDef.homeFromSF;
+      const awayNum = nextSlotDef.awayFromR32 ?? nextSlotDef.awayFromR16 ?? nextSlotDef.awayFromQF ?? nextSlotDef.awayFromSF;
       await this.prisma.cravouBracketSlot.create({
         data: {
           round: nextConfig.nextRound,
           slotNumber: nextSlotDef.slot,
-          homeDesc: `Vencedor R32-${nextSlotDef.homeFromR32 ?? nextSlotDef.homeFromR16 ?? nextSlotDef.homeFromQF}`,
-          awayDesc: `Vencedor R32-${nextSlotDef.awayFromR32 ?? nextSlotDef.awayFromR16 ?? nextSlotDef.awayFromQF}`,
+          homeDesc: `Vencedor ${tag}-${homeNum}`,
+          awayDesc: `Vencedor ${tag}-${awayNum}`,
           homeTeam: isHome ? winner : null,
           awayTeam: !isHome ? winner : null,
         },
@@ -226,6 +236,57 @@ export class BracketService {
     });
 
     this.gateway.emitBracketUpdated(slot.round, [updated]);
+    return updated;
+  }
+
+  // ─── Sincroniza times do R32 com as standings atuais ─────────────────────
+
+  async refreshR32TeamsFromStandings(): Promise<void> {
+    for (const def of R32_SLOT_DEFINITIONS) {
+      const existingSlot = await this.prisma.cravouBracketSlot.findUnique({
+        where: { round_slotNumber: { round: 'round_of_32', slotNumber: def.slot } },
+      });
+      if (!existingSlot) continue;
+
+      const updateData: { homeTeam?: string; awayTeam?: string } = {};
+
+      if (def.homeSource) {
+        const standing = await this.prisma.cravouGroupStanding.findFirst({
+          where: { group: def.homeSource.group, position: def.homeSource.pos },
+        });
+        if (standing?.teamName) updateData.homeTeam = standing.teamName;
+      }
+
+      if (!def.awayIsThird && def.awaySource) {
+        const standing = await this.prisma.cravouGroupStanding.findFirst({
+          where: { group: def.awaySource.group, position: def.awaySource.pos },
+        });
+        if (standing?.teamName) updateData.awayTeam = standing.teamName;
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await this.prisma.cravouBracketSlot.update({ where: { id: existingSlot.id }, data: updateData });
+      }
+    }
+
+    const allSlots = await this.getBracket();
+    this.gateway.emitBracketUpdated('round_of_32', allSlots);
+    this.logger.log('R32: times sincronizados com as standings');
+  }
+
+  // ─── Remove resultado de uma vaga ─────────────────────────────────────────
+
+  async resetKnockoutResult(slotId: string): Promise<any> {
+    const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
+    if (!slot) throw new NotFoundException('Vaga não encontrada');
+
+    const updated = await this.prisma.cravouBracketSlot.update({
+      where: { id: slotId },
+      data: { winnerTeam: null, loserTeam: null },
+    });
+
+    const allSlots = await this.getBracket();
+    this.gateway.emitBracketUpdated(slot.round, allSlots);
     return updated;
   }
 

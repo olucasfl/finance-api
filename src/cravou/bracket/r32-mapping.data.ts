@@ -189,3 +189,8 @@ export const SF_BRACKET = [
   { slot: 1, homeFromQF: 1, awayFromQF: 2 },
   { slot: 2, homeFromQF: 3, awayFromQF: 4 },
 ];
+
+// ─── Final ───────────────────────────────────────────────────────────────────
+export const FINAL_BRACKET = [
+  { slot: 1, homeFromSF: 1, awayFromSF: 2 },
+];

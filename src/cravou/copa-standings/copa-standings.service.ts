@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { BracketService } from '../bracket/bracket.service';
 import { TiebreakerService } from './tiebreaker.service';
 
 const ALL_GROUPS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
@@ -15,6 +16,7 @@ export class CopaStandingsService {
     private readonly prisma: PrismaService,
     private readonly tiebreaker: TiebreakerService,
     private readonly gateway: RealtimeGateway,
+    private readonly bracket: BracketService,
   ) {}
 
   // ─── Chamado pelo MatchesService quando um jogo de grupo termina ──────────
@@ -130,6 +132,12 @@ export class CopaStandingsService {
     this.logger.log(`Grupo ${group} classificado`);
     const finalStandings = await this.getGroupStandings(group);
     this.gateway.emitGroupClassified(group, finalStandings);
+
+    // Atualiza times do R32 se o chaveamento já foi montado
+    const r32Count = await this.prisma.cravouBracketSlot.count({ where: { round: 'round_of_32' } });
+    if (r32Count > 0) {
+      await this.bracket.refreshR32TeamsFromStandings();
+    }
 
     // Verifica se todos os 12 grupos terminaram
     await this.checkAllGroupsComplete();

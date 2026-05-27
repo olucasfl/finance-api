@@ -28,4 +28,14 @@ export class BracketAdminController {
   ) {
     return this.bracketService.overrideSlotTeams(slotId, body);
   }
+
+  @Post('sync-r32-teams')
+  syncR32Teams() {
+    return this.bracketService.refreshR32TeamsFromStandings();
+  }
+
+  @Post(':slotId/reset-result')
+  resetResult(@Param('slotId') slotId: string) {
+    return this.bracketService.resetKnockoutResult(slotId);
+  }
 }
