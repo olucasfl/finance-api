@@ -14,4 +14,5 @@ export class RankingController {
     }
     return this.rankingService.getGlobalRanking();
   }
+
 }

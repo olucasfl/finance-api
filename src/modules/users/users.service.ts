@@ -77,7 +77,7 @@ export class UsersService {
 
   async getProfile(userId: string) {
 
-  const [user, pointsAgg] = await Promise.all([
+  const [user, pointsAgg, cravasCount] = await Promise.all([
     this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -96,6 +96,9 @@ export class UsersService {
       where: { userId, points: { not: null } },
       _sum: { points: true },
     }),
+    this.prisma.cravouPrediction.count({
+      where: { userId, points: { in: [10, 15] } },
+    }),
   ]);
 
   if (!user) {
@@ -113,6 +116,7 @@ export class UsersService {
     emailVerified: user.emailVerified,
     isAdmin: user.isAdmin,
     bolaoPoints,
+    cravadas: cravasCount,
 
     spiritualProgress: {
 

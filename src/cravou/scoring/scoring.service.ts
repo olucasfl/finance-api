@@ -3,6 +3,9 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { calculatePoints } from './scoring.rules';
 
+// Pontos atribuídos apenas para placar exato (grupo=10, mata-mata=15)
+const EXACT_SCORE_POINTS = new Set([10, 15]);
+
 @Injectable()
 export class ScoringService {
   constructor(
@@ -47,16 +50,25 @@ export class ScoringService {
       });
     }
 
-    // Recalcula e persiste o total de pontos de cada usuário afetado
+    // Recalcula pontos e cravadas de cada usuário afetado
     const affectedUserIds = [...new Set(predictions.map((p) => p.userId))];
     for (const userId of affectedUserIds) {
-      const agg = await this.prisma.cravouPrediction.aggregate({
-        where: { userId, points: { not: null } },
-        _sum: { points: true },
-      });
+      const [pointsAgg, cravasCount] = await Promise.all([
+        this.prisma.cravouPrediction.aggregate({
+          where: { userId, points: { not: null } },
+          _sum: { points: true },
+        }),
+        this.prisma.cravouPrediction.count({
+          where: { userId, points: { in: [...EXACT_SCORE_POINTS] } },
+        }),
+      ]);
+
       await this.prisma.user.update({
         where: { id: userId },
-        data: { bolaoPoints: agg._sum.points ?? 0 },
+        data: {
+          bolaoPoints: pointsAgg._sum.points ?? 0,
+          cravadas: cravasCount,
+        },
       });
     }
 
