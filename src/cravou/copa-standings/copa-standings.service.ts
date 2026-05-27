@@ -271,6 +271,39 @@ export class CopaStandingsService {
     });
   }
 
+  // ─── Recalcula grupo do zero (chamado após reset de partida) ─────────────
+
+  async recalculateGroup(group: string): Promise<void> {
+    await this.prisma.cravouGroupStanding.updateMany({
+      where: { group },
+      data: {
+        matchesPlayed: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        goalDifference: 0,
+        points: 0,
+        position: null,
+        isQualified: false,
+      },
+    });
+
+    const finishedMatches = await this.prisma.cravouMatch.findMany({
+      where: { groupName: group, phase: 'group_stage', status: 'finished' },
+    });
+
+    for (const match of finishedMatches) {
+      if (match.homeScore === null || match.awayScore === null) continue;
+      await this.updateStandingForTeam(group, match.homeTeam, match.homeScore, match.awayScore);
+      await this.updateStandingForTeam(group, match.awayTeam, match.awayScore, match.homeScore);
+    }
+
+    await this.checkAndClassifyGroup(group);
+    this.logger.log(`Grupo ${group} recalculado do zero (${finishedMatches.length} partidas finalizadas)`);
+  }
+
   // ─── Admin: override manual de posição ───────────────────────────────────
 
   async overridePositions(

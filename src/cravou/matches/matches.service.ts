@@ -444,6 +444,10 @@ export class MatchesService {
       });
     }
 
+    if (match.phase === 'group_stage' && match.groupName) {
+      await this.standings.recalculateGroup(match.groupName);
+    }
+
     this.gateway.emitMatchUpdated(updated);
     this.gateway.emitRankingUpdated();
 
