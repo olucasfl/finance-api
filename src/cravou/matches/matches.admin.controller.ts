@@ -78,6 +78,16 @@ export class MatchesAdminController {
     return this.matchesService.updateMatchDate(id, dto);
   }
 
+  @Post('matches/:id/reset')
+  resetMatch(@Param('id') id: string) {
+    return this.matchesService.resetMatch(id);
+  }
+
+  @Post('matches/:id/unlock')
+  unlockMatch(@Param('id') id: string) {
+    return this.matchesService.unlockMatch(id);
+  }
+
   @Delete('matches/:id')
   remove(@Param('id') id: string) {
     return this.matchesService.removeMatch(id);

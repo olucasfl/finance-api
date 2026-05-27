@@ -400,6 +400,71 @@ export class MatchesService {
     return updated;
   }
 
+  // ─── Reset (apaga placar, zera pontos, reverte status) ──────────────────────
+
+  async resetMatch(id: string) {
+    const match = await this.prisma.cravouMatch.findUnique({ where: { id } });
+    if (!match) throw new NotFoundException('Jogo não encontrado');
+
+    const now = new Date();
+    const matchInFuture = new Date(match.matchDate).getTime() > now.getTime();
+
+    const newStatus = matchInFuture ? 'upcoming' : 'awaiting_result';
+    const newLocked = !matchInFuture;
+
+    const affected = await this.prisma.cravouPrediction.findMany({
+      where: { matchId: id, points: { not: null } },
+      select: { userId: true },
+    });
+
+    const updated = await this.prisma.cravouMatch.update({
+      where: { id },
+      data: { homeScore: null, awayScore: null, status: newStatus, predictionsLocked: newLocked },
+    });
+
+    await this.prisma.cravouPrediction.updateMany({
+      where: { matchId: id },
+      data: { points: null },
+    });
+
+    const affectedUserIds = [...new Set(affected.map((p) => p.userId))];
+    for (const userId of affectedUserIds) {
+      const [pointsAgg, cravasCount] = await Promise.all([
+        this.prisma.cravouPrediction.aggregate({
+          where: { userId, points: { not: null } },
+          _sum: { points: true },
+        }),
+        this.prisma.cravouPrediction.count({
+          where: { userId, points: { in: [10, 15] } },
+        }),
+      ]);
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { bolaoPoints: pointsAgg._sum.points ?? 0, cravadas: cravasCount },
+      });
+    }
+
+    this.gateway.emitMatchUpdated(updated);
+    this.gateway.emitRankingUpdated();
+
+    return { ...updated, affectedUsers: affectedUserIds.length };
+  }
+
+  // ─── Desbloquear palpites ────────────────────────────────────────────────────
+
+  async unlockMatch(id: string) {
+    const match = await this.prisma.cravouMatch.findUnique({ where: { id } });
+    if (!match) throw new NotFoundException('Jogo não encontrado');
+
+    const updated = await this.prisma.cravouMatch.update({
+      where: { id },
+      data: { predictionsLocked: false },
+    });
+
+    this.gateway.emitMatchUpdated(updated);
+    return updated;
+  }
+
   // ─── Alterar data/hora (para testes e correções) ──────────────────────────
 
   async updateMatchDate(id: string, dto: UpdateMatchDateDto) {
