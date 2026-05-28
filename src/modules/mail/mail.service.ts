@@ -339,6 +339,121 @@ export class MailService {
 
   /*
   =============================
+  CRAVOU TEMPLATE
+  =============================
+  */
+
+  private buildCravouTemplate(
+    title: string,
+    message: string,
+    buttonText: string,
+    link: string,
+    footer: string
+  ) {
+
+    return `
+<div style="
+  background:#0d0d0d;
+  padding:40px 20px;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+">
+
+  <div style="
+    max-width:520px;
+    margin:auto;
+    background:#1a1a1a;
+    border-radius:16px;
+    padding:40px;
+    text-align:center;
+    border:1px solid rgba(255,255,255,0.08);
+  ">
+
+    <h1 style="
+      margin:0;
+      font-size:30px;
+      font-weight:800;
+      color:white;
+      letter-spacing:1px;
+    ">
+      Cravou<span style="color:#e11d48">!</span>
+    </h1>
+
+    <div style="
+      height:3px;
+      width:60px;
+      margin:18px auto 28px auto;
+      background:#e11d48;
+      border-radius:4px;
+    "></div>
+
+    <h2 style="
+      color:white;
+      margin-bottom:12px;
+      font-weight:600;
+    ">
+      ${title}
+    </h2>
+
+    <p style="
+      color:#a1a1aa;
+      font-size:15px;
+      line-height:1.6;
+      margin-bottom:30px;
+    ">
+      ${message}
+    </p>
+
+    <a href="${link}"
+    style="
+      display:inline-block;
+      padding:14px 28px;
+      background:#e11d48;
+      color:white;
+      font-weight:700;
+      border-radius:10px;
+      text-decoration:none;
+      font-size:15px;
+      box-shadow:0 6px 20px rgba(225,29,72,0.35);
+    ">
+      ${buttonText}
+    </a>
+
+    <p style="
+      color:#71717a;
+      font-size:13px;
+      margin-top:28px;
+      line-height:1.5;
+    ">
+      ${footer}
+    </p>
+
+    <p style="
+      margin-top:18px;
+      font-size:12px;
+      color:#71717a;
+      word-break:break-all;
+    ">
+      Se o botão não funcionar, copie e cole este link:<br>
+      <span style="color:#e11d48">${link}</span>
+    </p>
+
+  </div>
+
+  <p style="
+    text-align:center;
+    margin-top:20px;
+    color:#71717a;
+    font-size:12px;
+  ">
+    © ${new Date().getFullYear()} Cravou!
+  </p>
+
+</div>
+`;
+  }
+
+  /*
+  =============================
   ORATIO EMAILS
   =============================
   */
@@ -380,6 +495,52 @@ export class MailService {
       "Oratio • Redefinir senha",
       htmlContent,
       "Oratio"
+    );
+  }
+
+  /*
+  =============================
+  CRAVOU EMAILS
+  =============================
+  */
+
+  async sendCravouVerificationEmail(email: string, token: string) {
+
+    const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}&app=cravou`;
+
+    const htmlContent = this.buildCravouTemplate(
+      "Confirme seu email",
+      "Bem-vindo ao <b>Cravou!</b><br>Clique no botão abaixo para confirmar seu email e ativar sua conta.",
+      "Confirmar email",
+      link,
+      "Se você não criou uma conta, pode ignorar este email."
+    );
+
+    await this.sendEmail(
+      email,
+      "Cravou! • Confirme seu email",
+      htmlContent,
+      "Cravou!"
+    );
+  }
+
+  async sendCravouPasswordResetEmail(email: string, token: string) {
+
+    const link = `https://cravou-ashy.vercel.app/reset-password?token=${token}`;
+
+    const htmlContent = this.buildCravouTemplate(
+      "Redefinir senha",
+      "Recebemos uma solicitação para redefinir sua senha no <b>Cravou!</b>.",
+      "Redefinir senha",
+      link,
+      "Este link expira em 30 minutos por segurança."
+    );
+
+    await this.sendEmail(
+      email,
+      "Cravou! • Redefinir senha",
+      htmlContent,
+      "Cravou!"
     );
   }
 

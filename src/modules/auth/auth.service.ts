@@ -117,10 +117,10 @@ export class AuthService {
 
     if (app === "oratio") {
       redirectUrl = "https://oratio-phi.vercel.app/login";
-    }
-
-    if (app === "smart-finance") {
+    } else if (app === "smart-finance") {
       redirectUrl = "https://finance-api-front.vercel.app/login";
+    } else if (app === "cravou") {
+      redirectUrl = "https://cravou-ashy.vercel.app/login";
     }
 
     return res.redirect(redirectUrl);
@@ -151,17 +151,15 @@ export class AuthService {
 
     if (app === AppType.ORATIO) {
 
-      await this.mailService.sendOratioVerificationEmail(
-        user.email,
-        token
-      );
-      
+      await this.mailService.sendOratioVerificationEmail(user.email, token);
+
+    } else if (app === AppType.CRAVOU) {
+
+      await this.mailService.sendCravouVerificationEmail(user.email, token);
+
     } else {
 
-      await this.mailService.sendVerificationEmail(
-        user.email,
-        token
-      );
+      await this.mailService.sendVerificationEmail(user.email, token);
 
     }
 
@@ -205,17 +203,15 @@ async requestPasswordReset(email: string, app?: string) {
 
   if (app === AppType.ORATIO) {
 
-    await this.mailService.sendOratioPasswordResetEmail(
-      user.email,
-      token
-    );
+    await this.mailService.sendOratioPasswordResetEmail(user.email, token);
+
+  } else if (app === AppType.CRAVOU) {
+
+    await this.mailService.sendCravouPasswordResetEmail(user.email, token);
 
   } else {
 
-    await this.mailService.sendPasswordResetEmail(
-      user.email,
-      token
-    );
+    await this.mailService.sendPasswordResetEmail(user.email, token);
 
   }
 

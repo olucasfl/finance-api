@@ -43,25 +43,22 @@ export class UsersService {
 
     const token = randomBytes(32).toString('hex');
 
-    // Cravou: auto-verifica sem precisar de e-mail
-    const isCravou = app === 'cravou';
-
     const user = await this.prisma.user.create({
       data: {
         name: data.name,
         email: data.email,
         password: hashedPassword,
-        emailVerified: isCravou,
-        emailVerificationToken: isCravou ? null : token,
+        emailVerified: false,
+        emailVerificationToken: token,
       },
     });
 
-    if (!isCravou) {
-      if (app === AppType.ORATIO) {
-        await this.mailService.sendOratioVerificationEmail(user.email, token);
-      } else {
-        await this.mailService.sendVerificationEmail(user.email, token);
-      }
+    if (app === AppType.ORATIO) {
+      await this.mailService.sendOratioVerificationEmail(user.email, token);
+    } else if (app === AppType.CRAVOU) {
+      await this.mailService.sendCravouVerificationEmail(user.email, token);
+    } else {
+      await this.mailService.sendVerificationEmail(user.email, token);
     }
 
     const { password, refreshToken, ...userWithoutPassword } = user;
