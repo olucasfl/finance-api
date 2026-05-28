@@ -36,6 +36,11 @@ export class GroupsController {
     return this.groupsService.editGroup(id, req.user.userId, dto);
   }
 
+  @Delete(':id')
+  deleteGroup(@Param('id') id: string, @Req() req: any) {
+    return this.groupsService.deleteGroup(id, req.user.userId);
+  }
+
   @Delete(':id/leave')
   leaveGroup(@Param('id') id: string, @Req() req: any) {
     return this.groupsService.leaveGroup(id, req.user.userId);

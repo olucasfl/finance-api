@@ -176,6 +176,17 @@ export class GroupsService {
     });
   }
 
+  // ─── Excluir grupo (só dono) ─────────────────────────────────────────────────
+
+  async deleteGroup(groupId: string, userId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({ where: { id: groupId } });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    if (group.ownerId !== userId) throw new ForbiddenException('Apenas o dono pode excluir o grupo');
+
+    await this.prisma.cravouGroup.delete({ where: { id: groupId } });
+    return { message: 'Grupo excluído' };
+  }
+
   // ─── Sair do grupo ───────────────────────────────────────────────────────────
 
   async leaveGroup(groupId: string, userId: string) {
