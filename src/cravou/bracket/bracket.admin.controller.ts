@@ -51,4 +51,9 @@ export class BracketAdminController {
   ) {
     return this.bracketService.createMatchFromSlot(slotId, body.matchDate);
   }
+
+  @Post(':slotId/unlink-match')
+  unlinkMatch(@Param('slotId') slotId: string) {
+    return this.bracketService.unlinkMatchFromSlot(slotId);
+  }
 }

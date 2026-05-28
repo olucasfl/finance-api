@@ -339,6 +339,42 @@ export class BracketService {
     return { match, slot: updatedSlot };
   }
 
+  // ─── Desvincula (e apaga) a partida de uma vaga ──────────────────────────────
+
+  async unlinkMatchFromSlot(slotId: string): Promise<any> {
+    const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
+    if (!slot) throw new NotFoundException('Vaga não encontrada');
+
+    if (!slot.matchId && !slot.homeTeam && !slot.awayTeam && !slot.winnerTeam) {
+      throw new BadRequestException('Esta vaga já está vazia');
+    }
+
+    // Se tiver partida vinculada, verificar e apagar
+    if (slot.matchId) {
+      const match = await this.prisma.cravouMatch.findUnique({ where: { id: slot.matchId } });
+      if (match && match.homeScore !== null) {
+        throw new BadRequestException(
+          'Não é possível resetar uma vaga com resultado registrado. Resete o resultado primeiro.',
+        );
+      }
+      if (match) {
+        await this.prisma.cravouPrediction.deleteMany({ where: { matchId: match.id } });
+        await this.prisma.cravouMatch.delete({ where: { id: match.id } });
+      }
+    }
+
+    // Limpa o matchId e os times do slot — volta para "A definir"
+    const updatedSlot = await this.prisma.cravouBracketSlot.update({
+      where: { id: slotId },
+      data: { matchId: null, homeTeam: null, awayTeam: null, winnerTeam: null, loserTeam: null },
+    });
+
+    const allSlots = await this.getBracket();
+    this.gateway.emitBracketUpdated(slot.round, allSlots);
+    this.logger.log(`Partida desvinculada do slot ${slotId}`);
+    return updatedSlot;
+  }
+
   // ─── Inicializa todos os slots de todas as fases ─────────────────────────────
 
   async initializeAllSlots(): Promise<{ created: number; existing: number }> {
