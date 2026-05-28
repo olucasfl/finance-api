@@ -1,0 +1,1 @@
+export declare function calculatePoints(phase: string, actualHome: number, actualAway: number, predictedHome: number, predictedAway: number, actualPenaltyWinner?: string | null, predictedPenaltyWinner?: string | null): number;

@@ -1,0 +1,103 @@
+import { BracketService } from './bracket.service';
+export declare class BracketController {
+    private readonly bracketService;
+    constructor(bracketService: BracketService);
+    getBracket(): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        homeTeam: string | null;
+        awayTeam: string | null;
+        round: string;
+        slotNumber: number;
+        homeDesc: string;
+        awayDesc: string;
+        winnerTeam: string | null;
+        loserTeam: string | null;
+        matchId: string | null;
+    }[]>;
+    getRoundOf32(): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        homeTeam: string | null;
+        awayTeam: string | null;
+        round: string;
+        slotNumber: number;
+        homeDesc: string;
+        awayDesc: string;
+        winnerTeam: string | null;
+        loserTeam: string | null;
+        matchId: string | null;
+    }[]>;
+    getRoundOf16(): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        homeTeam: string | null;
+        awayTeam: string | null;
+        round: string;
+        slotNumber: number;
+        homeDesc: string;
+        awayDesc: string;
+        winnerTeam: string | null;
+        loserTeam: string | null;
+        matchId: string | null;
+    }[]>;
+    getQuarterfinals(): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        homeTeam: string | null;
+        awayTeam: string | null;
+        round: string;
+        slotNumber: number;
+        homeDesc: string;
+        awayDesc: string;
+        winnerTeam: string | null;
+        loserTeam: string | null;
+        matchId: string | null;
+    }[]>;
+    getSemifinals(): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        homeTeam: string | null;
+        awayTeam: string | null;
+        round: string;
+        slotNumber: number;
+        homeDesc: string;
+        awayDesc: string;
+        winnerTeam: string | null;
+        loserTeam: string | null;
+        matchId: string | null;
+    }[]>;
+    getFinal(): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        homeTeam: string | null;
+        awayTeam: string | null;
+        round: string;
+        slotNumber: number;
+        homeDesc: string;
+        awayDesc: string;
+        winnerTeam: string | null;
+        loserTeam: string | null;
+        matchId: string | null;
+    }[]>;
+    getByRound(round: string): Promise<{
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        homeTeam: string | null;
+        awayTeam: string | null;
+        round: string;
+        slotNumber: number;
+        homeDesc: string;
+        awayDesc: string;
+        winnerTeam: string | null;
+        loserTeam: string | null;
+        matchId: string | null;
+    }[]>;
+}
