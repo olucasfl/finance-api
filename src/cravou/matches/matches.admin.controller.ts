@@ -16,6 +16,7 @@ import { FinalizeMatchDto } from './dto/finalize-match.dto';
 import { UpdateMatchDateDto } from './dto/update-match-date.dto';
 import { UpdateMatchScoreDto } from './dto/update-match-score.dto';
 import { UpdateMatchStatusDto } from './dto/update-match-status.dto';
+import { CalendarSeedService } from './calendar-seed.service';
 import { MatchesService } from './matches.service';
 
 @Controller('cravou/admin')
@@ -24,7 +25,13 @@ export class MatchesAdminController {
   constructor(
     private readonly matchesService: MatchesService,
     private readonly scoringService: ScoringService,
+    private readonly calendarSeedService: CalendarSeedService,
   ) {}
+
+  @Post('seed-calendar')
+  seedCalendar() {
+    return this.calendarSeedService.seedCalendar();
+  }
 
   @Post('import-matches')
   importMatches() {
