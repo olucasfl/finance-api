@@ -12,22 +12,37 @@ export function calculatePoints(
   actualAway: number,
   predictedHome: number,
   predictedAway: number,
+  actualPenaltyWinner?: string | null,
+  predictedPenaltyWinner?: string | null,
 ): number {
   const isGroupStage = phase === 'group_stage';
 
-  // Placar exato
+  // ── Placar exato ─────────────────────────────────────────────
   if (actualHome === predictedHome && actualAway === predictedAway) {
-    return isGroupStage ? 10 : 15;
+    if (isGroupStage) return 10;
+
+    // Mata-mata sem empate → CRAVOU sem pênaltis
+    if (actualHome !== actualAway) return 15;
+
+    // Mata-mata com empate: classificado nos pênaltis decide se é CRAVOU
+    if (
+      predictedPenaltyWinner &&
+      actualPenaltyWinner &&
+      predictedPenaltyWinner.toLowerCase() === actualPenaltyWinner.toLowerCase()
+    ) {
+      return 15; // CRAVOU: placar exato + classificado correto
+    }
+    return 8; // Placar certo mas classificado errado ou não previsto
   }
 
-  // Resultado correto (grupo) / vencedor correto (mata-mata)
+  // ── Resultado correto (vencedor ou empate) ───────────────────
   const actualOutcome = getOutcome(actualHome, actualAway);
   const predictedOutcome = getOutcome(predictedHome, predictedAway);
   if (actualOutcome === predictedOutcome) {
     return isGroupStage ? 5 : 8;
   }
 
-  // Acertou gols de apenas um time
+  // ── Acertou gols de apenas um time ───────────────────────────
   if (actualHome === predictedHome || actualAway === predictedAway) {
     return 2;
   }

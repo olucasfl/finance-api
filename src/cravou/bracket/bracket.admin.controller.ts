@@ -8,6 +8,11 @@ import { BracketService } from './bracket.service';
 export class BracketAdminController {
   constructor(private readonly bracketService: BracketService) {}
 
+  @Post('initialize-all')
+  initializeAll() {
+    return this.bracketService.initializeAllSlots();
+  }
+
   @Post('mount-r32')
   mountR32() {
     return this.bracketService.mountR32();
@@ -24,7 +29,7 @@ export class BracketAdminController {
   @Patch(':slotId/teams')
   overrideTeams(
     @Param('slotId') slotId: string,
-    @Body() body: { homeTeam?: string; awayTeam?: string },
+    @Body() body: { homeTeam?: string | null; awayTeam?: string | null },
   ) {
     return this.bracketService.overrideSlotTeams(slotId, body);
   }
@@ -37,5 +42,13 @@ export class BracketAdminController {
   @Post(':slotId/reset-result')
   resetResult(@Param('slotId') slotId: string) {
     return this.bracketService.resetKnockoutResult(slotId);
+  }
+
+  @Post(':slotId/create-match')
+  createMatch(
+    @Param('slotId') slotId: string,
+    @Body() body: { matchDate: string },
+  ) {
+    return this.bracketService.createMatchFromSlot(slotId, body.matchDate);
   }
 }

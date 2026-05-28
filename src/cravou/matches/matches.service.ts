@@ -9,6 +9,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ScoringService } from '../scoring/scoring.service';
 import { CopaStandingsService } from '../copa-standings/copa-standings.service';
+import { BracketService } from '../bracket/bracket.service';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { FinalizeMatchDto } from './dto/finalize-match.dto';
 import { UpdateMatchDateDto } from './dto/update-match-date.dto';
@@ -93,6 +94,7 @@ export class MatchesService {
     private readonly scoring: ScoringService,
     private readonly gateway: RealtimeGateway,
     private readonly standings: CopaStandingsService,
+    private readonly bracketService: BracketService,
   ) {}
 
   // ─── Import ────────────────────────────────────────────────────────────────
@@ -385,6 +387,7 @@ export class MatchesService {
       data: {
         homeScore: dto.homeScore,
         awayScore: dto.awayScore,
+        penaltyWinner: dto.penaltyWinner ?? null,
         status: 'finished',
         predictionsLocked: true,
       },
@@ -395,9 +398,53 @@ export class MatchesService {
 
     if (match.phase === 'group_stage') {
       await this.standings.updateFromMatch(id);
+    } else {
+      // Mata-mata: propaga vencedor para a próxima fase automaticamente
+      await this.propagateBracketWinner(id, dto.homeScore, dto.awayScore, dto.penaltyWinner);
     }
 
     return updated;
+  }
+
+  // ─── Propaga vencedor do mata-mata para a próxima fase ───────────────────────
+
+  private async propagateBracketWinner(
+    matchId: string,
+    homeScore: number,
+    awayScore: number,
+    penaltyWinner?: string,
+  ): Promise<void> {
+    const slot = await this.prisma.cravouBracketSlot.findFirst({ where: { matchId } });
+    if (!slot) return;
+
+    let winner: string | null = null;
+
+    if (homeScore > awayScore) {
+      winner = slot.homeTeam;
+    } else if (awayScore > homeScore) {
+      winner = slot.awayTeam;
+    } else if (penaltyWinner) {
+      // Empate após 90min: usa o vencedor nos pênaltis (case-insensitive)
+      if (slot.homeTeam && slot.homeTeam.toLowerCase() === penaltyWinner.toLowerCase()) {
+        winner = slot.homeTeam;
+      } else if (slot.awayTeam && slot.awayTeam.toLowerCase() === penaltyWinner.toLowerCase()) {
+        winner = slot.awayTeam;
+      }
+    }
+
+    if (!winner) {
+      this.logger.warn(
+        `Bracket slot ${slot.id}: empate sem penaltyWinner — propague manualmente via Admin`,
+      );
+      return;
+    }
+
+    try {
+      await this.bracketService.setKnockoutResult(slot.id, winner);
+      this.logger.log(`Bracket: vencedor ${winner} propagado do slot ${slot.id}`);
+    } catch (err: any) {
+      this.logger.error(`Erro ao propagar vencedor bracket: ${err.message}`);
+    }
   }
 
   // ─── Reset (apaga placar, zera pontos, reverte status) ──────────────────────
@@ -424,7 +471,7 @@ export class MatchesService {
 
     await this.prisma.cravouPrediction.updateMany({
       where: { matchId: id },
-      data: { points: null },
+      data: { points: null, penaltyWinner: null },
     });
 
     const affectedUserIds = [...new Set(affected.map((p) => p.userId))];
@@ -446,12 +493,25 @@ export class MatchesService {
 
     if (match.phase === 'group_stage' && match.groupName) {
       await this.standings.recalculateGroup(match.groupName);
+    } else {
+      // Mata-mata: limpa o vencedor do slot vinculado
+      await this.clearBracketSlotWinner(id);
     }
 
     this.gateway.emitMatchUpdated(updated);
     this.gateway.emitRankingUpdated();
 
     return { ...updated, affectedUsers: affectedUserIds.length };
+  }
+
+  private async clearBracketSlotWinner(matchId: string): Promise<void> {
+    const slot = await this.prisma.cravouBracketSlot.findFirst({ where: { matchId } });
+    if (!slot || !slot.winnerTeam) return;
+    await this.prisma.cravouBracketSlot.update({
+      where: { id: slot.id },
+      data: { winnerTeam: null, loserTeam: null },
+    });
+    this.logger.log(`Bracket slot ${slot.id}: resultado removido após reset da partida`);
   }
 
   // ─── Desbloquear palpites ────────────────────────────────────────────────────

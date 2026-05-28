@@ -1,4 +1,4 @@
-import { IsInt, IsString, IsUUID, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreatePredictionDto {
@@ -15,4 +15,8 @@ export class CreatePredictionDto {
   @IsInt()
   @Min(0)
   awayScore: number;
+
+  @IsOptional()
+  @IsString()
+  penaltyWinner?: string;
 }

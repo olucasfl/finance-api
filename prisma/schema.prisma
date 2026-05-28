@@ -352,15 +352,16 @@ model CravouBracketSlot {
 }
 
 model CravouPrediction {
-  id        String      @id @default(uuid())
-  userId    String
-  matchId   String
-  homeScore Int
-  awayScore Int
-  points    Int?
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  match     CravouMatch @relation(fields: [matchId], references: [id])
+  id            String      @id @default(uuid())
+  userId        String
+  matchId       String
+  homeScore     Int
+  awayScore     Int
+  penaltyWinner String?     // palpite do classificado nos pênaltis (mata-mata, empate)
+  points        Int?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  match         CravouMatch @relation(fields: [matchId], references: [id])
 
   @@unique([userId, matchId])
 }

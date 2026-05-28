@@ -21,6 +21,12 @@ export class PredictionsService {
       throw new BadRequestException('Os palpites para este jogo estão encerrados');
     }
 
+    // penaltyWinner só é relevante em mata-mata quando há empate previsto
+    const penaltyWinner =
+      match.phase !== 'group_stage' && dto.homeScore === dto.awayScore
+        ? (dto.penaltyWinner ?? null)
+        : null;
+
     return this.prisma.cravouPrediction.upsert({
       where: { userId_matchId: { userId, matchId: dto.matchId } },
       create: {
@@ -28,10 +34,12 @@ export class PredictionsService {
         matchId: dto.matchId,
         homeScore: dto.homeScore,
         awayScore: dto.awayScore,
+        penaltyWinner,
       },
       update: {
         homeScore: dto.homeScore,
         awayScore: dto.awayScore,
+        penaltyWinner,
       },
     });
   }

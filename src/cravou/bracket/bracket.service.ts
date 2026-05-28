@@ -222,7 +222,7 @@ export class BracketService {
 
   async overrideSlotTeams(
     slotId: string,
-    data: { homeTeam?: string; awayTeam?: string },
+    data: { homeTeam?: string | null; awayTeam?: string | null },
   ): Promise<any> {
     const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
     if (!slot) throw new NotFoundException('Vaga não encontrada');
@@ -230,10 +230,20 @@ export class BracketService {
     const updated = await this.prisma.cravouBracketSlot.update({
       where: { id: slotId },
       data: {
-        ...(data.homeTeam !== undefined ? { homeTeam: data.homeTeam } : {}),
-        ...(data.awayTeam !== undefined ? { awayTeam: data.awayTeam } : {}),
+        ...(data.homeTeam !== undefined ? { homeTeam: data.homeTeam || null } : {}),
+        ...(data.awayTeam !== undefined ? { awayTeam: data.awayTeam || null } : {}),
       },
     });
+
+    // Sync teams to the linked match if one exists
+    if (slot.matchId) {
+      const matchUpdate: { homeTeam?: string; awayTeam?: string } = {};
+      if (data.homeTeam !== undefined && data.homeTeam) matchUpdate.homeTeam = data.homeTeam;
+      if (data.awayTeam !== undefined && data.awayTeam) matchUpdate.awayTeam = data.awayTeam;
+      if (Object.keys(matchUpdate).length > 0) {
+        await this.prisma.cravouMatch.update({ where: { id: slot.matchId }, data: matchUpdate });
+      }
+    }
 
     this.gateway.emitBracketUpdated(slot.round, [updated]);
     return updated;
@@ -288,6 +298,82 @@ export class BracketService {
     const allSlots = await this.getBracket();
     this.gateway.emitBracketUpdated(slot.round, allSlots);
     return updated;
+  }
+
+  // ─── Cria partida a partir de uma vaga do chaveamento ────────────────────
+
+  async createMatchFromSlot(slotId: string, matchDate: string): Promise<any> {
+    const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
+    if (!slot) throw new NotFoundException('Vaga não encontrada');
+    if (!slot.homeTeam || !slot.awayTeam) {
+      throw new BadRequestException('Defina os dois times antes de criar o jogo');
+    }
+
+    const externalId = `bracket-${slot.round}-slot${slot.slotNumber}`;
+
+    const match = await this.prisma.cravouMatch.upsert({
+      where: { externalId },
+      create: {
+        externalId,
+        phase: slot.round,
+        homeTeam: slot.homeTeam,
+        awayTeam: slot.awayTeam,
+        matchDate: new Date(matchDate),
+        status: 'upcoming',
+      },
+      update: {
+        homeTeam: slot.homeTeam,
+        awayTeam: slot.awayTeam,
+        matchDate: new Date(matchDate),
+      },
+    });
+
+    const updatedSlot = await this.prisma.cravouBracketSlot.update({
+      where: { id: slotId },
+      data: { matchId: match.id },
+    });
+
+    const allSlots = await this.getBracket();
+    this.gateway.emitBracketUpdated(slot.round, allSlots);
+
+    return { match, slot: updatedSlot };
+  }
+
+  // ─── Inicializa todos os slots de todas as fases ─────────────────────────────
+
+  async initializeAllSlots(): Promise<{ created: number; existing: number }> {
+    const ROUNDS: { round: string; count: number }[] = [
+      { round: 'round_of_32',  count: 16 },
+      { round: 'round_of_16',  count: 8  },
+      { round: 'quarterfinal', count: 4  },
+      { round: 'semifinal',    count: 2  },
+      { round: 'third_place',  count: 1  },
+      { round: 'final',        count: 1  },
+    ];
+
+    let created = 0;
+    let existing = 0;
+
+    for (const { round, count } of ROUNDS) {
+      for (let i = 1; i <= count; i++) {
+        const exists = await this.prisma.cravouBracketSlot.findUnique({
+          where: { round_slotNumber: { round, slotNumber: i } },
+        });
+        if (!exists) {
+          await this.prisma.cravouBracketSlot.create({
+            data: { round, slotNumber: i, homeDesc: 'A definir', awayDesc: 'A definir' },
+          });
+          created++;
+        } else {
+          existing++;
+        }
+      }
+    }
+
+    const allSlots = await this.getBracket();
+    this.gateway.emitBracketUpdated('all', allSlots);
+    this.logger.log(`Slots inicializados: ${created} criados, ${existing} já existiam`);
+    return { created, existing };
   }
 
   // ─── Queries ───────────────────────────────────────────────────────────────

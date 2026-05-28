@@ -43,6 +43,8 @@ export class ScoringService {
         match.awayScore,
         pred.homeScore,
         pred.awayScore,
+        match.penaltyWinner,
+        pred.penaltyWinner,
       );
       await this.prisma.cravouPrediction.update({
         where: { id: pred.id },

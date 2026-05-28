@@ -1,4 +1,4 @@
-import { IsInt, Max, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export class FinalizeMatchDto {
   @IsInt()
@@ -10,4 +10,8 @@ export class FinalizeMatchDto {
   @Min(0)
   @Max(99)
   awayScore!: number;
+
+  @IsOptional()
+  @IsString()
+  penaltyWinner?: string;
 }
