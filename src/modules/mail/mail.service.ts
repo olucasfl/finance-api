@@ -353,7 +353,7 @@ export class MailService {
 
     return `
 <div style="
-  background:#0d0d0d;
+  background:#111111;
   padding:40px 20px;
   font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
 ">
@@ -361,80 +361,88 @@ export class MailService {
   <div style="
     max-width:520px;
     margin:auto;
-    background:#1a1a1a;
-    border-radius:16px;
-    padding:40px;
+    background:#1c1c1c;
+    border-radius:20px;
+    padding:40px 40px 32px;
     text-align:center;
-    border:1px solid rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.07);
   ">
 
-    <h1 style="
-      margin:0;
-      font-size:30px;
-      font-weight:800;
-      color:white;
-      letter-spacing:1px;
-    ">
-      Cravou<span style="color:#e11d48">!</span>
-    </h1>
+    <!-- Logo -->
+    <div style="margin-bottom:24px;">
+      <img
+        src="https://cravou-ashy.vercel.app/logo-ball.png"
+        alt="Cravou!"
+        width="72"
+        height="72"
+        style="display:block;margin:0 auto 12px;border-radius:50%;"
+      />
+      <img
+        src="https://cravou-ashy.vercel.app/logo-text.png"
+        alt="Cravou!"
+        width="160"
+        style="display:block;margin:0 auto;"
+      />
+    </div>
 
     <div style="
-      height:3px;
-      width:60px;
-      margin:18px auto 28px auto;
-      background:#e11d48;
+      height:2px;
+      width:50px;
+      margin:0 auto 28px;
+      background:#00e5d4;
       border-radius:4px;
     "></div>
 
     <h2 style="
-      color:white;
-      margin-bottom:12px;
-      font-weight:600;
+      color:#ffffff;
+      margin:0 0 12px;
+      font-size:22px;
+      font-weight:700;
     ">
       ${title}
     </h2>
 
     <p style="
-      color:#a1a1aa;
+      color:#9ca3af;
       font-size:15px;
-      line-height:1.6;
-      margin-bottom:30px;
+      line-height:1.7;
+      margin:0 0 30px;
     ">
       ${message}
     </p>
 
-    <a href="${link}"
-    style="
+    <a href="${link}" style="
       display:inline-block;
-      padding:14px 28px;
-      background:#e11d48;
-      color:white;
+      padding:14px 32px;
+      background:#00e5d4;
+      color:#111111;
       font-weight:700;
-      border-radius:10px;
+      border-radius:12px;
       text-decoration:none;
       font-size:15px;
-      box-shadow:0 6px 20px rgba(225,29,72,0.35);
+      letter-spacing:0.3px;
     ">
       ${buttonText}
     </a>
 
     <p style="
-      color:#71717a;
+      color:#6b7280;
       font-size:13px;
-      margin-top:28px;
-      line-height:1.5;
+      margin:28px 0 0;
+      line-height:1.6;
     ">
       ${footer}
     </p>
 
     <p style="
-      margin-top:18px;
-      font-size:12px;
-      color:#71717a;
+      margin-top:16px;
+      font-size:11px;
+      color:#4b5563;
       word-break:break-all;
+      line-height:1.6;
     ">
       Se o botão não funcionar, copie e cole este link:<br>
-      <span style="color:#e11d48">${link}</span>
+      <span style="color:#00e5d4">${link}</span>
     </p>
 
   </div>
@@ -442,10 +450,10 @@ export class MailService {
   <p style="
     text-align:center;
     margin-top:20px;
-    color:#71717a;
+    color:#4b5563;
     font-size:12px;
   ">
-    © ${new Date().getFullYear()} Cravou!
+    © ${new Date().getFullYear()} Cravou! — Todos os direitos reservados
   </p>
 
 </div>
