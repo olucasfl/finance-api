@@ -367,13 +367,14 @@ model CravouPrediction {
 }
 
 model CravouGroup {
-  id          String              @id @default(uuid())
+  id          String                @id @default(uuid())
   name        String
   description String?
-  inviteCode  String              @unique @default(cuid())
+  inviteCode  String                @unique @default(cuid())
   ownerId     String
-  createdAt   DateTime            @default(now())
+  createdAt   DateTime              @default(now())
   members     CravouGroupMember[]
+  invites     CravouGroupInvite[]
 }
 
 model CravouGroupMember {
@@ -381,7 +382,19 @@ model CravouGroupMember {
   groupId  String
   userId   String
   joinedAt DateTime    @default(now())
-  group    CravouGroup @relation(fields: [groupId], references: [id])
+  group    CravouGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, userId])
+}
+
+model CravouGroupInvite {
+  id         String      @id @default(uuid())
+  groupId    String
+  inviterId  String
+  inviteeId  String
+  status     String      @default("pending") // pending | accepted | declined
+  createdAt  DateTime    @default(now())
+  group      CravouGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, inviteeId])
 }

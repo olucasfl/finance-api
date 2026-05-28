@@ -5,27 +5,35 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { CreateGroupDto } from './dto/create-group.dto';
+import { EditGroupDto } from './dto/edit-group.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
 import { JoinGroupDto } from './dto/join-group.dto';
+import { RespondInviteDto } from './dto/respond-invite.dto';
 
 @Injectable()
 export class GroupsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeGateway,
+  ) {}
+
+  // ─── Criar grupo ────────────────────────────────────────────────────────────
 
   async create(userId: string, dto: CreateGroupDto) {
-    const group = await this.prisma.cravouGroup.create({
+    return this.prisma.cravouGroup.create({
       data: {
         name: dto.name,
         description: dto.description,
         ownerId: userId,
-        members: {
-          create: { userId },
-        },
+        members: { create: { userId } },
       },
-      include: { members: true },
+      include: { _count: { select: { members: true } } },
     });
-    return group;
   }
+
+  // ─── Entrar via código ───────────────────────────────────────────────────────
 
   async join(userId: string, dto: JoinGroupDto) {
     const group = await this.prisma.cravouGroup.findUnique({
@@ -42,16 +50,61 @@ export class GroupsService {
       data: { groupId: group.id, userId },
     });
 
+    // Se havia convite pendente, marca como aceito
+    await this.prisma.cravouGroupInvite.updateMany({
+      where: { groupId: group.id, inviteeId: userId, status: 'pending' },
+      data: { status: 'accepted' },
+    });
+
     return { message: 'Entrou no grupo com sucesso', groupId: group.id, groupName: group.name };
   }
 
-  getMyGroups(userId: string) {
-    return this.prisma.cravouGroup.findMany({
+  // ─── Meus grupos ─────────────────────────────────────────────────────────────
+
+  async getMyGroups(userId: string) {
+    const groups = await this.prisma.cravouGroup.findMany({
       where: { members: { some: { userId } } },
       include: { _count: { select: { members: true } } },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Para cada grupo, calcular pontos do usuário e posição
+    const result = await Promise.all(
+      groups.map(async (g) => {
+        const predictions = await this.prisma.cravouPrediction.findMany({
+          where: {
+            userId: { in: (await this.prisma.cravouGroupMember.findMany({ where: { groupId: g.id }, select: { userId: true } })).map((m) => m.userId) },
+            points: { not: null },
+          },
+          select: { userId: true, points: true },
+        });
+
+        const totals = new Map<string, number>();
+        for (const p of predictions) {
+          totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
+        }
+
+        const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+        const myPos = sorted.findIndex(([uid]) => uid === userId) + 1;
+        const myPoints = totals.get(userId) ?? 0;
+
+        return {
+          id: g.id,
+          name: g.name,
+          description: g.description,
+          inviteCode: g.inviteCode,
+          ownerId: g.ownerId,
+          memberCount: g._count.members,
+          myPoints,
+          myPosition: myPos > 0 ? myPos : g._count.members,
+        };
+      }),
+    );
+
+    return result;
   }
+
+  // ─── Detalhes do grupo ────────────────────────────────────────────────────────
 
   async getGroup(groupId: string, userId: string) {
     const group = await this.prisma.cravouGroup.findUnique({
@@ -66,24 +119,34 @@ export class GroupsService {
 
     const memberUserIds = group.members.map((m) => m.userId);
 
-    const predictions = await this.prisma.cravouPrediction.findMany({
-      where: { userId: { in: memberUserIds }, points: { not: null } },
-      select: { userId: true, points: true },
-    });
+    const [predictions, users] = await Promise.all([
+      this.prisma.cravouPrediction.findMany({
+        where: { userId: { in: memberUserIds }, points: { not: null } },
+        select: { userId: true, points: true, matchId: true, homeScore: true, awayScore: true },
+      }),
+      this.prisma.user.findMany({
+        where: { id: { in: memberUserIds } },
+        select: { id: true, name: true },
+      }),
+    ]);
 
     const totals = new Map<string, number>();
+    const cravadas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
+      if ((p.points ?? 0) >= 10) {
+        cravadas.set(p.userId, (cravadas.get(p.userId) ?? 0) + 1);
+      }
     }
 
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: memberUserIds } },
-      select: { id: true, name: true, email: true },
-    });
-
     const ranking = users
-      .map((u) => ({ userId: u.id, name: u.name, email: u.email, points: totals.get(u.id) ?? 0 }))
-      .sort((a, b) => b.points - a.points)
+      .map((u) => ({
+        userId: u.id,
+        name: u.name,
+        points: totals.get(u.id) ?? 0,
+        cravadas: cravadas.get(u.id) ?? 0,
+      }))
+      .sort((a, b) => b.points - a.points || b.cravadas - a.cravadas)
       .map((entry, index) => ({ position: index + 1, ...entry }));
 
     return {
@@ -94,8 +157,187 @@ export class GroupsService {
         inviteCode: group.inviteCode,
         ownerId: group.ownerId,
         memberCount: group.members.length,
+        isOwner: group.ownerId === userId,
       },
       ranking,
     };
+  }
+
+  // ─── Editar grupo (só dono) ──────────────────────────────────────────────────
+
+  async editGroup(groupId: string, userId: string, dto: EditGroupDto) {
+    const group = await this.prisma.cravouGroup.findUnique({ where: { id: groupId } });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    if (group.ownerId !== userId) throw new ForbiddenException('Apenas o dono pode editar o grupo');
+
+    return this.prisma.cravouGroup.update({
+      where: { id: groupId },
+      data: { ...(dto.name && { name: dto.name }), ...(dto.description !== undefined && { description: dto.description }) },
+    });
+  }
+
+  // ─── Sair do grupo ───────────────────────────────────────────────────────────
+
+  async leaveGroup(groupId: string, userId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({ where: { id: groupId } });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    if (group.ownerId === userId) throw new BadRequestException('O dono não pode sair do grupo. Exclua o grupo.');
+
+    const member = await this.prisma.cravouGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId } },
+    });
+    if (!member) throw new NotFoundException('Você não é membro deste grupo');
+
+    await this.prisma.cravouGroupMember.delete({
+      where: { groupId_userId: { groupId, userId } },
+    });
+
+    return { message: 'Você saiu do grupo' };
+  }
+
+  // ─── Remover membro (só dono) ────────────────────────────────────────────────
+
+  async removeMember(groupId: string, ownerId: string, targetUserId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({ where: { id: groupId } });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    if (group.ownerId !== ownerId) throw new ForbiddenException('Apenas o dono pode remover membros');
+    if (targetUserId === ownerId) throw new BadRequestException('O dono não pode se remover');
+
+    const member = await this.prisma.cravouGroupMember.findUnique({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+    });
+    if (!member) throw new NotFoundException('Membro não encontrado');
+
+    await this.prisma.cravouGroupMember.delete({
+      where: { groupId_userId: { groupId, userId: targetUserId } },
+    });
+
+    return { message: 'Membro removido' };
+  }
+
+  // ─── Buscar usuários para convidar ───────────────────────────────────────────
+
+  async searchUsers(query: string, groupId: string, requesterId: string) {
+    if (!query || query.trim().length < 2) return [];
+
+    const group = await this.prisma.cravouGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true, invites: { where: { status: 'pending' } } },
+    });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    if (group.ownerId !== requesterId) throw new ForbiddenException('Apenas o dono pode convidar');
+
+    const excludeIds = [
+      ...group.members.map((m) => m.userId),
+      ...group.invites.map((i) => i.inviteeId),
+    ];
+
+    return this.prisma.user.findMany({
+      where: {
+        name: { contains: query.trim(), mode: 'insensitive' },
+        id: { notIn: excludeIds },
+      },
+      select: { id: true, name: true },
+      take: 10,
+    });
+  }
+
+  // ─── Enviar convite ──────────────────────────────────────────────────────────
+
+  async sendInvite(groupId: string, inviterId: string, dto: InviteMemberDto) {
+    const group = await this.prisma.cravouGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    if (group.ownerId !== inviterId) throw new ForbiddenException('Apenas o dono pode convidar');
+
+    const alreadyMember = group.members.some((m) => m.userId === dto.inviteeId);
+    if (alreadyMember) throw new BadRequestException('Esta pessoa já é membro do grupo');
+
+    const existing = await this.prisma.cravouGroupInvite.findUnique({
+      where: { groupId_inviteeId: { groupId, inviteeId: dto.inviteeId } },
+    });
+    if (existing && existing.status === 'pending') {
+      throw new BadRequestException('Já existe um convite pendente para esta pessoa');
+    }
+
+    const inviter = await this.prisma.user.findUnique({
+      where: { id: inviterId },
+      select: { name: true },
+    });
+
+    const invite = await this.prisma.cravouGroupInvite.upsert({
+      where: { groupId_inviteeId: { groupId, inviteeId: dto.inviteeId } },
+      create: { groupId, inviterId, inviteeId: dto.inviteeId, status: 'pending' },
+      update: { status: 'pending', inviterId, createdAt: new Date() },
+    });
+
+    // Emite socket para o convidado
+    this.realtime.emitGroupInviteReceived(dto.inviteeId, {
+      inviteId: invite.id,
+      groupId: group.id,
+      groupName: group.name,
+      inviterName: inviter?.name ?? '',
+    });
+
+    return { message: 'Convite enviado', inviteId: invite.id };
+  }
+
+  // ─── Convites pendentes recebidos ────────────────────────────────────────────
+
+  async getPendingInvites(userId: string) {
+    const invites = await this.prisma.cravouGroupInvite.findMany({
+      where: { inviteeId: userId, status: 'pending' },
+      include: { group: { select: { id: true, name: true, description: true, _count: { select: { members: true } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const inviterIds = [...new Set(invites.map((i) => i.inviterId))];
+    const inviters = await this.prisma.user.findMany({
+      where: { id: { in: inviterIds } },
+      select: { id: true, name: true },
+    });
+    const inviterMap = new Map(inviters.map((u) => [u.id, u.name]));
+
+    return invites.map((i) => ({
+      id: i.id,
+      groupId: i.group.id,
+      groupName: i.group.name,
+      groupDescription: i.group.description,
+      memberCount: i.group._count.members,
+      inviterName: inviterMap.get(i.inviterId) ?? '',
+      createdAt: i.createdAt,
+    }));
+  }
+
+  // ─── Responder convite ───────────────────────────────────────────────────────
+
+  async respondToInvite(inviteId: string, userId: string, dto: RespondInviteDto) {
+    const invite = await this.prisma.cravouGroupInvite.findUnique({
+      where: { id: inviteId },
+    });
+    if (!invite) throw new NotFoundException('Convite não encontrado');
+    if (invite.inviteeId !== userId) throw new ForbiddenException('Este convite não é para você');
+    if (invite.status !== 'pending') throw new BadRequestException('Este convite já foi respondido');
+
+    await this.prisma.cravouGroupInvite.update({
+      where: { id: inviteId },
+      data: { status: dto.status },
+    });
+
+    if (dto.status === 'accepted') {
+      const alreadyMember = await this.prisma.cravouGroupMember.findUnique({
+        where: { groupId_userId: { groupId: invite.groupId, userId } },
+      });
+      if (!alreadyMember) {
+        await this.prisma.cravouGroupMember.create({
+          data: { groupId: invite.groupId, userId },
+        });
+      }
+      return { message: 'Você entrou no grupo', groupId: invite.groupId };
+    }
+
+    return { message: 'Convite recusado' };
   }
 }
