@@ -238,19 +238,23 @@ export class GroupsService {
     if (!group) throw new NotFoundException('Grupo não encontrado');
     if (group.ownerId !== requesterId) throw new ForbiddenException('Apenas o dono pode convidar');
 
-    const excludeIds = [
-      ...group.members.map((m) => m.userId),
-      ...group.invites.map((i) => i.inviteeId),
-    ];
+    const memberIds  = new Set(group.members.map((m) => m.userId));
+    const pendingIds = new Set(group.invites.map((i) => i.inviteeId));
 
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: {
         name: { contains: query.trim(), mode: 'insensitive' },
-        id: { notIn: excludeIds },
+        id: { not: requesterId },
       },
       select: { id: true, name: true },
-      take: 10,
+      take: 15,
     });
+
+    return users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      status: memberIds.has(u.id) ? 'member' : pendingIds.has(u.id) ? 'pending' : 'available',
+    }));
   }
 
   // ─── Enviar convite ──────────────────────────────────────────────────────────
