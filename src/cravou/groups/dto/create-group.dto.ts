@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
 export class CreateGroupDto {
   @IsString()
@@ -10,4 +10,8 @@ export class CreateGroupDto {
   @IsString()
   @MaxLength(200)
   description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  brazilOnly?: boolean;
 }

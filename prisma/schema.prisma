@@ -372,6 +372,7 @@ model CravouGroup {
   description String?
   inviteCode  String                @unique @default(cuid())
   ownerId     String
+  brazilOnly  Boolean               @default(false)
   createdAt   DateTime              @default(now())
   members     CravouGroupMember[]
   invites     CravouGroupInvite[]

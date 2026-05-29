@@ -77,3 +77,12 @@ DO $$ BEGIN
       FOREIGN KEY ("groupId") REFERENCES "CravouGroup"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
   END IF;
 END $$;
+
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'CravouGroup' AND column_name = 'brazilOnly'
+  ) THEN
+    ALTER TABLE "CravouGroup" ADD COLUMN "brazilOnly" BOOLEAN NOT NULL DEFAULT false;
+  END IF;
+END $$;

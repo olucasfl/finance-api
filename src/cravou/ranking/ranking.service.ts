@@ -58,7 +58,11 @@ export class RankingService {
         select: { id: true, name: true, email: true },
       }),
       this.prisma.cravouPrediction.findMany({
-        where: { userId: { in: memberUserIds }, points: { not: null } },
+        where: {
+          userId: { in: memberUserIds },
+          points: { not: null },
+          ...(group.brazilOnly ? { match: { OR: [{ homeTeam: { equals: 'brasil', mode: 'insensitive' as const } }, { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } }] } } : {}),
+        },
         select: { userId: true, points: true },
       }),
     ]);

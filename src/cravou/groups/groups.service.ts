@@ -26,6 +26,7 @@ export class GroupsService {
       data: {
         name: dto.name,
         description: dto.description,
+        brazilOnly: dto.brazilOnly ?? false,
         ownerId: userId,
         members: { create: { userId } },
       },
@@ -71,10 +72,12 @@ export class GroupsService {
     // Para cada grupo, calcular pontos do usuário e posição
     const result = await Promise.all(
       groups.map(async (g) => {
+        const memberIds = (await this.prisma.cravouGroupMember.findMany({ where: { groupId: g.id }, select: { userId: true } })).map((m) => m.userId);
         const predictions = await this.prisma.cravouPrediction.findMany({
           where: {
-            userId: { in: (await this.prisma.cravouGroupMember.findMany({ where: { groupId: g.id }, select: { userId: true } })).map((m) => m.userId) },
+            userId: { in: memberIds },
             points: { not: null },
+            ...(g.brazilOnly ? { match: { OR: [{ homeTeam: { equals: 'brasil', mode: 'insensitive' as const } }, { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } }] } } : {}),
           },
           select: { userId: true, points: true },
         });
@@ -94,6 +97,7 @@ export class GroupsService {
           description: g.description,
           inviteCode: g.inviteCode,
           ownerId: g.ownerId,
+          brazilOnly: g.brazilOnly,
           memberCount: g._count.members,
           myPoints,
           myPosition: myPos > 0 ? myPos : g._count.members,
@@ -121,7 +125,11 @@ export class GroupsService {
 
     const [predictions, users] = await Promise.all([
       this.prisma.cravouPrediction.findMany({
-        where: { userId: { in: memberUserIds }, points: { not: null } },
+        where: {
+          userId: { in: memberUserIds },
+          points: { not: null },
+          ...(group.brazilOnly ? { match: { OR: [{ homeTeam: { equals: 'brasil', mode: 'insensitive' as const } }, { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } }] } } : {}),
+        },
         select: { userId: true, points: true, matchId: true, homeScore: true, awayScore: true },
       }),
       this.prisma.user.findMany({
@@ -156,6 +164,7 @@ export class GroupsService {
         description: group.description,
         inviteCode: group.inviteCode,
         ownerId: group.ownerId,
+        brazilOnly: group.brazilOnly,
         memberCount: group.members.length,
         isOwner: group.ownerId === userId,
       },
