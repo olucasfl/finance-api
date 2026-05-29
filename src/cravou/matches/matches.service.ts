@@ -466,7 +466,7 @@ export class MatchesService {
 
     const updated = await this.prisma.cravouMatch.update({
       where: { id },
-      data: { homeScore: null, awayScore: null, status: newStatus, predictionsLocked: newLocked },
+      data: { homeScore: null, awayScore: null, penaltyWinner: null, status: newStatus, predictionsLocked: newLocked },
     });
 
     await this.prisma.cravouPrediction.updateMany({
@@ -506,12 +506,60 @@ export class MatchesService {
 
   private async clearBracketSlotWinner(matchId: string): Promise<void> {
     const slot = await this.prisma.cravouBracketSlot.findFirst({ where: { matchId } });
-    if (!slot || !slot.winnerTeam) return;
+    if (!slot) return;
+
+    const prevWinner = slot.winnerTeam;
+    const prevLoser  = slot.loserTeam;
+
     await this.prisma.cravouBracketSlot.update({
       where: { id: slot.id },
       data: { winnerTeam: null, loserTeam: null },
     });
-    this.logger.log(`Bracket slot ${slot.id}: resultado removido após reset da partida`);
+
+    // Cascade: remove o time propagado para a próxima fase e para o 3º lugar
+    const nextRoundMap: Record<string, string> = {
+      round_of_32: 'round_of_16',
+      round_of_16: 'quarterfinal',
+      quarterfinal: 'semifinal',
+      semifinal: 'final',
+    };
+
+    if (prevWinner) {
+      const nextRound = nextRoundMap[slot.round];
+      if (nextRound) {
+        const nextSlot = await this.prisma.cravouBracketSlot.findFirst({
+          where: { round: nextRound, OR: [{ homeTeam: prevWinner }, { awayTeam: prevWinner }] },
+        });
+        if (nextSlot) {
+          await this.prisma.cravouBracketSlot.update({
+            where: { id: nextSlot.id },
+            data: {
+              homeTeam: nextSlot.homeTeam === prevWinner ? null : nextSlot.homeTeam,
+              awayTeam: nextSlot.awayTeam === prevWinner ? null : nextSlot.awayTeam,
+              winnerTeam: null,
+              loserTeam: null,
+            },
+          });
+        }
+      }
+      // Semifinal: perdedor ia para 3º lugar
+      if (slot.round === 'semifinal' && prevLoser) {
+        const thirdSlot = await this.prisma.cravouBracketSlot.findFirst({
+          where: { round: 'third_place', OR: [{ homeTeam: prevLoser }, { awayTeam: prevLoser }] },
+        });
+        if (thirdSlot) {
+          await this.prisma.cravouBracketSlot.update({
+            where: { id: thirdSlot.id },
+            data: {
+              homeTeam: thirdSlot.homeTeam === prevLoser ? null : thirdSlot.homeTeam,
+              awayTeam: thirdSlot.awayTeam === prevLoser ? null : thirdSlot.awayTeam,
+            },
+          });
+        }
+      }
+    }
+
+    this.logger.log(`Bracket slot ${slot.id}: resultado removido e cascade aplicado`);
   }
 
   // ─── Desbloquear palpites ────────────────────────────────────────────────────
