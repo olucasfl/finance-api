@@ -5,7 +5,6 @@ import { PrismaService } from "src/prisma/prisma.service"
 
 import { VoxAiDto } from "./dto/voxai.dto"
 import { VOX_SYSTEM_PROMPT } from "./prompts/vox.prompt"
-import { buildPrompt } from "./utils/buildPrompt"
 import { contentFilter } from "./filters/vox.content-filter"
 import { VoxRateLimiter } from "./guards/vox.rate-limiter"
 import { LiturgicalCalendarService } from "./services/liturgical-calendar.service"
@@ -22,10 +21,18 @@ export class VoxAiService{
   private activityService: ActivityService
  ){}
 
- private apiKey = process.env.GEMINI_API_KEY
+ private apiKey = process.env.OPENAI_API_KEY
 
- private url =
-  "https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent"
+ private url = "https://api.openai.com/v1/chat/completions"
+
+ private model = "gpt-4.1-mini"
+
+ private get headers(){
+  return {
+   Authorization: `Bearer ${this.apiKey}`,
+   "Content-Type": "application/json"
+  }
+ }
 
  /* =========================
     GERAR TÍTULO
@@ -68,21 +75,20 @@ ${evangelho?.texto?.slice(0, 800)}
 }
 
  /* =========================
-    🧠 EXTRAIR DATA COM IA (🔥 NOVO)
+    🧠 EXTRAIR DATA COM IA
  ========================= */
  private async extractDateWithAI(message: string): Promise<Date | null>{
 
   try{
 
    const response = await axios.post(
-    `${this.url}?key=${this.apiKey}`,
+    this.url,
     {
-     contents:[
+     model: this.model,
+     messages:[
       {
-       parts:[
-        {
-         text: `
-Extraia a data da frase abaixo.
+       role:"user",
+       content:`Extraia a data da frase abaixo.
 
 Regras MUITO IMPORTANTES:
 - Responda SOMENTE no formato YYYY-MM-DD (ex: 2026-03-22)
@@ -92,32 +98,28 @@ Regras MUITO IMPORTANTES:
 
 Se não houver data clara, responda: NONE
 
-Frase: "${message}"
-`
-        }
-       ]
+Frase: "${message}"`
       }
-     ]
-    }
+     ],
+     max_tokens: 20
+    },
+    { headers: this.headers }
    )
 
-   const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-
+   const text = response?.data?.choices?.[0]?.message?.content?.trim()
 
    if(!text || text === "NONE") return null
 
    const normalized = text.trim()
 
-   // formato ideal YYYY-MM-DD
    if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
-   return new Date(normalized + "T00:00:00")
+    return new Date(normalized + "T00:00:00")
    }
 
-   // fallback (caso a IA erre o formato)
    const parsed = new Date(normalized)
 
    if (!isNaN(parsed.getTime())) {
-   return parsed
+    return parsed
    }
 
    return null
@@ -159,7 +161,7 @@ Frase: "${message}"
   try{
 
    if(!this.apiKey){
-    throw new Error("GEMINI_API_KEY not configured")
+    throw new Error("OPENAI_API_KEY not configured")
    }
 
    if(!data.message){
@@ -218,7 +220,7 @@ Frase: "${message}"
    const history = historyMessages
     .reverse()
     .map(m => ({
-     role: m.role,
+     role: m.role as "user" | "assistant",
      content: m.content
     }))
 
@@ -242,7 +244,7 @@ Frase: "${message}"
    }
 
    /* =========================
-      🧠 DATA INTELIGENTE (🔥)
+      🧠 DATA INTELIGENTE
    ========================= */
 
    const now = new Date()
@@ -250,16 +252,13 @@ Frase: "${message}"
 
    let parsedDate = await this.extractDateWithAI(data.message)
 
-// 🔥 NOVO PARSER (substitui o antigo)
-if (!parsedDate) {
-  parsedDate = parseNaturalDate(data.message)
-}
+   if (!parsedDate) {
+    parsedDate = parseNaturalDate(data.message)
+   }
 
-// fallback final
-if (!parsedDate) {
-  parsedDate = now
-}
-
+   if (!parsedDate) {
+    parsedDate = now
+   }
 
    const requestedDateText = parsedDate.toLocaleDateString("pt-BR", {
     timeZone: "America/Sao_Paulo"
@@ -277,16 +276,13 @@ if (!parsedDate) {
     targetLiturgical = null
    }
 
-   const liturgicalContext =
-    await this.liturgicalCalendarService.getLiturgicalContext(parsedDate)
-
    const liturgySummarized = this.formatLiturgicalForAI(targetLiturgical)
 
    /* =========================
       🧠 PROMPT FINAL
    ========================= */
 
-   const enhancedSystemPrompt = `${VOX_SYSTEM_PROMPT}
+   const systemPrompt = `${VOX_SYSTEM_PROMPT}
 
 ⚠️ REGRA ABSOLUTA:
 Se a seção "Liturgia EXATA" estiver presente, você DEVE usar essas informações.
@@ -299,29 +295,24 @@ Liturgia EXATA:
 ${liturgySummarized}
 `
 
-   const prompt = buildPrompt(
-    enhancedSystemPrompt,
-    history,
-    data.message
-   )
-
    const response = await axios.post(
-    `${this.url}?key=${this.apiKey}`,
+    this.url,
     {
-     contents:[
-      {
-       parts:[
-        { text:prompt }
-       ]
-      }
-     ]
+     model: this.model,
+     messages:[
+      { role:"system", content: systemPrompt },
+      ...history,
+      { role:"user", content: data.message }
+     ],
+     max_tokens: 2000
     },
     {
-     timeout:30000
+     headers: this.headers,
+     timeout: 30000
     }
    )
 
-   const text = response?.data?.candidates?.[0]?.content?.parts?.[0]?.text
+   const text = response?.data?.choices?.[0]?.message?.content
 
    if(!text){
     throw new Error("EMPTY_AI_RESPONSE")
