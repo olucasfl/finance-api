@@ -49,6 +49,12 @@ export function buildRosary(type:string){
 
  /* final */
 
+ steps.push({
+  type: "prayer",
+  title: "Oração de Agradecimento",
+  text: "Infinitas graças Vos damos, ó Soberana Rainha, pelos benefícios que todos os dias recebemos de vossas mãos liberais. Dignai-Vos, agora e para sempre, tomar-nos debaixo do vosso poderoso amparo. E, para mais Vos alegrar, Vos saudamos com uma Salve Rainha."
+ })
+
  steps.push({ type:"prayer", title:"Salve Rainha" })
 
  return steps
