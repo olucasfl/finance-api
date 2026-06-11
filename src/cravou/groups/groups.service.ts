@@ -335,6 +335,140 @@ export class GroupsService {
     }));
   }
 
+  // ─── Jogos finalizados do grupo ───────────────────────────────────────────────
+
+  async getGroupFinishedMatches(groupId: string, userId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    const isMember = group.members.some((m) => m.userId === userId);
+    if (!isMember) throw new ForbiddenException('Você não faz parte deste grupo');
+
+    const matches = await this.prisma.cravouMatch.findMany({
+      where: {
+        status: 'finished',
+        homeScore: { not: null },
+        awayScore: { not: null },
+        ...(group.brazilOnly
+          ? {
+              OR: [
+                { homeTeam: { equals: 'brasil', mode: 'insensitive' as const } },
+                { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { matchDate: 'desc' },
+      select: {
+        id: true,
+        homeTeam: true,
+        awayTeam: true,
+        homeScore: true,
+        awayScore: true,
+        matchDate: true,
+        phase: true,
+        penaltyWinner: true,
+      },
+    });
+
+    return { matches };
+  }
+
+  // ─── Palpites de todos os membros para um jogo ───────────────────────────────
+
+  async getGroupMatchPalpites(groupId: string, matchId: string, userId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    const isMember = group.members.some((m) => m.userId === userId);
+    if (!isMember) throw new ForbiddenException('Você não faz parte deste grupo');
+
+    const match = await this.prisma.cravouMatch.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true,
+        homeTeam: true,
+        awayTeam: true,
+        homeScore: true,
+        awayScore: true,
+        matchDate: true,
+        phase: true,
+        penaltyWinner: true,
+        status: true,
+      },
+    });
+    if (!match) throw new NotFoundException('Jogo não encontrado');
+    if (match.status !== 'finished') throw new BadRequestException('Jogo ainda não finalizado');
+
+    const memberUserIds = group.members.map((m) => m.userId);
+
+    const [users, predictions] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: memberUserIds } },
+        select: { id: true, name: true },
+      }),
+      this.prisma.cravouPrediction.findMany({
+        where: { matchId, userId: { in: memberUserIds } },
+        select: { userId: true, homeScore: true, awayScore: true, penaltyWinner: true, points: true },
+      }),
+    ]);
+
+    const predMap = new Map(predictions.map((p) => [p.userId, p]));
+
+    const palpites = users.map((u) => {
+      const pred = predMap.get(u.id);
+      if (!pred) {
+        return {
+          userId: u.id,
+          name: u.name,
+          homeScore: null as number | null,
+          awayScore: null as number | null,
+          penaltyWinner: null as string | null,
+          points: null as number | null,
+          category: 'sem_palpite' as const,
+        };
+      }
+
+      const pts = pred.points ?? 0;
+      let category: 'cravou' | 'resultado_certo' | 'parcial' | 'errou';
+      if (pts >= 10) category = 'cravou';
+      else if (pts >= 5) category = 'resultado_certo';
+      else if (pts >= 2) category = 'parcial';
+      else category = 'errou';
+
+      return {
+        userId: u.id,
+        name: u.name,
+        homeScore: pred.homeScore,
+        awayScore: pred.awayScore,
+        penaltyWinner: pred.penaltyWinner,
+        points: pts,
+        category,
+      };
+    });
+
+    const order: Record<string, number> = { cravou: 0, resultado_certo: 1, parcial: 2, errou: 3, sem_palpite: 4 };
+    palpites.sort((a, b) => order[a.category] - order[b.category] || (b.points ?? -1) - (a.points ?? -1));
+
+    return {
+      match: {
+        id: match.id,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+        matchDate: match.matchDate,
+        phase: match.phase,
+        penaltyWinner: match.penaltyWinner,
+      },
+      palpites,
+    };
+  }
+
   // ─── Responder convite ───────────────────────────────────────────────────────
 
   async respondToInvite(inviteId: string, userId: string, dto: RespondInviteDto) {

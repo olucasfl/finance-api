@@ -73,6 +73,18 @@ export class GroupsController {
     return this.groupsService.respondToInvite(inviteId, req.user.userId, dto);
   }
 
+  // ─── Palpites do grupo ───────────────────────────────────────────────────────
+
+  @Get(':id/finished-matches')
+  getGroupFinishedMatches(@Param('id') id: string, @Req() req: any) {
+    return this.groupsService.getGroupFinishedMatches(id, req.user.userId);
+  }
+
+  @Get(':id/matches/:matchId/palpites')
+  getGroupMatchPalpites(@Param('id') id: string, @Param('matchId') matchId: string, @Req() req: any) {
+    return this.groupsService.getGroupMatchPalpites(id, matchId, req.user.userId);
+  }
+
   // ─── Detalhe (deve ficar por último para não conflitar com rotas acima) ───────
 
   @Get(':id')
