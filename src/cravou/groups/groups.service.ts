@@ -142,7 +142,7 @@ export class GroupsService {
     const cravadas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if ((p.points ?? 0) >= 10) {
+      if (p.points !== null && [10, 15].includes(p.points)) {
         cravadas.set(p.userId, (cravadas.get(p.userId) ?? 0) + 1);
       }
     }
@@ -433,11 +433,11 @@ export class GroupsService {
         };
       }
 
-      const pts = pred.points ?? 0;
+      const pts = pred.points;
       let category: 'cravou' | 'resultado_certo' | 'parcial' | 'errou';
-      if (pts >= 10) category = 'cravou';
-      else if (pts >= 5) category = 'resultado_certo';
-      else if (pts >= 2) category = 'parcial';
+      if (pts !== null && pts >= 10) category = 'cravou';
+      else if (pts !== null && pts >= 5) category = 'resultado_certo';
+      else if (pts !== null && pts >= 2) category = 'parcial';
       else category = 'errou';
 
       return {

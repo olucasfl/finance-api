@@ -28,8 +28,7 @@ export class ScheduledService {
     ]);
   }
 
-  // 1. Bloqueia palpites 1 hora antes do jogo (horário de Brasília é UTC-3,
-  //    mas a comparação é feita em UTC puro — o resultado é idêntico)
+  // 1. Bloqueia palpites 30 minutos antes do jogo
   private async autoLockPredictions(now: Date) {
     const lockThreshold = new Date(now.getTime() + LOCK_BEFORE_MS);
 

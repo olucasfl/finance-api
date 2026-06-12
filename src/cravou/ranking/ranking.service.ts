@@ -55,7 +55,7 @@ export class RankingService {
     const [users, predictions] = await Promise.all([
       this.prisma.user.findMany({
         where: { id: { in: memberUserIds } },
-        select: { id: true, name: true, email: true },
+        select: { id: true, name: true },
       }),
       this.prisma.cravouPrediction.findMany({
         where: {
@@ -80,7 +80,6 @@ export class RankingService {
       .map((u) => ({
         userId: u.id,
         name: u.name,
-        email: u.email,
         points: totals.get(u.id) ?? 0,
         cravadas: cravas.get(u.id) ?? 0,
       }))
