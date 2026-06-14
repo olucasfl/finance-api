@@ -39,7 +39,9 @@ export function calculatePoints(
   const actualOutcome = getOutcome(actualHome, actualAway);
   const predictedOutcome = getOutcome(predictedHome, predictedAway);
   if (actualOutcome === predictedOutcome) {
-    return isGroupStage ? 5 : 8;
+    const base = isGroupStage ? 5 : 8;
+    const oneTeamCorrect = actualHome === predictedHome || actualAway === predictedAway;
+    return base + (oneTeamCorrect ? 2 : 0);
   }
 
   // ── Acertou gols de apenas um time ───────────────────────────

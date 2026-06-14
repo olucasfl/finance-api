@@ -1,8 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 
-const EXACT_POINTS = new Set([10, 15]);
-
 @Injectable()
 export class RankingService {
   constructor(private readonly prisma: PrismaService) {}
@@ -15,7 +13,7 @@ export class RankingService {
       }),
       this.prisma.cravouPrediction.findMany({
         where: { points: { not: null } },
-        select: { userId: true, points: true },
+        select: { userId: true, points: true, match: { select: { phase: true } } },
       }),
     ]);
 
@@ -23,7 +21,7 @@ export class RankingService {
     const cravas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (p.points !== null && EXACT_POINTS.has(p.points)) {
+      if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
         cravas.set(p.userId, (cravas.get(p.userId) ?? 0) + 1);
       }
     }
@@ -63,7 +61,7 @@ export class RankingService {
           points: { not: null },
           ...(group.brazilOnly ? { match: { OR: [{ homeTeam: { equals: 'brasil', mode: 'insensitive' as const } }, { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } }] } } : {}),
         },
-        select: { userId: true, points: true },
+        select: { userId: true, points: true, match: { select: { phase: true } } },
       }),
     ]);
 
@@ -71,7 +69,7 @@ export class RankingService {
     const cravas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (p.points !== null && EXACT_POINTS.has(p.points)) {
+      if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
         cravas.set(p.userId, (cravas.get(p.userId) ?? 0) + 1);
       }
     }

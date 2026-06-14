@@ -12,8 +12,6 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { JoinGroupDto } from './dto/join-group.dto';
 import { RespondInviteDto } from './dto/respond-invite.dto';
 
-const EXACT_POINTS = new Set([10, 15]);
-
 const BRAZIL_MATCH_FILTER = {
   OR: [
     { homeTeam: { equals: 'brasil', mode: 'insensitive' as const } },
@@ -141,7 +139,7 @@ export class GroupsService {
           points: { not: null },
           ...(group.brazilOnly ? BRAZIL_PREDICTION_FILTER : {}),
         },
-        select: { userId: true, points: true, matchId: true, homeScore: true, awayScore: true },
+        select: { userId: true, points: true, matchId: true, homeScore: true, awayScore: true, match: { select: { phase: true } } },
       }),
       this.prisma.user.findMany({
         where: { id: { in: memberUserIds } },
@@ -153,7 +151,7 @@ export class GroupsService {
     const cravadas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (p.points !== null && EXACT_POINTS.has(p.points)) {
+      if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
         cravadas.set(p.userId, (cravadas.get(p.userId) ?? 0) + 1);
       }
     }
@@ -438,8 +436,10 @@ export class GroupsService {
       }
 
       const pts = pred.points;
-      let category: 'cravou' | 'resultado_certo' | 'parcial' | 'errou';
-      if (pts !== null && pts >= 10) category = 'cravou';
+      const isGroupStage = match.phase === 'group_stage';
+      let category: 'cravou' | 'resultado_bonus' | 'resultado_certo' | 'parcial' | 'errou';
+      if (pts !== null && (pts >= 15 || (pts === 10 && isGroupStage))) category = 'cravou';
+      else if (pts !== null && (pts === 7 || (pts === 10 && !isGroupStage))) category = 'resultado_bonus';
       else if (pts !== null && pts >= 5) category = 'resultado_certo';
       else if (pts !== null && pts >= 2) category = 'parcial';
       else category = 'errou';
@@ -455,7 +455,7 @@ export class GroupsService {
       };
     });
 
-    const order: Record<string, number> = { cravou: 0, resultado_certo: 1, parcial: 2, errou: 3, sem_palpite: 4 };
+    const order: Record<string, number> = { cravou: 0, resultado_bonus: 1, resultado_certo: 2, parcial: 3, errou: 4, sem_palpite: 5 };
     palpites.sort((a, b) => order[a.category] - order[b.category] || (b.points ?? -1) - (a.points ?? -1));
 
     return {

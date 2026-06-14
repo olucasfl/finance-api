@@ -3,8 +3,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { calculatePoints } from './scoring.rules';
 
-// Pontos atribuídos apenas para placar exato (grupo=10, mata-mata=15)
-const EXACT_SCORE_POINTS = new Set([10, 15]);
 
 @Injectable()
 export class ScoringService {
@@ -61,7 +59,13 @@ export class ScoringService {
           _sum: { points: true },
         }),
         this.prisma.cravouPrediction.count({
-          where: { userId, points: { in: [...EXACT_SCORE_POINTS] } },
+          where: {
+            userId,
+            OR: [
+              { points: 15 },
+              { points: 10, match: { phase: 'group_stage' } },
+            ],
+          },
         }),
       ]);
 
