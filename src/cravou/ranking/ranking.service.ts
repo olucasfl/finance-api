@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 
-const EXACT_POINTS = [10, 15];
+const EXACT_POINTS = new Set([10, 15]);
 
 @Injectable()
 export class RankingService {
@@ -23,7 +23,7 @@ export class RankingService {
     const cravas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (EXACT_POINTS.includes(p.points ?? -1)) {
+      if (p.points !== null && EXACT_POINTS.has(p.points)) {
         cravas.set(p.userId, (cravas.get(p.userId) ?? 0) + 1);
       }
     }
@@ -71,7 +71,7 @@ export class RankingService {
     const cravas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (EXACT_POINTS.includes(p.points ?? -1)) {
+      if (p.points !== null && EXACT_POINTS.has(p.points)) {
         cravas.set(p.userId, (cravas.get(p.userId) ?? 0) + 1);
       }
     }

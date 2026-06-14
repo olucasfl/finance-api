@@ -594,8 +594,8 @@ export class MatchesService {
     let newStatus = match.status;
     let newLocked = match.predictionsLocked;
 
-    // Se a nova data ainda está no futuro (> 30min), volta para upcoming aberto
-    if (newDate.getTime() - now.getTime() > 30 * 60 * 1000) {
+    // Se a nova data ainda está no futuro (> 10min), volta para upcoming aberto
+    if (newDate.getTime() - now.getTime() > 10 * 60 * 1000) {
       newStatus = 'upcoming';
       newLocked = false;
     }

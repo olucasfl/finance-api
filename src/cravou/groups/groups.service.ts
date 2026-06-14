@@ -12,6 +12,17 @@ import { InviteMemberDto } from './dto/invite-member.dto';
 import { JoinGroupDto } from './dto/join-group.dto';
 import { RespondInviteDto } from './dto/respond-invite.dto';
 
+const EXACT_POINTS = new Set([10, 15]);
+
+const BRAZIL_MATCH_FILTER = {
+  OR: [
+    { homeTeam: { equals: 'brasil', mode: 'insensitive' as const } },
+    { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } },
+  ],
+};
+
+const BRAZIL_PREDICTION_FILTER = { match: BRAZIL_MATCH_FILTER };
+
 @Injectable()
 export class GroupsService {
   constructor(
@@ -77,7 +88,7 @@ export class GroupsService {
           where: {
             userId: { in: memberIds },
             points: { not: null },
-            ...(g.brazilOnly ? { match: { OR: [{ homeTeam: { equals: 'brasil', mode: 'insensitive' as const } }, { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } }] } } : {}),
+            ...(g.brazilOnly ? BRAZIL_PREDICTION_FILTER : {}),
           },
           select: { userId: true, points: true },
         });
@@ -128,7 +139,7 @@ export class GroupsService {
         where: {
           userId: { in: memberUserIds },
           points: { not: null },
-          ...(group.brazilOnly ? { match: { OR: [{ homeTeam: { equals: 'brasil', mode: 'insensitive' as const } }, { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } }] } } : {}),
+          ...(group.brazilOnly ? BRAZIL_PREDICTION_FILTER : {}),
         },
         select: { userId: true, points: true, matchId: true, homeScore: true, awayScore: true },
       }),
@@ -142,7 +153,7 @@ export class GroupsService {
     const cravadas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (p.points !== null && [10, 15].includes(p.points)) {
+      if (p.points !== null && EXACT_POINTS.has(p.points)) {
         cravadas.set(p.userId, (cravadas.get(p.userId) ?? 0) + 1);
       }
     }
@@ -351,14 +362,7 @@ export class GroupsService {
         status: 'finished',
         homeScore: { not: null },
         awayScore: { not: null },
-        ...(group.brazilOnly
-          ? {
-              OR: [
-                { homeTeam: { equals: 'brasil', mode: 'insensitive' as const } },
-                { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } },
-              ],
-            }
-          : {}),
+        ...(group.brazilOnly ? BRAZIL_MATCH_FILTER : {}),
       },
       orderBy: { matchDate: 'desc' },
       select: {

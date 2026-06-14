@@ -5,8 +5,8 @@ import { RealtimeGateway } from '../realtime/realtime.gateway';
 
 // Duração estimada de uma partida em milissegundos (90min + intervalos)
 const MATCH_DURATION_MS = 2 * 60 * 60 * 1000;
-// Antecedência para bloquear palpites antes do início (30 minutos)
-const LOCK_BEFORE_MS = 30 * 60 * 1000;
+// Antecedência para bloquear palpites antes do início (10 minutos)
+const LOCK_BEFORE_MS = 10 * 60 * 1000;
 
 @Injectable()
 export class ScheduledService {
@@ -28,7 +28,7 @@ export class ScheduledService {
     ]);
   }
 
-  // 1. Bloqueia palpites 30 minutos antes do jogo
+  // 1. Bloqueia palpites 10 minutos antes do jogo
   private async autoLockPredictions(now: Date) {
     const lockThreshold = new Date(now.getTime() + LOCK_BEFORE_MS);
 
@@ -47,7 +47,7 @@ export class ScheduledService {
       });
       this.gateway.emitMatchLocked(match.id);
       this.logger.log(
-        `[AUTO-LOCK] ${match.homeTeam} x ${match.awayTeam} — palpites encerrados (30min antes do início)`,
+        `[AUTO-LOCK] ${match.homeTeam} x ${match.awayTeam} — palpites encerrados (10min antes do início)`,
       );
     }
   }

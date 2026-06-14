@@ -16,7 +16,7 @@ export class BracketService {
 
   // ─── Montagem do Round of 32 ──────────────────────────────────────────────
 
-  async mountR32(): Promise<{ slots: any[]; thirds: any }> {
+  async mountR32() {
     const thirds = await this.thirdPlaceService.selectBest8();
     const qualifiedThirds = thirds.qualifiers;
 
@@ -25,7 +25,7 @@ export class BracketService {
       qualifiedThirds.map((q) => ({ teamName: q.teamName, group: q.group })),
     );
 
-    const slots: any[] = [];
+    const slots: Awaited<ReturnType<typeof this.prisma.cravouBracketSlot.upsert>>[] = [];
 
     for (const def of R32_SLOT_DEFINITIONS) {
       let homeTeam: string | null = null;
@@ -99,7 +99,7 @@ export class BracketService {
 
   // ─── Registro de resultado do mata-mata ───────────────────────────────────
 
-  async setKnockoutResult(slotId: string, winnerTeam: string): Promise<any> {
+  async setKnockoutResult(slotId: string, winnerTeam: string) {
     const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
     if (!slot) throw new NotFoundException('Vaga do chaveamento não encontrada');
 
@@ -135,7 +135,7 @@ export class BracketService {
     slotNumber: number,
     winner: string,
   ): Promise<void> {
-    const nextRoundMap: Record<string, { nextRound: string; bracket: any[] }> = {
+    const nextRoundMap = {
       round_of_32: { nextRound: 'round_of_16', bracket: R16_BRACKET },
       round_of_16: { nextRound: 'quarterfinal', bracket: QF_BRACKET },
       quarterfinal: { nextRound: 'semifinal',   bracket: SF_BRACKET },
@@ -223,7 +223,7 @@ export class BracketService {
   async overrideSlotTeams(
     slotId: string,
     data: { homeTeam?: string | null; awayTeam?: string | null },
-  ): Promise<any> {
+  ) {
     const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
     if (!slot) throw new NotFoundException('Vaga não encontrada');
 
@@ -286,7 +286,7 @@ export class BracketService {
 
   // ─── Remove resultado de uma vaga ─────────────────────────────────────────
 
-  async resetKnockoutResult(slotId: string): Promise<any> {
+  async resetKnockoutResult(slotId: string) {
     const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
     if (!slot) throw new NotFoundException('Vaga não encontrada');
 
@@ -302,7 +302,7 @@ export class BracketService {
 
   // ─── Cria partida a partir de uma vaga do chaveamento ────────────────────
 
-  async createMatchFromSlot(slotId: string, matchDate: string): Promise<any> {
+  async createMatchFromSlot(slotId: string, matchDate: string) {
     const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
     if (!slot) throw new NotFoundException('Vaga não encontrada');
     if (!slot.homeTeam || !slot.awayTeam) {
@@ -341,7 +341,7 @@ export class BracketService {
 
   // ─── Desvincula (e apaga) a partida de uma vaga ──────────────────────────────
 
-  async unlinkMatchFromSlot(slotId: string): Promise<any> {
+  async unlinkMatchFromSlot(slotId: string) {
     const slot = await this.prisma.cravouBracketSlot.findUnique({ where: { id: slotId } });
     if (!slot) throw new NotFoundException('Vaga não encontrada');
 
