@@ -14,4 +14,8 @@ export class CreateGroupDto {
   @IsOptional()
   @IsBoolean()
   brazilOnly?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  zeroPoints?: boolean;
 }

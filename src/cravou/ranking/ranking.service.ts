@@ -13,7 +13,7 @@ export class RankingService {
       }),
       this.prisma.cravouPrediction.findMany({
         where: { points: { not: null } },
-        select: { userId: true, points: true, match: { select: { phase: true } } },
+        select: { userId: true, points: true, match: { select: { phase: true, matchDate: true } } },
       }),
     ]);
 
@@ -61,13 +61,17 @@ export class RankingService {
           points: { not: null },
           ...(group.brazilOnly ? { match: { OR: [{ homeTeam: { equals: 'brasil', mode: 'insensitive' as const } }, { awayTeam: { equals: 'brasil', mode: 'insensitive' as const } }] } } : {}),
         },
-        select: { userId: true, points: true, match: { select: { phase: true } } },
+        select: { userId: true, points: true, match: { select: { phase: true, matchDate: true } } },
       }),
     ]);
 
+    const activePredictions = group.zeroPoints
+      ? predictions.filter((p) => p.match.matchDate >= group.createdAt)
+      : predictions;
+
     const totals = new Map<string, number>();
     const cravas = new Map<string, number>();
-    for (const p of predictions) {
+    for (const p of activePredictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
       if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
         cravas.set(p.userId, (cravas.get(p.userId) ?? 0) + 1);

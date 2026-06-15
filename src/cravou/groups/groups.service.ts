@@ -36,6 +36,7 @@ export class GroupsService {
         name: dto.name,
         description: dto.description,
         brazilOnly: dto.brazilOnly ?? false,
+        zeroPoints: dto.zeroPoints ?? false,
         ownerId: userId,
         members: { create: { userId } },
       },
@@ -88,11 +89,15 @@ export class GroupsService {
             points: { not: null },
             ...(g.brazilOnly ? BRAZIL_PREDICTION_FILTER : {}),
           },
-          select: { userId: true, points: true },
+          select: { userId: true, points: true, match: { select: { matchDate: true } } },
         });
 
+        const active = g.zeroPoints
+          ? predictions.filter((p) => p.match.matchDate >= g.createdAt)
+          : predictions;
+
         const totals = new Map<string, number>();
-        for (const p of predictions) {
+        for (const p of active) {
           totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
         }
 
@@ -107,6 +112,7 @@ export class GroupsService {
           inviteCode: g.inviteCode,
           ownerId: g.ownerId,
           brazilOnly: g.brazilOnly,
+          zeroPoints: g.zeroPoints,
           memberCount: g._count.members,
           myPoints,
           myPosition: myPos > 0 ? myPos : g._count.members,
@@ -139,7 +145,7 @@ export class GroupsService {
           points: { not: null },
           ...(group.brazilOnly ? BRAZIL_PREDICTION_FILTER : {}),
         },
-        select: { userId: true, points: true, matchId: true, homeScore: true, awayScore: true, match: { select: { phase: true } } },
+        select: { userId: true, points: true, matchId: true, homeScore: true, awayScore: true, match: { select: { phase: true, matchDate: true } } },
       }),
       this.prisma.user.findMany({
         where: { id: { in: memberUserIds } },
@@ -147,9 +153,13 @@ export class GroupsService {
       }),
     ]);
 
+    const activePredictions = group.zeroPoints
+      ? predictions.filter((p) => p.match.matchDate >= group.createdAt)
+      : predictions;
+
     const totals = new Map<string, number>();
     const cravadas = new Map<string, number>();
-    for (const p of predictions) {
+    for (const p of activePredictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
       if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
         cravadas.set(p.userId, (cravadas.get(p.userId) ?? 0) + 1);
@@ -174,6 +184,7 @@ export class GroupsService {
         inviteCode: group.inviteCode,
         ownerId: group.ownerId,
         brazilOnly: group.brazilOnly,
+        zeroPoints: group.zeroPoints,
         memberCount: group.members.length,
         isOwner: group.ownerId === userId,
       },
