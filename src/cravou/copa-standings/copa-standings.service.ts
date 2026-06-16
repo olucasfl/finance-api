@@ -56,34 +56,33 @@ export class CopaStandingsService {
   ): Promise<void> {
     const isWin = goalsFor > goalsAgainst;
     const isDraw = goalsFor === goalsAgainst;
+    const pts = isWin ? 3 : isDraw ? 1 : 0;
+    const gd  = goalsFor - goalsAgainst;
 
-    const current = await this.prisma.cravouGroupStanding.findUnique({
-      where: { group_teamName: { group, teamName } },
-    });
-
+    // Operações atômicas de increment evitam race condition entre partidas simultâneas
     await this.prisma.cravouGroupStanding.upsert({
       where: { group_teamName: { group, teamName } },
       create: {
         group,
         teamName,
         matchesPlayed: 1,
-        wins: isWin ? 1 : 0,
-        draws: isDraw ? 1 : 0,
-        losses: !isWin && !isDraw ? 1 : 0,
+        wins:   isWin              ? 1 : 0,
+        draws:  isDraw             ? 1 : 0,
+        losses: !isWin && !isDraw  ? 1 : 0,
         goalsFor,
         goalsAgainst,
-        goalDifference: goalsFor - goalsAgainst,
-        points: isWin ? 3 : isDraw ? 1 : 0,
+        goalDifference: gd,
+        points: pts,
       },
       update: {
-        matchesPlayed: (current?.matchesPlayed ?? 0) + 1,
-        wins: (current?.wins ?? 0) + (isWin ? 1 : 0),
-        draws: (current?.draws ?? 0) + (isDraw ? 1 : 0),
-        losses: (current?.losses ?? 0) + (!isWin && !isDraw ? 1 : 0),
-        goalsFor: (current?.goalsFor ?? 0) + goalsFor,
-        goalsAgainst: (current?.goalsAgainst ?? 0) + goalsAgainst,
-        goalDifference: (current?.goalDifference ?? 0) + (goalsFor - goalsAgainst),
-        points: (current?.points ?? 0) + (isWin ? 3 : isDraw ? 1 : 0),
+        matchesPlayed:  { increment: 1 },
+        wins:           { increment: isWin             ? 1 : 0 },
+        draws:          { increment: isDraw            ? 1 : 0 },
+        losses:         { increment: !isWin && !isDraw ? 1 : 0 },
+        goalsFor:       { increment: goalsFor },
+        goalsAgainst:   { increment: goalsAgainst },
+        goalDifference: { increment: gd },
+        points:         { increment: pts },
       },
     });
   }

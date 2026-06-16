@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import axios from 'axios';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { RealtimeGateway } from '../realtime/realtime.gateway';
 import { ScoringService } from '../scoring/scoring.service';
@@ -356,6 +357,9 @@ export class MatchesService {
       await this.scoring.reprocessMatch(id);
       if (match.phase === 'group_stage') {
         await this.standings.updateFromMatch(id);
+      } else {
+        // Mata-mata: propaga vencedor para a próxima fase (estava faltando aqui)
+        await this.propagateBracketWinner(id, match.homeScore!, match.awayScore!, match.penaltyWinner ?? undefined);
       }
     }
 
@@ -455,15 +459,17 @@ export class MatchesService {
 
     const now = new Date();
     const matchInFuture = new Date(match.matchDate).getTime() > now.getTime();
-
     const newStatus = matchInFuture ? 'upcoming' : 'awaiting_result';
     const newLocked = !matchInFuture;
 
+    // Busca usuários afetados antes de zerar os pontos
     const affected = await this.prisma.cravouPrediction.findMany({
       where: { matchId: id, points: { not: null } },
       select: { userId: true },
     });
+    const affectedUserIds = [...new Set(affected.map((p) => p.userId))];
 
+    // Reseta o jogo e as predictions
     const updated = await this.prisma.cravouMatch.update({
       where: { id },
       data: { homeScore: null, awayScore: null, penaltyWinner: null, status: newStatus, predictionsLocked: newLocked },
@@ -474,27 +480,53 @@ export class MatchesService {
       data: { points: null, penaltyWinner: null },
     });
 
-    const affectedUserIds = [...new Set(affected.map((p) => p.userId))];
-    for (const userId of affectedUserIds) {
-      const [pointsAgg, cravasCount] = await Promise.all([
-        this.prisma.cravouPrediction.aggregate({
-          where: { userId, points: { not: null } },
-          _sum: { points: true },
-        }),
-        this.prisma.cravouPrediction.count({
-          where: { userId, points: { in: [10, 15] } },
-        }),
-      ]);
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { bolaoPoints: pointsAgg._sum.points ?? 0, cravadas: cravasCount },
-      });
+    // Recalcula pontos e cravadas de todos os usuários afetados em uma única query SQL
+    if (affectedUserIds.length > 0) {
+      const userTotals = await this.prisma.$queryRaw<
+        { userId: string; totalPoints: number; cravadas: bigint }[]
+      >`
+        SELECT
+          p."userId",
+          COALESCE(SUM(p.points), 0)::int AS "totalPoints",
+          COUNT(CASE
+            WHEN p.points = 15 THEN 1
+            WHEN p.points = 10 AND m.phase = 'group_stage' THEN 1
+            ELSE NULL
+          END)::int AS cravadas
+        FROM "CravouPrediction" p
+        JOIN "CravouMatch" m ON m.id = p."matchId"
+        WHERE p."userId" IN (${Prisma.join(affectedUserIds)})
+          AND p.points IS NOT NULL
+        GROUP BY p."userId"
+      `;
+
+      const usersWithPoints = new Set(userTotals.map((u) => u.userId));
+
+      // Batch: atualiza usuários que ainda têm pontos
+      if (userTotals.length > 0) {
+        await this.prisma.$transaction(
+          userTotals.map((u) =>
+            this.prisma.user.update({
+              where: { id: u.userId },
+              data: { bolaoPoints: u.totalPoints, cravadas: Number(u.cravadas) },
+            }),
+          ),
+        );
+      }
+
+      // Zera em batch quem perdeu todos os pontos
+      const usersToZero = affectedUserIds.filter((uid) => !usersWithPoints.has(uid));
+      if (usersToZero.length > 0) {
+        await this.prisma.user.updateMany({
+          where: { id: { in: usersToZero } },
+          data: { bolaoPoints: 0, cravadas: 0 },
+        });
+      }
     }
 
     if (match.phase === 'group_stage' && match.groupName) {
       await this.standings.recalculateGroup(match.groupName);
     } else {
-      // Mata-mata: limpa o vencedor do slot vinculado
       await this.clearBracketSlotWinner(id);
     }
 
@@ -516,50 +548,69 @@ export class MatchesService {
       data: { winnerTeam: null, loserTeam: null },
     });
 
-    // Cascade: remove o time propagado para a próxima fase e para o 3º lugar
+    if (prevWinner) {
+      await this.cascadeClearBracketTeam(slot.round, prevWinner, prevLoser);
+    }
+
+    this.logger.log(`Bracket slot ${slot.id}: resultado removido e cascade recursivo aplicado`);
+  }
+
+  // Limpa recursivamente um time propagado por todas as fases seguintes
+  private async cascadeClearBracketTeam(
+    fromRound: string,
+    team: string,
+    loserTeam: string | null,
+  ): Promise<void> {
     const nextRoundMap: Record<string, string> = {
       round_of_32: 'round_of_16',
       round_of_16: 'quarterfinal',
       quarterfinal: 'semifinal',
-      semifinal: 'final',
+      semifinal:    'final',
     };
 
-    if (prevWinner) {
-      const nextRound = nextRoundMap[slot.round];
-      if (nextRound) {
-        const nextSlot = await this.prisma.cravouBracketSlot.findFirst({
-          where: { round: nextRound, OR: [{ homeTeam: prevWinner }, { awayTeam: prevWinner }] },
+    const nextRound = nextRoundMap[fromRound];
+    if (nextRound) {
+      const nextSlot = await this.prisma.cravouBracketSlot.findFirst({
+        where: { round: nextRound, OR: [{ homeTeam: team }, { awayTeam: team }] },
+      });
+      if (nextSlot) {
+        const nextWinner = nextSlot.winnerTeam;
+        const nextLoser  = nextSlot.loserTeam;
+
+        await this.prisma.cravouBracketSlot.update({
+          where: { id: nextSlot.id },
+          data: {
+            homeTeam:   nextSlot.homeTeam === team ? null : nextSlot.homeTeam,
+            awayTeam:   nextSlot.awayTeam === team ? null : nextSlot.awayTeam,
+            winnerTeam: null,
+            loserTeam:  null,
+          },
         });
-        if (nextSlot) {
-          await this.prisma.cravouBracketSlot.update({
-            where: { id: nextSlot.id },
-            data: {
-              homeTeam: nextSlot.homeTeam === prevWinner ? null : nextSlot.homeTeam,
-              awayTeam: nextSlot.awayTeam === prevWinner ? null : nextSlot.awayTeam,
-              winnerTeam: null,
-              loserTeam: null,
-            },
-          });
-        }
-      }
-      // Semifinal: perdedor ia para 3º lugar
-      if (slot.round === 'semifinal' && prevLoser) {
-        const thirdSlot = await this.prisma.cravouBracketSlot.findFirst({
-          where: { round: 'third_place', OR: [{ homeTeam: prevLoser }, { awayTeam: prevLoser }] },
-        });
-        if (thirdSlot) {
-          await this.prisma.cravouBracketSlot.update({
-            where: { id: thirdSlot.id },
-            data: {
-              homeTeam: thirdSlot.homeTeam === prevLoser ? null : thirdSlot.homeTeam,
-              awayTeam: thirdSlot.awayTeam === prevLoser ? null : thirdSlot.awayTeam,
-            },
-          });
+
+        // Continua o cascade se este slot também havia propagado um vencedor
+        if (nextWinner) {
+          await this.cascadeClearBracketTeam(nextRound, nextWinner, nextLoser);
         }
       }
     }
 
-    this.logger.log(`Bracket slot ${slot.id}: resultado removido e cascade aplicado`);
+    // Semifinal: o perdedor foi enviado para o 3º lugar
+    if (fromRound === 'semifinal' && loserTeam) {
+      const thirdSlot = await this.prisma.cravouBracketSlot.findFirst({
+        where: { round: 'third_place', OR: [{ homeTeam: loserTeam }, { awayTeam: loserTeam }] },
+      });
+      if (thirdSlot) {
+        await this.prisma.cravouBracketSlot.update({
+          where: { id: thirdSlot.id },
+          data: {
+            homeTeam:   thirdSlot.homeTeam === loserTeam ? null : thirdSlot.homeTeam,
+            awayTeam:   thirdSlot.awayTeam === loserTeam ? null : thirdSlot.awayTeam,
+            winnerTeam: null,
+            loserTeam:  null,
+          },
+        });
+      }
+    }
   }
 
   // ─── Jogos finalizados (global) ──────────────────────────────────────────────
