@@ -562,6 +562,83 @@ export class MatchesService {
     this.logger.log(`Bracket slot ${slot.id}: resultado removido e cascade aplicado`);
   }
 
+  // ─── Jogos finalizados (global) ──────────────────────────────────────────────
+
+  async getFinishedMatches() {
+    const matches = await this.prisma.cravouMatch.findMany({
+      where: { status: 'finished', homeScore: { not: null }, awayScore: { not: null } },
+      orderBy: { matchDate: 'desc' },
+      select: {
+        id: true, homeTeam: true, awayTeam: true,
+        homeScore: true, awayScore: true,
+        matchDate: true, phase: true, penaltyWinner: true,
+      },
+    })
+    return { matches }
+  }
+
+  // ─── Palpites de todos os usuários para um jogo (global) ─────────────────────
+
+  async getMatchPalpites(matchId: string) {
+    const match = await this.prisma.cravouMatch.findUnique({
+      where: { id: matchId },
+      select: {
+        id: true, homeTeam: true, awayTeam: true,
+        homeScore: true, awayScore: true,
+        matchDate: true, phase: true, penaltyWinner: true, status: true,
+      },
+    })
+    if (!match) throw new NotFoundException('Jogo não encontrado')
+    if (match.status !== 'finished') throw new BadRequestException('Jogo ainda não finalizado')
+
+    const predictions = await this.prisma.cravouPrediction.findMany({
+      where: { matchId },
+      select: { userId: true, homeScore: true, awayScore: true, penaltyWinner: true, points: true },
+    })
+
+    const userIds = predictions.map((p) => p.userId)
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true },
+    })
+
+    const predMap = new Map(predictions.map((p) => [p.userId, p]))
+    const isGroupStage = match.phase === 'group_stage'
+
+    const palpites = users.map((u) => {
+      const pred = predMap.get(u.id)!
+      const pts = pred.points
+      let category: string
+      if (pts !== null && (pts >= 15 || (pts === 10 && isGroupStage))) category = 'cravou'
+      else if (pts !== null && (pts === 7 || (pts === 10 && !isGroupStage))) category = 'resultado_bonus'
+      else if (pts !== null && pts >= 5) category = 'resultado_certo'
+      else if (pts !== null && pts >= 2) category = 'parcial'
+      else category = 'errou'
+
+      return {
+        userId: u.id,
+        name: u.name,
+        homeScore: pred.homeScore,
+        awayScore: pred.awayScore,
+        penaltyWinner: pred.penaltyWinner,
+        points: pts,
+        category,
+      }
+    })
+
+    const order: Record<string, number> = { cravou: 0, resultado_bonus: 1, resultado_certo: 2, parcial: 3, errou: 4 }
+    palpites.sort((a, b) => order[a.category] - order[b.category] || (b.points ?? -1) - (a.points ?? -1))
+
+    return {
+      match: {
+        id: match.id, homeTeam: match.homeTeam, awayTeam: match.awayTeam,
+        homeScore: match.homeScore, awayScore: match.awayScore,
+        matchDate: match.matchDate, phase: match.phase, penaltyWinner: match.penaltyWinner,
+      },
+      palpites,
+    }
+  }
+
   // ─── Desbloquear palpites ────────────────────────────────────────────────────
 
   async unlockMatch(id: string) {

@@ -18,6 +18,18 @@ export class MatchesController {
     return this.matchesService.findAll(phase, status);
   }
 
+  @Get('finished')
+  @UseGuards(JwtAuthGuard)
+  getFinishedMatches() {
+    return this.matchesService.getFinishedMatches();
+  }
+
+  @Get(':id/palpites')
+  @UseGuards(JwtAuthGuard)
+  getMatchPalpites(@Param('id') id: string) {
+    return this.matchesService.getMatchPalpites(id);
+  }
+
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   findOne(@Param('id') id: string, @Req() req: any) {
