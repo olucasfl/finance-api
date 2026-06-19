@@ -21,7 +21,10 @@ export class RankingService {
     const cravas = new Map<string, number>();
     for (const p of predictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
+      const isCravada = p.match.phase === 'group_stage'
+        ? p.points === 10
+        : p.points === 14 || p.points === 15 || p.points === 17;
+      if (isCravada) {
         cravas.set(p.userId, (cravas.get(p.userId) ?? 0) + 1);
       }
     }
@@ -73,7 +76,10 @@ export class RankingService {
     const cravas = new Map<string, number>();
     for (const p of activePredictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
+      const isCravada = p.match.phase === 'group_stage'
+        ? p.points === 10
+        : p.points === 14 || p.points === 15 || p.points === 17;
+      if (isCravada) {
         cravas.set(p.userId, (cravas.get(p.userId) ?? 0) + 1);
       }
     }

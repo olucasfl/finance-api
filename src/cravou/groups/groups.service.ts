@@ -161,7 +161,10 @@ export class GroupsService {
     const cravadas = new Map<string, number>();
     for (const p of activePredictions) {
       totals.set(p.userId, (totals.get(p.userId) ?? 0) + (p.points ?? 0));
-      if (p.points === 15 || (p.points === 10 && p.match.phase === 'group_stage')) {
+      const isCravada = p.match.phase === 'group_stage'
+        ? p.points === 10
+        : p.points === 14 || p.points === 15 || p.points === 17;
+      if (isCravada) {
         cravadas.set(p.userId, (cravadas.get(p.userId) ?? 0) + 1);
       }
     }
@@ -449,7 +452,7 @@ export class GroupsService {
       const pts = pred.points;
       const isGroupStage = match.phase === 'group_stage';
       let category: 'cravou' | 'resultado_bonus' | 'resultado_certo' | 'parcial' | 'errou';
-      if (pts !== null && (pts >= 15 || (pts === 10 && isGroupStage))) category = 'cravou';
+      if (pts !== null && ((isGroupStage && pts === 10) || (!isGroupStage && pts >= 14))) category = 'cravou';
       else if (pts !== null && ((isGroupStage && (pts === 7 || pts === 8)) || (!isGroupStage && (pts === 10 || pts === 11)))) category = 'resultado_bonus';
       else if (pts !== null && pts >= 5) category = 'resultado_certo';
       else if (pts !== null && pts >= 2) category = 'parcial';

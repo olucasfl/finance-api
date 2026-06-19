@@ -21,18 +21,15 @@ export function calculatePoints(
   if (actualHome === predictedHome && actualAway === predictedAway) {
     if (isGroupStage) return 10;
 
-    // Mata-mata sem empate → CRAVOU sem pênaltis
+    // Mata-mata sem empate → CRAVOU vitória
     if (actualHome !== actualAway) return 15;
 
-    // Mata-mata com empate: classificado nos pênaltis decide se é CRAVOU
-    if (
+    // Mata-mata com empate exato: +2 se acertou classificado, -1 se errou
+    const classifiedCorrect =
       predictedPenaltyWinner &&
       actualPenaltyWinner &&
-      predictedPenaltyWinner.toLowerCase() === actualPenaltyWinner.toLowerCase()
-    ) {
-      return 15; // CRAVOU: placar exato + classificado correto
-    }
-    return 8; // Placar certo mas classificado errado ou não previsto
+      predictedPenaltyWinner.toLowerCase() === actualPenaltyWinner.toLowerCase();
+    return classifiedCorrect ? 17 : 14;
   }
 
   // ── Resultado correto (vencedor ou empate) ───────────────────
@@ -40,15 +37,24 @@ export function calculatePoints(
   const predictedOutcome = getOutcome(predictedHome, predictedAway);
   if (actualOutcome === predictedOutcome) {
     const base = isGroupStage ? 5 : 8;
+
+    // Empate não-exato no mata-mata: classificado decide bônus/penalização
+    if (!isGroupStage && actualOutcome === 'draw') {
+      const classifiedCorrect =
+        predictedPenaltyWinner &&
+        actualPenaltyWinner &&
+        predictedPenaltyWinner.toLowerCase() === actualPenaltyWinner.toLowerCase();
+      return classifiedCorrect ? base + 2 : base - 1;
+    }
+
     const oneTeamCorrect = actualHome === predictedHome || actualAway === predictedAway;
-    // +1 bônus por acertar empate sem cravar (empate não tem bônus de vencedor)
-    const drawBonus = actualOutcome === 'draw' ? 1 : 0;
+    const drawBonus = actualOutcome === 'draw' ? 1 : 0; // grupo: +1 por acertar empate
     return base + (oneTeamCorrect ? 2 : 0) + drawBonus;
   }
 
   // ── Acertou gols de apenas um time ───────────────────────────
   if (actualHome === predictedHome || actualAway === predictedAway) {
-    return 2;
+    return isGroupStage ? 2 : 3;
   }
 
   return 0;

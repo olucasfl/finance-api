@@ -58,8 +58,8 @@ export class ScoringService {
         p."userId",
         COALESCE(SUM(p.points), 0)::int  AS "totalPoints",
         COUNT(CASE
-          WHEN p.points = 15 THEN 1
-          WHEN p.points = 10 AND m.phase = 'group_stage' THEN 1
+          WHEN m.phase = 'group_stage' AND p.points = 10 THEN 1
+          WHEN m.phase != 'group_stage' AND p.points IN (14, 15, 17) THEN 1
           ELSE NULL
         END)::int AS cravadas
       FROM "CravouPrediction" p

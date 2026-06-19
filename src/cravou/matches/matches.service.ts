@@ -660,7 +660,7 @@ export class MatchesService {
       const pred = predMap.get(u.id)!
       const pts = pred.points
       let category: string
-      if (pts !== null && (pts >= 15 || (pts === 10 && isGroupStage))) category = 'cravou'
+      if (pts !== null && ((isGroupStage && pts === 10) || (!isGroupStage && pts >= 14))) category = 'cravou'
       else if (pts !== null && ((isGroupStage && (pts === 7 || pts === 8)) || (!isGroupStage && (pts === 10 || pts === 11)))) category = 'resultado_bonus'
       else if (pts !== null && pts >= 5) category = 'resultado_certo'
       else if (pts !== null && pts >= 2) category = 'parcial'
