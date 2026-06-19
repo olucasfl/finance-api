@@ -41,7 +41,9 @@ export function calculatePoints(
   if (actualOutcome === predictedOutcome) {
     const base = isGroupStage ? 5 : 8;
     const oneTeamCorrect = actualHome === predictedHome || actualAway === predictedAway;
-    return base + (oneTeamCorrect ? 2 : 0);
+    // +1 bônus por acertar empate sem cravar (empate não tem bônus de vencedor)
+    const drawBonus = actualOutcome === 'draw' ? 1 : 0;
+    return base + (oneTeamCorrect ? 2 : 0) + drawBonus;
   }
 
   // ── Acertou gols de apenas um time ───────────────────────────
