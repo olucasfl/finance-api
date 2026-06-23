@@ -432,17 +432,15 @@ export class GroupsService {
     const isGroupStage = match.phase === 'group_stage';
     const memberUserIds = group.members.map((m) => m.userId);
 
-    const [users, predictions] = await Promise.all([
-      this.prisma.user.findMany({
-        where: { id: { in: memberUserIds } },
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.cravouPrediction.findMany({
-        where: { matchId, userId: { in: memberUserIds } },
-        select: { userId: true, homeScore: true, awayScore: true, penaltyWinner: true, points: true },
-      }),
-    ]);
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: memberUserIds } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    const predictions = await this.prisma.cravouPrediction.findMany({
+      where: { matchId, userId: { in: memberUserIds } },
+      select: { userId: true, homeScore: true, awayScore: true, penaltyWinner: true, points: true },
+    });
 
     const predMap = new Map(predictions.map((p) => [p.userId, p]));
 

@@ -658,7 +658,7 @@ export class MatchesService {
       orderBy: { name: 'asc' },
     });
     const predictions = await this.prisma.cravouPrediction.findMany({
-      where: { matchId },
+      where: { matchId, userId: { in: allUsers.map((u) => u.id) } },
       select: { userId: true, homeScore: true, awayScore: true, penaltyWinner: true, points: true },
     });
 
