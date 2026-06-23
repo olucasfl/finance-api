@@ -6,16 +6,15 @@ export class RankingService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getGlobalRanking() {
-    const [users, predictions] = await Promise.all([
-      this.prisma.user.findMany({
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
-      }),
-      this.prisma.cravouPrediction.findMany({
-        where: { points: { not: null } },
-        select: { userId: true, points: true, match: { select: { phase: true, matchDate: true } } },
-      }),
-    ]);
+    const users = await this.prisma.user.findMany({
+      where: { bolaoPoints: { gt: 0 } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    const predictions = await this.prisma.cravouPrediction.findMany({
+      where: { points: { not: null } },
+      select: { userId: true, points: true, match: { select: { phase: true, matchDate: true } } },
+    });
 
     const totals = new Map<string, number>();
     const cravas = new Map<string, number>();
