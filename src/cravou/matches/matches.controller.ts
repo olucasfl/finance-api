@@ -24,10 +24,22 @@ export class MatchesController {
     return this.matchesService.getFinishedMatches();
   }
 
+  @Get('palpitavel')
+  @UseGuards(JwtAuthGuard)
+  getPalpitavelMatches() {
+    return this.matchesService.getPalpitavelMatches();
+  }
+
   @Get(':id/palpites')
   @UseGuards(JwtAuthGuard)
   getMatchPalpites(@Param('id') id: string) {
     return this.matchesService.getMatchPalpites(id);
+  }
+
+  @Get(':id/palpites-live')
+  @UseGuards(JwtAuthGuard)
+  getMatchPalpitesLive(@Param('id') id: string) {
+    return this.matchesService.getMatchPalpitesLive(id);
   }
 
   @Get(':id')

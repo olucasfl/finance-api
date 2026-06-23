@@ -80,6 +80,11 @@ export class GroupsController {
     return this.groupsService.getGroupFinishedMatches(id, req.user.userId);
   }
 
+  @Get(':id/palpitavel-matches')
+  getGroupPalpitavelMatches(@Param('id') id: string, @Req() req: any) {
+    return this.groupsService.getGroupPalpitavelMatches(id, req.user.userId);
+  }
+
   @Get(':id/matches/:matchId/palpites')
   getGroupMatchPalpites(@Param('id') id: string, @Param('matchId') matchId: string, @Req() req: any) {
     return this.groupsService.getGroupMatchPalpites(id, matchId, req.user.userId);

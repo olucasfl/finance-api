@@ -392,6 +392,39 @@ export class GroupsService {
     return { matches };
   }
 
+  // ─── Jogos com palpites visíveis no grupo (bloqueados + finalizados) ──────────
+
+  async getGroupPalpitavelMatches(groupId: string, userId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    const isMember = group.members.some((m) => m.userId === userId);
+    if (!isMember) throw new ForbiddenException('Você não faz parte deste grupo');
+
+    const matches = await this.prisma.cravouMatch.findMany({
+      where: {
+        predictionsLocked: true,
+        ...(group.brazilOnly ? BRAZIL_MATCH_FILTER : {}),
+      },
+      orderBy: { matchDate: 'desc' },
+      select: {
+        id: true,
+        homeTeam: true,
+        awayTeam: true,
+        homeScore: true,
+        awayScore: true,
+        matchDate: true,
+        phase: true,
+        penaltyWinner: true,
+        status: true,
+      },
+    });
+
+    return { matches };
+  }
+
   // ─── Palpites de todos os membros para um jogo ───────────────────────────────
 
   async getGroupMatchPalpites(groupId: string, matchId: string, userId: string) {
@@ -415,11 +448,14 @@ export class GroupsService {
         phase: true,
         penaltyWinner: true,
         status: true,
+        predictionsLocked: true,
       },
     });
     if (!match) throw new NotFoundException('Jogo não encontrado');
-    if (match.status !== 'finished') throw new BadRequestException('Jogo ainda não finalizado');
+    if (!match.predictionsLocked) throw new BadRequestException('Palpites ainda não bloqueados');
 
+    const isFinished = match.status === 'finished';
+    const isGroupStage = match.phase === 'group_stage';
     const memberUserIds = group.members.map((m) => m.userId);
 
     const [users, predictions] = await Promise.all([
@@ -445,13 +481,24 @@ export class GroupsService {
           awayScore: null as number | null,
           penaltyWinner: null as string | null,
           points: null as number | null,
-          category: 'sem_palpite' as const,
+          category: 'sem_palpite' as string | null,
+        };
+      }
+
+      if (!isFinished) {
+        return {
+          userId: u.id,
+          name: u.name,
+          homeScore: pred.homeScore,
+          awayScore: pred.awayScore,
+          penaltyWinner: pred.penaltyWinner,
+          points: null as number | null,
+          category: null as string | null,
         };
       }
 
       const pts = pred.points;
-      const isGroupStage = match.phase === 'group_stage';
-      let category: 'cravou' | 'resultado_bonus' | 'resultado_certo' | 'parcial' | 'errou';
+      let category: string;
       if (pts !== null && ((isGroupStage && pts === 10) || (!isGroupStage && pts >= 14))) category = 'cravou';
       else if (pts !== null && ((isGroupStage && (pts === 7 || pts === 8)) || (!isGroupStage && (pts === 10 || pts === 11)))) category = 'resultado_bonus';
       else if (pts !== null && pts >= 5) category = 'resultado_certo';
@@ -469,8 +516,16 @@ export class GroupsService {
       };
     });
 
-    const order: Record<string, number> = { cravou: 0, resultado_bonus: 1, resultado_certo: 2, parcial: 3, errou: 4, sem_palpite: 5 };
-    palpites.sort((a, b) => order[a.category] - order[b.category] || (b.points ?? -1) - (a.points ?? -1));
+    if (isFinished) {
+      const order: Record<string, number> = { cravou: 0, resultado_bonus: 1, resultado_certo: 2, parcial: 3, errou: 4, sem_palpite: 5 };
+      palpites.sort((a, b) => order[a.category ?? 'errou'] - order[b.category ?? 'errou'] || (b.points ?? -1) - (a.points ?? -1));
+    } else {
+      palpites.sort((a, b) => {
+        if (a.category === 'sem_palpite' && b.category !== 'sem_palpite') return 1;
+        if (a.category !== 'sem_palpite' && b.category === 'sem_palpite') return -1;
+        return a.name.localeCompare(b.name);
+      });
+    }
 
     return {
       match: {
@@ -482,6 +537,7 @@ export class GroupsService {
         matchDate: match.matchDate,
         phase: match.phase,
         penaltyWinner: match.penaltyWinner,
+        status: match.status,
       },
       palpites,
     };
