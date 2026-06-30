@@ -94,7 +94,13 @@ export class UsersService {
       _sum: { points: true },
     }),
     this.prisma.cravouPrediction.count({
-      where: { userId, points: { in: [10, 15] } },
+      where: {
+        userId,
+        OR: [
+          { points: 10,                   match: { phase: 'group_stage' } },
+          { points: { in: [14, 15, 17] }, match: { phase: { not: 'group_stage' } } },
+        ],
+      },
     }),
   ]);
 

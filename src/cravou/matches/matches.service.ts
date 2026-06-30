@@ -613,16 +613,22 @@ export class MatchesService {
     }
   }
 
-  // ─── Jogos finalizados (global) ──────────────────────────────────────────────
+  // ─── Jogos finalizados ou bloqueados (global) ────────────────────────────────
 
   async getFinishedMatches() {
     const matches = await this.prisma.cravouMatch.findMany({
-      where: { status: 'finished', homeScore: { not: null }, awayScore: { not: null } },
+      where: {
+        OR: [
+          { status: 'finished', homeScore: { not: null }, awayScore: { not: null } },
+          { predictionsLocked: true, status: { not: 'finished' } },
+        ],
+      },
       orderBy: { matchDate: 'desc' },
       select: {
         id: true, homeTeam: true, awayTeam: true,
         homeScore: true, awayScore: true,
         matchDate: true, phase: true, penaltyWinner: true,
+        status: true, predictionsLocked: true,
       },
     })
     return { matches }
@@ -749,57 +755,75 @@ export class MatchesService {
       select: {
         id: true, homeTeam: true, awayTeam: true,
         homeScore: true, awayScore: true,
-        matchDate: true, phase: true, penaltyWinner: true, status: true,
+        matchDate: true, phase: true, penaltyWinner: true,
+        status: true, predictionsLocked: true,
       },
     })
     if (!match) throw new NotFoundException('Jogo não encontrado')
-    if (match.status !== 'finished') throw new BadRequestException('Jogo ainda não finalizado')
+    if (!match.predictionsLocked) throw new BadRequestException('Palpites ainda não bloqueados')
 
-    const predictions = await this.prisma.cravouPrediction.findMany({
-      where: { matchId },
-      select: { userId: true, homeScore: true, awayScore: true, penaltyWinner: true, points: true },
-    })
-
-    const userIds = predictions.map((p) => p.userId)
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true },
-    })
-
-    const predMap = new Map(predictions.map((p) => [p.userId, p]))
+    const isFinished = match.status === 'finished'
     const isGroupStage = match.phase === 'group_stage'
 
-    const palpites = users.map((u) => {
-      const pred = predMap.get(u.id)!
-      const pts = pred.points
+    const allUsers = await this.prisma.user.findMany({
+      where: { bolaoPoints: { gt: 0 } },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    const predictions = await this.prisma.cravouPrediction.findMany({
+      where: { matchId, userId: { in: allUsers.map((u) => u.id) } },
+      select: { userId: true, homeScore: true, awayScore: true, penaltyWinner: true, points: true },
+    });
+
+    const predMap = new Map(predictions.map((p) => [p.userId, p]))
+
+    const palpites = allUsers.map((u) => {
+      const pred = predMap.get(u.id)
+      if (!pred) {
+        return {
+          userId: u.id, name: u.name,
+          homeScore: null as number | null, awayScore: null as number | null,
+          penaltyWinner: null as string | null, points: null as number | null,
+          category: 'sem_palpite',
+        }
+      }
+
       let category: string
-      if (pts !== null && ((isGroupStage && pts === 10) || (!isGroupStage && pts >= 14))) category = 'cravou'
-      else if (pts !== null && ((isGroupStage && (pts === 7 || pts === 8)) || (!isGroupStage && (pts === 10 || pts === 11)))) category = 'resultado_bonus'
-      else if (pts !== null && pts >= 5) category = 'resultado_certo'
-      else if (pts !== null && pts >= 2) category = 'parcial'
-      else category = 'errou'
+      if (isFinished) {
+        const pts = pred.points
+        if (pts !== null && ((isGroupStage && pts === 10) || (!isGroupStage && pts >= 14))) category = 'cravou'
+        else if (pts !== null && ((isGroupStage && (pts === 7 || pts === 8)) || (!isGroupStage && (pts === 10 || pts === 11)))) category = 'resultado_bonus'
+        else if (pts !== null && pts >= 5) category = 'resultado_certo'
+        else if (pts !== null && pts >= 2) category = 'parcial'
+        else category = 'errou'
+      } else {
+        if (pred.homeScore! > pred.awayScore!) category = 'vitoria_casa'
+        else if (pred.awayScore! > pred.homeScore!) category = 'vitoria_fora'
+        else category = 'empate'
+      }
 
       return {
-        userId: u.id,
-        name: u.name,
-        homeScore: pred.homeScore,
-        awayScore: pred.awayScore,
-        penaltyWinner: pred.penaltyWinner,
-        points: pts,
+        userId: u.id, name: u.name,
+        homeScore: pred.homeScore, awayScore: pred.awayScore,
+        penaltyWinner: pred.penaltyWinner, points: pred.points,
         category,
       }
     })
 
-    const order: Record<string, number> = { cravou: 0, resultado_bonus: 1, resultado_certo: 2, parcial: 3, errou: 4 }
-    palpites.sort((a, b) => order[a.category] - order[b.category] || (b.points ?? -1) - (a.points ?? -1))
+    const finishedOrder: Record<string, number> = { cravou: 0, resultado_bonus: 1, resultado_certo: 2, parcial: 3, errou: 4, sem_palpite: 5 }
+    const lockedOrder: Record<string, number> = { vitoria_casa: 0, vitoria_fora: 1, empate: 2, sem_palpite: 3 }
+    const order = isFinished ? finishedOrder : lockedOrder
+    palpites.sort((a, b) => (order[a.category] ?? 99) - (order[b.category] ?? 99) || (b.points ?? -1) - (a.points ?? -1))
 
     return {
       match: {
         id: match.id, homeTeam: match.homeTeam, awayTeam: match.awayTeam,
         homeScore: match.homeScore, awayScore: match.awayScore,
         matchDate: match.matchDate, phase: match.phase, penaltyWinner: match.penaltyWinner,
+        status: match.status, predictionsLocked: match.predictionsLocked,
       },
       palpites,
+      isFinished,
     }
   }
 
