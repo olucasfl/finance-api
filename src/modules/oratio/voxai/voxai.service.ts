@@ -156,7 +156,7 @@ Frase: "${message}"`
  /* =========================
     CHAT (IA)
  ========================= */
- async chat(data: VoxAiDto){
+ async chat(data: VoxAiDto, userId: string){
 
   try{
 
@@ -192,7 +192,15 @@ Frase: "${message}"`
     }
    }
 
-   const rate = this.rateLimiter.check("global-user")
+   if(conversation.userId !== userId){
+    return {
+     success:false,
+     error:"FORBIDDEN",
+     message:"Conversa inválida."
+    }
+   }
+
+   const rate = this.rateLimiter.check(userId)
 
    if(!rate.allowed){
     return {

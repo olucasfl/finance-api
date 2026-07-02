@@ -29,8 +29,11 @@ export class VoxAiController{
  ========================= */
 
  @Post("chat")
- async chat(@Body() body: VoxAiDto){
-  return this.voxAiService.chat(body)
+ async chat(@Body() body: VoxAiDto, @Req() req){
+
+  const userId = req.user.userId
+
+  return this.voxAiService.chat(body, userId)
  }
 
  /* =========================

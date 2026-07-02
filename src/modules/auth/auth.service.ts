@@ -19,7 +19,7 @@ export class AuthService {
   async login(email: string, password: string) {
 
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: email.trim().toLowerCase() },
     });
 
     if (!user) {
@@ -129,7 +129,7 @@ export class AuthService {
   async resendVerification(email: string, app?: string) {
 
     const user = await this.prisma.user.findUnique({
-      where: { email },
+      where: { email: email.trim().toLowerCase() },
     });
 
     if (!user) {
@@ -172,7 +172,7 @@ export class AuthService {
   async checkVerification(email: string) {
 
   const user = await this.prisma.user.findUnique({
-    where: { email },
+    where: { email: email.trim().toLowerCase() },
   });
 
   return {
@@ -184,7 +184,7 @@ export class AuthService {
 async requestPasswordReset(email: string, app?: string) {
 
   const user = await this.prisma.user.findUnique({
-    where: { email },
+    where: { email: email.trim().toLowerCase() },
   });
 
   if (!user) return;
