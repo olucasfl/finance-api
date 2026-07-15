@@ -400,3 +400,13 @@ model CravouGroupInvite {
 
   @@unique([groupId, inviteeId])
 }
+
+// ─── Cravou Wrapped (retrospectiva de fim de Copa) ──────────────────────────
+// Linha única (id fixo "singleton"): não há caso de múltiplas configurações.
+model CravouWrappedConfig {
+  id            String    @id @default("singleton")
+  status        String    @default("off") // off | preview | released
+  previewUserId String?   // id de quem ativou a prévia (setado a partir do JWT, nunca hardcoded)
+  activatedAt   DateTime? // renovado a cada transição para preview/released; usado pelo client para saber se já viu
+  updatedAt     DateTime  @updatedAt
+}

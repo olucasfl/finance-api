@@ -48,4 +48,18 @@ export class RealtimeGateway {
   emitGroupInviteReceived(inviteeId: string, payload: { inviteId: string; groupId: string; groupName: string; inviterName: string }) {
     this.server.to(`user:${inviteeId}`).emit('group:invite-received', payload);
   }
+
+  // ─── Cravou Wrapped ───────────────────────────────────────────────────────
+
+  emitWrappedActivatedTo(userId: string, activatedAt: string) {
+    this.server.to(`user:${userId}`).emit('wrapped:activated', { activatedAt });
+  }
+
+  emitWrappedActivatedAll(activatedAt: string) {
+    this.server.emit('wrapped:activated', { activatedAt });
+  }
+
+  emitWrappedDeactivated() {
+    this.server.emit('wrapped:deactivated', {});
+  }
 }
