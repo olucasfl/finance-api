@@ -3,6 +3,10 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityService } from '../activity/activity.service'
 import { toZonedTime } from 'date-fns-tz'
 import { format } from 'date-fns'
+import { CreateConsecrationStageDto } from './dto/create-consecration-stage.dto';
+import { CreateConsecrationDayDto } from './dto/create-consecration-day.dto';
+import { CreateConsecrationPrayerDto } from './dto/create-consecration-prayer.dto';
+import { AddDayPrayerDto } from './dto/add-day-prayer.dto';
 
 @Injectable()
 export class ConsecrationService {
@@ -159,7 +163,7 @@ export class ConsecrationService {
     return day;
   }
 
-  async createStage(data: any) {
+  async createStage(data: CreateConsecrationStageDto) {
 
     return this.prisma.consecrationStage.create({
       data
@@ -167,7 +171,7 @@ export class ConsecrationService {
 
   }
 
-  async createDay(data: any) {
+  async createDay(data: CreateConsecrationDayDto) {
 
     return this.prisma.consecrationDay.create({
       data
@@ -175,7 +179,7 @@ export class ConsecrationService {
 
   }
 
-  async createPrayer(data: any) {
+  async createPrayer(data: CreateConsecrationPrayerDto) {
 
     return this.prisma.prayer.create({
       data
@@ -183,7 +187,7 @@ export class ConsecrationService {
 
   }
 
-  async addPrayerToDay(data: any) {
+  async addPrayerToDay(data: AddDayPrayerDto) {
 
     return this.prisma.dayPrayer.create({
       data
