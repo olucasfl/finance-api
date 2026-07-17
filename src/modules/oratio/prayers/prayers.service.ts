@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { ActivityService } from '../activity/activity.service'
+import { CreatePrayerCategoryDto } from './dto/create-prayer-category.dto'
+import { CreatePrayerDto } from './dto/create-prayer.dto'
 
 @Injectable()
 export class PrayersService {
@@ -13,7 +15,7 @@ export class PrayersService {
     CATEGORIES
  ========================= */
 
- async createCategory(data:any){
+ async createCategory(data:CreatePrayerCategoryDto){
 
   return this.prisma.prayerCategory.create({
    data
@@ -35,7 +37,7 @@ export class PrayersService {
     PRAYERS
  ========================= */
 
- async createPrayer(data:any){
+ async createPrayer(data:CreatePrayerDto){
 
   return this.prisma.generalPrayer.create({
    data

@@ -12,6 +12,9 @@ import {
 
 import { PrayersService } from './prayers.service'
 import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard'
+import { AdminGuard } from 'src/cravou/admin/admin.guard'
+import { CreatePrayerCategoryDto } from './dto/create-prayer-category.dto'
+import { CreatePrayerDto } from './dto/create-prayer.dto'
 
 @Controller('oratio/prayers')
 export class PrayersController {
@@ -23,8 +26,8 @@ export class PrayersController {
  ========================= */
 
  @Post("category")
- @UseGuards(JwtAuthGuard)
- createCategory(@Body() body:any){
+ @UseGuards(JwtAuthGuard, AdminGuard)
+ createCategory(@Body() body:CreatePrayerCategoryDto){
   return this.service.createCategory(body)
  }
 
@@ -38,8 +41,8 @@ export class PrayersController {
  ========================= */
 
  @Post()
- @UseGuards(JwtAuthGuard)
- createPrayer(@Body() body:any){
+ @UseGuards(JwtAuthGuard, AdminGuard)
+ createPrayer(@Body() body:CreatePrayerDto){
   return this.service.createPrayer(body)
  }
 
