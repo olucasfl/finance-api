@@ -118,7 +118,9 @@ getRosary(type:string){
     userId,
     type,
     completed:false
-   }
+   },
+
+   orderBy:{ startedAt:"desc" }
 
   })
 
@@ -128,7 +130,7 @@ getRosary(type:string){
  UPDATE STEP
  ========================= */
 
- async updateStep(userId:string, type:string, step:number){
+ async updateStep(userId:string, type:string, step:number, elapsedSeconds?:number){
 
   const session = await this.getSession(userId, type)
 
@@ -140,7 +142,12 @@ getRosary(type:string){
 
    where:{ id:session.id },
 
-   data:{ currentStep:step }
+   data:{
+    currentStep:step,
+    ...(typeof elapsedSeconds === "number"
+     ? { elapsedSeconds }
+     : {})
+   }
 
   })
 
@@ -154,11 +161,22 @@ getRosary(type:string){
 
   const sessions = await this.prisma.rosarySession.findMany({
 
-   where:{ userId, completed:false }
+   where:{ userId, completed:false },
+
+   orderBy:{ startedAt:"desc" }
 
   })
 
-  return sessions
+  // mantém só a sessão mais recente de cada type
+  const latestByType = new Map<string, typeof sessions[number]>()
+
+  for(const s of sessions){
+   if(!latestByType.has(s.type)){
+    latestByType.set(s.type, s)
+   }
+  }
+
+  return Array.from(latestByType.values())
    .filter((s)=> s.currentStep > 0)
    .map((s)=>{
 

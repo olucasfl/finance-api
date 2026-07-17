@@ -43,8 +43,8 @@ export class RosaryController{
 
  @Post("step")
  @UseGuards(JwtAuthGuard)
- step(@Req() req:any, @Body() body:{ type:string, step:number }){
-  return this.service.updateStep(req.user.userId, body.type, body.step)
+ step(@Req() req:any, @Body() body:{ type:string, step:number, elapsedSeconds?:number }){
+  return this.service.updateStep(req.user.userId, body.type, body.step, body.elapsedSeconds)
  }
 
  /* FINISH */
