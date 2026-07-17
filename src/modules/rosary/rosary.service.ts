@@ -10,6 +10,7 @@ import { buildStMichael } from "./stMichaelBuilder"
 import { buildStBenedict } from "./stBenedictBuilder"
 import { buildHolySpirit } from "./HolySpiritBuilder"
 import { buildTearsMary } from "./tearsMaryBuilder"
+import { buildViaSacra } from "./viaSacraBuilder"
 import { JourneyService } from "../oratio/journey/journey.service"
 
 @Injectable()
@@ -64,6 +65,10 @@ getRosary(type:string){
 
   if(type === "coroa-lagrimas"){
     return buildTearsMary()
+  }
+
+  if(type === "via-sacra"){
+    return buildViaSacra()
   }
 
  throw new NotFoundException("Invalid rosary type")
