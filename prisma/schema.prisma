@@ -135,11 +135,14 @@ model GeneralPrayer {
 model RosarySession {
   id          String    @id @default(uuid())
   userId      String
+  type        String    @default("gozosos")
   currentStep Int       @default(0)
   completed   Boolean   @default(false)
   startedAt   DateTime  @default(now())
   finishedAt  DateTime?
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, completed])
 }
 
 model SpiritualStats {

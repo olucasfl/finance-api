@@ -42,7 +42,7 @@ getRosary(type:string){
   if(type === "misericordia"){
     return buildDivineMercy()
   }
-  
+
   if(type === "sagrado-coracao"){
     return buildSacredHeart()
   }
@@ -74,10 +74,26 @@ getRosary(type:string){
  throw new NotFoundException("Invalid rosary type")
 }
 
- async start(userId:string){
+ async start(userId:string, type:string, restart?:boolean){
+
+  if(restart){
+
+   await this.prisma.rosarySession.deleteMany({
+    where:{ userId, type, completed:false }
+   })
+
+  }else{
+
+   const existing = await this.getSession(userId, type)
+
+   if(existing){
+    return existing
+   }
+
+  }
 
   const session = await this.prisma.rosarySession.create({
-   data:{ userId }
+   data:{ userId, type }
   })
 
   await this.activityService.log(
@@ -94,12 +110,13 @@ getRosary(type:string){
  GET SESSION
  ========================= */
 
- async getSession(userId:string){
+ async getSession(userId:string, type:string){
 
   return this.prisma.rosarySession.findFirst({
 
    where:{
     userId,
+    type,
     completed:false
    }
 
@@ -108,26 +125,75 @@ getRosary(type:string){
  }
 
  /* =========================
- NEXT STEP
+ UPDATE STEP
  ========================= */
 
- async nextStep(userId:string){
+ async updateStep(userId:string, type:string, step:number){
 
-  const session = await this.getSession(userId)
+  const session = await this.getSession(userId, type)
 
   if(!session){
-   throw new NotFoundException("Rosary session not found")
+   return null
   }
 
   return this.prisma.rosarySession.update({
 
    where:{ id:session.id },
 
-   data:{
-    currentStep:{
-     increment:1
+   data:{ currentStep:step }
+
+  })
+
+ }
+
+ /* =========================
+ ACTIVE PROGRESS (para a lista de terços)
+ ========================= */
+
+ async getActiveProgress(userId:string){
+
+  const sessions = await this.prisma.rosarySession.findMany({
+
+   where:{ userId, completed:false }
+
+  })
+
+  return sessions
+   .filter((s)=> s.currentStep > 0)
+   .map((s)=>{
+
+    let totalSteps = 0
+
+    try{
+     totalSteps = this.getRosary(s.type).length
+    }catch{
+     totalSteps = 0
     }
-   }
+
+    return {
+     type:s.type,
+     currentStep:s.currentStep,
+     totalSteps
+    }
+
+   })
+   .filter((s)=> s.totalSteps > 0)
+
+ }
+
+ /* =========================
+ HISTÓRICO
+ ========================= */
+
+ async getHistory(userId:string){
+
+  return this.prisma.rosarySession.findMany({
+
+   where:{ userId, completed:true },
+
+   orderBy:{ finishedAt:"desc" },
+
+   take:50
 
   })
 
@@ -137,9 +203,9 @@ getRosary(type:string){
  FINISH
  ========================= */
 
-async finish(userId:string){
+async finish(userId:string, type:string){
 
- const session = await this.getSession(userId)
+ const session = await this.getSession(userId, type)
 
  if(!session){
   throw new NotFoundException("Rosary session not found")
