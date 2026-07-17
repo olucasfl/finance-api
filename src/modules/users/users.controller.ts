@@ -16,6 +16,7 @@ import {
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AdminGuard } from 'src/cravou/admin/admin.guard';
 
 @Controller('users')
 export class UsersController {
@@ -53,7 +54,7 @@ export class UsersController {
   }
 
   @Get('admin/users')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   getAllUsers(
     @Req() req: any,
     @Query('search') search?: string,
@@ -78,7 +79,7 @@ export class UsersController {
   }
 
   @Get('admin/users/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   getUserDetail(@Req() req: any, @Param('id') userId: string) {
     const adminId = req?.user?.userId;
 
@@ -90,7 +91,7 @@ export class UsersController {
   }
 
   @Delete('admin/users/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   deleteUser(@Req() req: any, @Param('id') userId: string) {
     const adminId = req?.user?.userId;
 
@@ -103,7 +104,7 @@ export class UsersController {
 
 
   @Get('admin/stats')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   getAdminStats(@Req() req: any) {
     const userId = req?.user?.userId;
 
@@ -115,7 +116,7 @@ export class UsersController {
   }
 
   @Patch('admin/users/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   setAdminStatus(
     @Req() req: any,
     @Param('id') id: string,
@@ -136,7 +137,7 @@ export class UsersController {
   }
 
   @Get('admin/users/:id/activity')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   getUserActivity(@Req() req: any, @Param('id') userId: string) {
     const adminId = req?.user?.userId;
 

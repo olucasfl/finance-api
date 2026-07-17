@@ -9,6 +9,7 @@ import { RankingModule } from './ranking/ranking.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { ScheduledModule } from './scheduled/scheduled.module';
 import { ScoringModule } from './scoring/scoring.module';
+import { WrappedModule } from './wrapped/wrapped.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ScoringModule } from './scoring/scoring.module';
     CopaStandingsModule,
     BracketModule,
     ScheduledModule,
+    WrappedModule,
   ],
 })
 export class CravouModule {}

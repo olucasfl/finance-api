@@ -2,6 +2,11 @@ import { Body, Controller, Post, Get, Query, Res, Headers, UnauthorizedException
 import type { Response } from "express";
 import { AuthService } from './auth.service';
 import { JwtService } from '@nestjs/jwt';
+import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ResendVerificationDto } from './dto/resend-verification.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -12,13 +17,13 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  login(@Body() body: { email: string; password: string }) {
+  login(@Body() body: LoginDto) {
     return this.authService.login(body.email, body.password);
   }
 
   @Post('refresh')
-    refresh(@Body("refresh_token") refreshToken: string) {
-      return this.authService.refresh(refreshToken);
+    refresh(@Body() body: RefreshTokenDto) {
+      return this.authService.refresh(body.refresh_token);
     }
 
   @Get("verify-email")
@@ -27,7 +32,7 @@ export class AuthController {
   }
 
   @Post('resend-verification')
-  resendVerification(@Body() body: { email: string }, @Headers('x-app') app?: string) {
+  resendVerification(@Body() body: ResendVerificationDto, @Headers('x-app') app?: string) {
     return this.authService.resendVerification(body.email, app);
   }
 
@@ -37,12 +42,12 @@ export class AuthController {
   }
 
   @Post("forgot-password")
-  forgotPassword(@Body() body: { email: string }, @Headers('x-app') app?: string) {
+  forgotPassword(@Body() body: ForgotPasswordDto, @Headers('x-app') app?: string) {
     return this.authService.requestPasswordReset(body.email, app);
   }
 
   @Post("reset-password")
-  resetPassword(@Body() body: { token: string; password: string }) {
+  resetPassword(@Body() body: ResetPasswordDto) {
     return this.authService.resetPassword(body.token, body.password);
   }
 

@@ -31,8 +31,10 @@ export class UsersService {
       throw new ConflictException('Passwords do not match');
     }
 
+    const email = data.email.trim().toLowerCase();
+
     const emailExists = await this.prisma.user.findUnique({
-      where: { email: data.email },
+      where: { email },
     });
 
     if (emailExists) {
@@ -46,7 +48,7 @@ export class UsersService {
     const user = await this.prisma.user.create({
       data: {
         name: data.name,
-        email: data.email,
+        email,
         password: hashedPassword,
         emailVerified: false,
         emailVerificationToken: token,
@@ -94,7 +96,13 @@ export class UsersService {
       _sum: { points: true },
     }),
     this.prisma.cravouPrediction.count({
-      where: { userId, points: { in: [10, 15] } },
+      where: {
+        userId,
+        OR: [
+          { points: 10,                   match: { phase: 'group_stage' } },
+          { points: { in: [14, 15, 17] }, match: { phase: { not: 'group_stage' } } },
+        ],
+      },
     }),
   ]);
 

@@ -35,6 +35,7 @@ export class RankingService {
         points: totals.get(u.id) ?? 0,
         cravadas: cravas.get(u.id) ?? 0,
       }))
+      .filter((entry) => entry.points > 0)
       .sort((a, b) => b.points - a.points || b.cravadas - a.cravadas)
       .map((entry, index) => ({ ...entry, position: index + 1 }));
   }

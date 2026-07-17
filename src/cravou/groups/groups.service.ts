@@ -399,6 +399,39 @@ export class GroupsService {
     return { matches };
   }
 
+  // ─── Jogos com palpites visíveis no grupo (bloqueados + finalizados) ──────────
+
+  async getGroupPalpitavelMatches(groupId: string, userId: string) {
+    const group = await this.prisma.cravouGroup.findUnique({
+      where: { id: groupId },
+      include: { members: true },
+    });
+    if (!group) throw new NotFoundException('Grupo não encontrado');
+    const isMember = group.members.some((m) => m.userId === userId);
+    if (!isMember) throw new ForbiddenException('Você não faz parte deste grupo');
+
+    const matches = await this.prisma.cravouMatch.findMany({
+      where: {
+        predictionsLocked: true,
+        ...(group.brazilOnly ? BRAZIL_MATCH_FILTER : {}),
+      },
+      orderBy: { matchDate: 'desc' },
+      select: {
+        id: true,
+        homeTeam: true,
+        awayTeam: true,
+        homeScore: true,
+        awayScore: true,
+        matchDate: true,
+        phase: true,
+        penaltyWinner: true,
+        status: true,
+      },
+    });
+
+    return { matches };
+  }
+
   // ─── Palpites de todos os membros para um jogo ───────────────────────────────
 
   async getGroupMatchPalpites(groupId: string, matchId: string, userId: string) {

@@ -12,6 +12,7 @@ import {
 
 import { ConsecrationService } from './consecration.service';
 import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { AdminGuard } from 'src/cravou/admin/admin.guard';
 
 @Controller('oratio/consecration')
 export class ConsecrationController {
@@ -69,6 +70,7 @@ export class ConsecrationController {
   /* ============================= */
 
   @Post('stage')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   createStage(@Body() body: any) {
 
     return this.service.createStage(body)
@@ -76,6 +78,7 @@ export class ConsecrationController {
   }
 
   @Post('day')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   createDay(@Body() body: any) {
 
     return this.service.createDay(body)
@@ -83,6 +86,7 @@ export class ConsecrationController {
   }
 
   @Post('prayer')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   createPrayer(@Body() body: any) {
 
     return this.service.createPrayer(body)
@@ -90,6 +94,7 @@ export class ConsecrationController {
   }
 
   @Post('day-prayer')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   addPrayerToDay(@Body() body: any) {
 
     return this.service.addPrayerToDay(body)
@@ -97,6 +102,7 @@ export class ConsecrationController {
   }
 
   @Put('day-prayer/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   updateDayPrayer(
     @Param('id') id: string,
     @Body() body: { order: number }
@@ -107,6 +113,7 @@ export class ConsecrationController {
   }
 
   @Put('prayer/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   updatePrayer(
     @Param('id') id: string,
     @Body() body: { title?: string; content?: string }
