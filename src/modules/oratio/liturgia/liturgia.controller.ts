@@ -9,7 +9,15 @@ export class LiturgiaController{
  ){}
 
  @Get()
- getToday(){
+ getToday(
+  @Query("dia") dia?: string,
+  @Query("mes") mes?: string,
+  @Query("ano") ano?: string
+ ){
+
+  if(dia && mes && ano){
+   return this.liturgiaService.getByDate(dia, mes, ano)
+  }
 
   return this.liturgiaService.getToday()
 
