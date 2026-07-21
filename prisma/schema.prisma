@@ -27,7 +27,6 @@ model User {
   isAdmin                   Boolean                    @default(false)
   bolaoPoints               Int                        @default(0)
   cravadas                  Int                        @default(0)
-  budgets                   Budget[]
   completedConsecrationDays ConsecrationCompletedDay[]
   consecrations             ConsecrationProgress[]
   conversations             Conversation[]
@@ -60,28 +59,6 @@ model UserActivity {
   action    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-}
-
-model Budget {
-  id        String    @id @default(uuid())
-  name      String
-  limit     Float
-  createdAt DateTime  @default(now())
-  userId    String
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  expenses  Expense[]
-}
-
-model Expense {
-  id            String        @id @default(uuid())
-  title         String
-  amount        Float
-  createdAt     DateTime      @default(now())
-  budgetId      String
-  expenseDate   DateTime      @default(now())
-  category      Category
-  paymentMethod PaymentMethod
-  budget        Budget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
 }
 
 model ConsecrationProgress {
@@ -283,30 +260,6 @@ enum JourneyRole {
 
   MEMBER
 
-}
-
-enum PaymentMethod {
-  CASH
-  CREDIT_CARD
-  DEBIT_CARD
-  BANK_TRANSFER
-  PIX
-  OTHER
-}
-
-enum Category {
-  FOOD
-  TRANSPORT
-  ENTERTAINMENT
-  HEALTH
-  BILLS
-  EDUCATION
-  TRAVEL
-  RENT
-  SHOPPING
-  INVESTMENTS
-  SUBSCRIPTIONS
-  OTHER
 }
 
 // ============================================================

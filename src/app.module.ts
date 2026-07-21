@@ -7,8 +7,6 @@ import { ScheduleModule } from "@nestjs/schedule"
 
 import { UsersModule } from './modules/users/users.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { BudgetsModule } from './modules/smart-finance/budgets/budgets.module';
-import { ExpensesModule } from './modules/smart-finance/expenses/expenses.module';
 import { ConsecrationModule } from './modules/oratio/consecration/consecration.module';
 import { LiturgiaModule } from './modules/oratio/liturgia/liturgia.module';
 import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
@@ -26,8 +24,6 @@ import { CravouModule } from './cravou/cravou.module';
     ScheduleModule.forRoot(),
     UsersModule,
     AuthModule,
-    BudgetsModule,
-    ExpensesModule,
     ConsecrationModule,
     LiturgiaModule,
     VoxAiModule,

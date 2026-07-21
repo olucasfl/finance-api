@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -235,17 +235,15 @@ export class AuthService {
 
     await this.confirmEmailToken(token);
 
-    let redirectUrl = "https://finance-api-front.vercel.app/login";
-
     if (app === "oratio") {
-      redirectUrl = "https://oratio-phi.vercel.app/login";
-    } else if (app === "smart-finance") {
-      redirectUrl = "https://finance-api-front.vercel.app/login";
-    } else if (app === "cravou") {
-      redirectUrl = "https://cravou-ashy.vercel.app/login";
+      return res.redirect("https://oratio-phi.vercel.app/login");
     }
 
-    return res.redirect(redirectUrl);
+    if (app === "cravou") {
+      return res.redirect("https://cravou-ashy.vercel.app/login");
+    }
+
+    throw new BadRequestException("Unknown app");
   }
 
   /*
@@ -315,21 +313,13 @@ export class AuthService {
       },
     });
 
-    let emailSent: boolean;
-
-    if (app === AppType.ORATIO) {
-
-      emailSent = await this.mailService.sendOratioVerificationEmail(user.email, token);
-
-    } else if (app === AppType.CRAVOU) {
-
-      emailSent = await this.mailService.sendCravouVerificationEmail(user.email, token);
-
-    } else {
-
-      emailSent = await this.mailService.sendVerificationEmail(user.email, token);
-
+    if (app !== AppType.ORATIO && app !== AppType.CRAVOU) {
+      throw new BadRequestException('Unknown or missing app');
     }
+
+    const emailSent = app === AppType.ORATIO
+      ? await this.mailService.sendOratioVerificationEmail(user.email, token)
+      : await this.mailService.sendCravouVerificationEmail(user.email, token);
 
     /*
     Diferente do forgot-password, essa rota já não é "genérica não
@@ -368,7 +358,13 @@ async requestPasswordReset(email: string, app?: string) {
     where: { email: email.trim().toLowerCase() },
   });
 
+  /*
+  Silencioso nos dois casos (email não existe OU app não reconhecido) —
+  de propósito, pra não dar nenhum sinal que deixe alguém descobrir se
+  um email existe na base testando variações do header x-app.
+  */
   if (!user) return;
+  if (app !== AppType.ORATIO && app !== AppType.CRAVOU) return;
 
   const token = randomBytes(32).toString("hex");
 
@@ -386,13 +382,9 @@ async requestPasswordReset(email: string, app?: string) {
 
     await this.mailService.sendOratioPasswordResetEmail(user.email, token);
 
-  } else if (app === AppType.CRAVOU) {
-
-    await this.mailService.sendCravouPasswordResetEmail(user.email, token);
-
   } else {
 
-    await this.mailService.sendPasswordResetEmail(user.email, token);
+    await this.mailService.sendCravouPasswordResetEmail(user.email, token);
 
   }
 

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -28,6 +29,10 @@ export class UsersService {
   */
 
   async create(data: CreateUserDto, app?: string) {
+
+    if (app !== AppType.ORATIO && app !== AppType.CRAVOU) {
+      throw new BadRequestException('Unknown or missing app');
+    }
 
     if (data.password !== data.confirmPassword) {
       throw new ConflictException('Passwords do not match');
@@ -59,15 +64,9 @@ export class UsersService {
       },
     });
 
-    let emailSent: boolean;
-
-    if (app === AppType.ORATIO) {
-      emailSent = await this.mailService.sendOratioVerificationEmail(user.email, token);
-    } else if (app === AppType.CRAVOU) {
-      emailSent = await this.mailService.sendCravouVerificationEmail(user.email, token);
-    } else {
-      emailSent = await this.mailService.sendVerificationEmail(user.email, token);
-    }
+    const emailSent = app === AppType.ORATIO
+      ? await this.mailService.sendOratioVerificationEmail(user.email, token)
+      : await this.mailService.sendCravouVerificationEmail(user.email, token);
 
     const { password, ...userWithoutPassword } = user;
 
@@ -223,6 +222,11 @@ export class UsersService {
 
   async requestEmailChange(userId: string, newEmail: string, app?: string) {
 
+    // Hoje só o Oratio tem essa funcionalidade no frontend.
+    if (app !== AppType.ORATIO) {
+      throw new BadRequestException('Unknown or unsupported app');
+    }
+
     const email = newEmail.trim().toLowerCase();
 
     const user = await this.prisma.user.findUnique({
@@ -257,9 +261,7 @@ export class UsersService {
       },
     });
 
-    const emailSent = app === AppType.ORATIO
-      ? await this.mailService.sendOratioEmailChangeConfirmation(email, token)
-      : await this.mailService.sendEmailChangeConfirmation(email, token);
+    const emailSent = await this.mailService.sendOratioEmailChangeConfirmation(email, token);
 
     if (!emailSent) {
 
