@@ -80,4 +80,15 @@ export class AuthController {
     return this.authService.resetPassword(body.token, body.password);
   }
 
+  /*
+  Confirmação de troca de email. Pública (o clique vem de um link de
+  email, pode não ter sessão válida nesse navegador) — o frontend
+  chama essa rota via fetch depois de carregar a página, nunca por
+  navegação GET direta.
+  */
+  @Post('verify-email-change')
+  confirmEmailChange(@Body() body: VerifyEmailDto) {
+    return this.authService.confirmEmailChange(body.token);
+  }
+
 }

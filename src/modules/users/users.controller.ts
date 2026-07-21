@@ -15,6 +15,8 @@ import {
 
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ChangeEmailDto } from './dto/change-email.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from 'src/cravou/admin/admin.guard';
 
@@ -171,6 +173,68 @@ export class UsersController {
       userId,
       body.name,
     );
+  }
+
+  /*
+  =============================
+  CHANGE PASSWORD
+  =============================
+  */
+
+  @Post('me/change-password')
+  @UseGuards(JwtAuthGuard)
+  changePassword(
+    @Req() req: any,
+    @Body() body: ChangePasswordDto,
+  ) {
+
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.changePassword(
+      userId,
+      body.currentPassword,
+      body.newPassword,
+    );
+  }
+
+  /*
+  =============================
+  CHANGE EMAIL (2 passos)
+  =============================
+  */
+
+  @Post('me/email')
+  @UseGuards(JwtAuthGuard)
+  requestEmailChange(
+    @Req() req: any,
+    @Body() body: ChangeEmailDto,
+    @Headers('x-app') app?: string,
+  ) {
+
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.requestEmailChange(userId, body.email, app);
+  }
+
+  @Post('me/email/cancel')
+  @UseGuards(JwtAuthGuard)
+  cancelEmailChange(@Req() req: any) {
+
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.cancelEmailChange(userId);
   }
 
   /*

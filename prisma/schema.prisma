@@ -21,6 +21,9 @@ model User {
   emailVerified             Boolean                    @default(false)
   passwordResetExpires      DateTime?
   passwordResetToken        String?
+  pendingEmail              String?
+  pendingEmailToken         String?                    @unique
+  pendingEmailExpires       DateTime?
   isAdmin                   Boolean                    @default(false)
   bolaoPoints               Int                        @default(0)
   cravadas                  Int                        @default(0)

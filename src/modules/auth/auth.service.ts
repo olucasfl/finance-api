@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
@@ -184,6 +184,48 @@ export class AuthService {
     }
 
     return res.redirect(redirectUrl);
+  }
+
+  /*
+  Confirmação de troca de email — mesmo desenho idempotente do
+  confirmEmailToken (token não é limpo no sucesso, checagem de "já
+  aplicado" via comparação de estado). O link é enviado só pro
+  frontend (nunca direto pra API), então não corre o mesmo risco de
+  link prefetching que a verificação original tinha.
+  */
+  async confirmEmailChange(token: string) {
+
+    const user = await this.prisma.user.findFirst({
+      where: { pendingEmailToken: token },
+    });
+
+    if (!user || !user.pendingEmail) {
+      throw new UnauthorizedException('Invalid confirmation token');
+    }
+
+    if (user.email === user.pendingEmail) {
+      return { alreadyConfirmed: true, email: user.email };
+    }
+
+    if (user.pendingEmailExpires && user.pendingEmailExpires < new Date()) {
+      throw new UnauthorizedException('Confirmation link expired');
+    }
+
+    const taken = await this.prisma.user.findFirst({
+      where: { email: user.pendingEmail, id: { not: user.id } },
+    });
+
+    if (taken) {
+      throw new ConflictException('This email is no longer available');
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { email: user.pendingEmail },
+    });
+
+    return { alreadyConfirmed: false, email: user.pendingEmail };
+
   }
 
   async resendVerification(email: string, app?: string) {

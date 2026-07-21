@@ -337,6 +337,26 @@ export class MailService {
     );
   }
 
+  async sendEmailChangeConfirmation(email: string, token: string) {
+
+    const link = `https://finance-api-front.vercel.app/confirmar-troca-email?token=${token}`;
+
+    const htmlContent = this.buildTemplate(
+      "Confirme seu novo email",
+      "Recebemos um pedido para trocar o email da sua conta para este endereço.",
+      "Confirmar novo email",
+      link,
+      "Se você não pediu essa troca, ignore este email — seu email atual continua ativo."
+    );
+
+    await this.sendEmail(
+      email,
+      "Confirme seu novo email",
+      htmlContent,
+      "Smart Finance"
+    );
+  }
+
   /*
   =============================
   CRAVOU TEMPLATE
@@ -508,6 +528,30 @@ export class MailService {
     await this.sendEmail(
       email,
       "Oratio • Redefinir senha",
+      htmlContent,
+      "Oratio"
+    );
+  }
+
+  async sendOratioEmailChangeConfirmation(email: string, token: string) {
+
+    /*
+    Aponta pro frontend, igual ao link de verificação de email — a
+    página confirma via fetch, não por navegação GET direta.
+    */
+    const link = `https://oratio-phi.vercel.app/confirmar-troca-email?token=${token}`;
+
+    const htmlContent = this.buildOratioTemplate(
+      "Confirme seu novo email",
+      "Recebemos um pedido para trocar o email da sua conta no <b>Oratio</b> para este endereço.",
+      "Confirmar novo email",
+      link,
+      "Se você não pediu essa troca, ignore este email — seu email atual continua ativo. Este link expira em 1 hora."
+    );
+
+    await this.sendEmail(
+      email,
+      "Oratio • Confirme seu novo email",
       htmlContent,
       "Oratio"
     );

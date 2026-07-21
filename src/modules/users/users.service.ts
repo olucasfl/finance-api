@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -85,6 +86,7 @@ export class UsersService {
         id: true,
         name: true,
         email: true,
+        pendingEmail: true,
         createdAt: true,
         emailVerified: true,
         isAdmin: true,
@@ -119,6 +121,7 @@ export class UsersService {
     id: user.id,
     name: user.name,
     email: user.email,
+    pendingEmail: user.pendingEmail,
     createdAt: user.createdAt,
     emailVerified: user.emailVerified,
     isAdmin: user.isAdmin,
@@ -161,6 +164,116 @@ export class UsersService {
     const { password, refreshToken, ...safeUser } = user;
 
     return safeUser;
+  }
+
+  /*
+  =============================
+  CHANGE PASSWORD (autenticado, com senha atual)
+  =============================
+  */
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    const matches = await bcrypt.compare(currentPassword, user.password);
+
+    if (!matches) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        password: hashed,
+        // Invalida sessões renovadas silenciosamente em outros
+        // dispositivos — força um novo login em qualquer lugar que
+        // não seja o atual, caso a troca seja por suspeita de acesso
+        // indevido.
+        refreshToken: null,
+      },
+    });
+
+    return { message: 'Password changed successfully' };
+
+  }
+
+  /*
+  =============================
+  TROCA DE EMAIL (2 passos: solicitar -> confirmar no novo endereço)
+  =============================
+  */
+
+  async requestEmailChange(userId: string, newEmail: string, app?: string) {
+
+    const email = newEmail.trim().toLowerCase();
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    if (email === user.email) {
+      throw new ConflictException('This is already your current email');
+    }
+
+    const taken = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (taken) {
+      throw new ConflictException('Email already in use');
+    }
+
+    const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 1000 * 60 * 60);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        pendingEmail: email,
+        pendingEmailToken: token,
+        pendingEmailExpires: expires,
+      },
+    });
+
+    if (app === AppType.ORATIO) {
+      await this.mailService.sendOratioEmailChangeConfirmation(email, token);
+    } else {
+      await this.mailService.sendEmailChangeConfirmation(email, token);
+    }
+
+    return {
+      emailChangePending: true,
+      pendingEmail: email,
+    };
+
+  }
+
+  async cancelEmailChange(userId: string) {
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        pendingEmail: null,
+        pendingEmailToken: null,
+        pendingEmailExpires: null,
+      },
+    });
+
+    return { message: 'Email change cancelled' };
+
   }
 
   /*
