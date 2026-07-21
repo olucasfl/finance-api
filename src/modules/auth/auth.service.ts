@@ -1,8 +1,8 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { Response } from 'express';
 import { AppType } from 'src/enums/app-type.enum';
@@ -34,6 +34,22 @@ export class AuthService {
 
   }
 
+  /*
+  Hash do refresh token pra guardar no banco. Propositalmente NÃO usa
+  bcrypt aqui: bcrypt trunca a entrada em 72 bytes, e como todo refresh
+  token do mesmo usuário começa com o mesmo prefixo (header fixo + sub +
+  email, antes de iat/exp no payload do JWT), tokens *diferentes* do
+  mesmo usuário podiam colidir no hash truncado — ou seja, um token já
+  rotacionado continuava "válido" contra o hash de outro. Bcrypt é pra
+  segredo de baixa entropia (senha); um JWT assinado já é de altíssima
+  entropia, então um hash rápido (SHA-256) resolve certo, sem o limite
+  de tamanho, e ainda permite lookup direto por hash em vez de comparar
+  um por um contra cada sessão.
+  */
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
   async login(email: string, password: string) {
 
     const user = await this.prisma.user.findUnique({
@@ -58,6 +74,8 @@ export class AuthService {
 
   }
 
+  private readonly REFRESH_TTL_MS = 1000 * 60 * 60 * 24 * 180;
+
   async generateTokens(userId: string, email: string) {
 
     const payload = { sub: userId, email };
@@ -78,11 +96,17 @@ export class AuthService {
       secret: this.getRefreshSecret(),
     });
 
-    const hashedRefresh = await bcrypt.hash(refresh_token, 10);
-
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { refreshToken: hashedRefresh },
+    /*
+    Uma sessão nova por login/renovação, em vez de sobrescrever um
+    campo único — assim logar num segundo aparelho não derruba a
+    sessão persistente do primeiro.
+    */
+    await this.prisma.refreshSession.create({
+      data: {
+        userId,
+        tokenHash: this.hashToken(refresh_token),
+        expiresAt: new Date(Date.now() + this.REFRESH_TTL_MS),
+      },
     });
 
     return {
@@ -108,17 +132,55 @@ export class AuthService {
       where: { id: payload.sub },
     });
 
-    if (!user || !user.refreshToken) {
+    if (!user) {
       throw new UnauthorizedException();
     }
 
-    const matches = await bcrypt.compare(refreshToken, user.refreshToken);
+    const session = await this.prisma.refreshSession.findFirst({
+      where: {
+        userId: user.id,
+        tokenHash: this.hashToken(refreshToken),
+        expiresAt: { gt: new Date() },
+      },
+    });
 
-    if (!matches) {
+    if (!session) {
       throw new UnauthorizedException();
     }
+
+    // Rotação: essa sessão específica é substituída por uma nova.
+    // As sessões de outros dispositivos não são tocadas.
+    await this.prisma.refreshSession.delete({
+      where: { id: session.id },
+    });
 
     return this.generateTokens(user.id, user.email);
+  }
+
+  /*
+  Revoga a sessão do refresh token informado (best-effort — se o token
+  já não bater com nenhuma sessão ativa, não há nada a fazer, e isso
+  não deve impedir o logout do lado do cliente).
+  */
+  async logout(refreshToken: string) {
+
+    let payload: any;
+
+    try {
+      payload = this.jwtService.verify(refreshToken, {
+        secret: this.getRefreshSecret(),
+      });
+    } catch {
+      return;
+    }
+
+    await this.prisma.refreshSession.deleteMany({
+      where: {
+        userId: payload.sub,
+        tokenHash: this.hashToken(refreshToken),
+      },
+    });
+
   }
 
   /*
@@ -253,18 +315,33 @@ export class AuthService {
       },
     });
 
+    let emailSent: boolean;
+
     if (app === AppType.ORATIO) {
 
-      await this.mailService.sendOratioVerificationEmail(user.email, token);
+      emailSent = await this.mailService.sendOratioVerificationEmail(user.email, token);
 
     } else if (app === AppType.CRAVOU) {
 
-      await this.mailService.sendCravouVerificationEmail(user.email, token);
+      emailSent = await this.mailService.sendCravouVerificationEmail(user.email, token);
 
     } else {
 
-      await this.mailService.sendVerificationEmail(user.email, token);
+      emailSent = await this.mailService.sendVerificationEmail(user.email, token);
 
+    }
+
+    /*
+    Diferente do forgot-password, essa rota já não é "genérica não
+    importa o quê" — a essa altura já sabemos que a conta existe e não
+    está verificada (branches acima), então não tem segredo de
+    existência sendo protegido aqui. Faz sentido avisar de verdade se
+    o envio falhou, em vez de mentir "reenviado com sucesso".
+    */
+    if (!emailSent) {
+      throw new ServiceUnavailableException(
+        'Failed to send verification email. Please try again in a moment.',
+      );
     }
 
     return {

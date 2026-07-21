@@ -15,7 +15,7 @@ model User {
   password                  String
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
-  refreshToken              String?
+  refreshSessions           RefreshSession[]
   emailVerificationToken    String?                    @unique
   emailVerificationTokenExpires DateTime?
   emailVerified             Boolean                    @default(false)
@@ -36,6 +36,21 @@ model User {
   activities                UserActivity[]
   journeyMembers            JourneyMember[]
   journeyIntents            JourneyPrayerIntent[]
+}
+
+// Uma linha por dispositivo/login ativo. Antes disso o refresh token
+// vivia num campo único em User — logar num segundo aparelho sobrescrevia
+// o token do primeiro, derrubando a sessão dele silenciosamente. Agora
+// cada login cria sua própria sessão, e renovar uma não mexe nas outras.
+model RefreshSession {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model UserActivity {

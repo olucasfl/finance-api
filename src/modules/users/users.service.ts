@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -58,17 +59,25 @@ export class UsersService {
       },
     });
 
+    let emailSent: boolean;
+
     if (app === AppType.ORATIO) {
-      await this.mailService.sendOratioVerificationEmail(user.email, token);
+      emailSent = await this.mailService.sendOratioVerificationEmail(user.email, token);
     } else if (app === AppType.CRAVOU) {
-      await this.mailService.sendCravouVerificationEmail(user.email, token);
+      emailSent = await this.mailService.sendCravouVerificationEmail(user.email, token);
     } else {
-      await this.mailService.sendVerificationEmail(user.email, token);
+      emailSent = await this.mailService.sendVerificationEmail(user.email, token);
     }
 
-    const { password, refreshToken, ...userWithoutPassword } = user;
+    const { password, ...userWithoutPassword } = user;
 
-    return userWithoutPassword;
+    /*
+    A conta já foi criada mesmo se o email falhar — não faz sentido
+    reverter a criação por causa disso. Mas o frontend precisa saber
+    que o email de verificação pode não ter chegado, pra não deixar a
+    pessoa esperando um email que nunca vai vir sem nenhum aviso.
+    */
+    return { ...userWithoutPassword, emailSent };
   }
 
   /*
@@ -161,7 +170,7 @@ export class UsersService {
       data: { name },
     });
 
-    const { password, refreshToken, ...safeUser } = user;
+    const { password, ...safeUser } = user;
 
     return safeUser;
   }
@@ -192,14 +201,14 @@ export class UsersService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: {
-        password: hashed,
-        // Invalida sessões renovadas silenciosamente em outros
-        // dispositivos — força um novo login em qualquer lugar que
-        // não seja o atual, caso a troca seja por suspeita de acesso
-        // indevido.
-        refreshToken: null,
-      },
+      data: { password: hashed },
+    });
+
+    // Invalida todas as sessões (todos os dispositivos, incluindo o
+    // atual) — força um novo login em qualquer lugar, caso a troca
+    // seja por suspeita de acesso indevido.
+    await this.prisma.refreshSession.deleteMany({
+      where: { userId },
     });
 
     return { message: 'Password changed successfully' };
@@ -248,10 +257,27 @@ export class UsersService {
       },
     });
 
-    if (app === AppType.ORATIO) {
-      await this.mailService.sendOratioEmailChangeConfirmation(email, token);
-    } else {
-      await this.mailService.sendEmailChangeConfirmation(email, token);
+    const emailSent = app === AppType.ORATIO
+      ? await this.mailService.sendOratioEmailChangeConfirmation(email, token)
+      : await this.mailService.sendEmailChangeConfirmation(email, token);
+
+    if (!emailSent) {
+
+      // Desfaz a troca pendente — sem isso, o perfil ficaria mostrando
+      // "confirmação pendente" pra um email que nunca recebeu o link.
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          pendingEmail: null,
+          pendingEmailToken: null,
+          pendingEmailExpires: null,
+        },
+      });
+
+      throw new ServiceUnavailableException(
+        'Failed to send confirmation email. Please try again in a moment.',
+      );
+
     }
 
     return {

@@ -241,16 +241,24 @@ export class MailService {
   =============================
   */
 
+  /*
+  Retorna se o envio deu certo (true/false) em vez de engolir a falha
+  em silêncio. Quem chama decide o que fazer com isso — em fluxos onde
+  saber se a conta existe já não é mais um segredo (signup, reenvio de
+  verificação), propagamos o erro pro usuário; em forgot-password, que
+  precisa responder igual não importa o que aconteça (pra não vazar se
+  o email existe), o chamador simplesmente ignora o retorno.
+  */
   private async sendEmail(
     email: string,
     subject: string,
     htmlContent: string,
     senderName: string
-  ) {
+  ): Promise<boolean> {
 
     if (!process.env.BREVO_API_KEY) {
       this.logger.error("BREVO_API_KEY is not defined");
-      return;
+      return false;
     }
 
     try {
@@ -277,6 +285,8 @@ export class MailService {
 
       this.logger.log(`Email enviado para ${email}`);
 
+      return true;
+
     } catch (error: any) {
 
       this.logger.error("Erro ao enviar email");
@@ -286,6 +296,8 @@ export class MailService {
       } else {
         this.logger.error(error.message);
       }
+
+      return false;
 
     }
 
@@ -297,7 +309,7 @@ export class MailService {
   =============================
   */
 
-  async sendVerificationEmail(email: string, token: string) {
+  async sendVerificationEmail(email: string, token: string): Promise<boolean> {
 
     const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}&app=smart-finance`;
 
@@ -309,7 +321,7 @@ export class MailService {
       "Se você não criou uma conta, pode ignorar este email."
     );
 
-    await this.sendEmail(
+    return this.sendEmail(
       email,
       "Smart Finance • Confirme seu email",
       htmlContent,
@@ -337,7 +349,7 @@ export class MailService {
     );
   }
 
-  async sendEmailChangeConfirmation(email: string, token: string) {
+  async sendEmailChangeConfirmation(email: string, token: string): Promise<boolean> {
 
     const link = `https://finance-api-front.vercel.app/confirmar-troca-email?token=${token}`;
 
@@ -349,7 +361,7 @@ export class MailService {
       "Se você não pediu essa troca, ignore este email — seu email atual continua ativo."
     );
 
-    await this.sendEmail(
+    return this.sendEmail(
       email,
       "Confirme seu novo email",
       htmlContent,
@@ -486,7 +498,7 @@ export class MailService {
   =============================
   */
 
-  async sendOratioVerificationEmail(email: string, token: string) {
+  async sendOratioVerificationEmail(email: string, token: string): Promise<boolean> {
 
     /*
     Aponta pro FRONTEND (não direto pra API) — a página /verificar-email
@@ -505,7 +517,7 @@ export class MailService {
       "Se você não criou uma conta, ignore este email."
     );
 
-    await this.sendEmail(
+    return this.sendEmail(
       email,
       "Oratio • Confirme seu email",
       htmlContent,
@@ -533,7 +545,7 @@ export class MailService {
     );
   }
 
-  async sendOratioEmailChangeConfirmation(email: string, token: string) {
+  async sendOratioEmailChangeConfirmation(email: string, token: string): Promise<boolean> {
 
     /*
     Aponta pro frontend, igual ao link de verificação de email — a
@@ -549,7 +561,7 @@ export class MailService {
       "Se você não pediu essa troca, ignore este email — seu email atual continua ativo. Este link expira em 1 hora."
     );
 
-    await this.sendEmail(
+    return this.sendEmail(
       email,
       "Oratio • Confirme seu novo email",
       htmlContent,
@@ -563,7 +575,7 @@ export class MailService {
   =============================
   */
 
-  async sendCravouVerificationEmail(email: string, token: string) {
+  async sendCravouVerificationEmail(email: string, token: string): Promise<boolean> {
 
     const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}&app=cravou`;
 
@@ -575,7 +587,7 @@ export class MailService {
       "Se você não criou uma conta, pode ignorar este email."
     );
 
-    await this.sendEmail(
+    return this.sendEmail(
       email,
       "Cravou! • Confirme seu email",
       htmlContent,

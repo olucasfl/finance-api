@@ -8,7 +8,7 @@ import { ResendVerificationDto } from './dto/resend-verification.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
-import { ThrottlerGuard, Throttle, SkipThrottle } from '@nestjs/throttler';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 @UseGuards(ThrottlerGuard)
@@ -35,6 +35,18 @@ export class AuthController {
       return this.authService.refresh(body.refresh_token);
     }
 
+  /*
+  Revoga a sessão desse refresh token especificamente — as outras
+  sessões/dispositivos do usuário continuam ativos. Best-effort: não
+  lança erro se o token já não for válido, o logout do lado do
+  cliente não deve travar por causa disso.
+  */
+  @Post('logout')
+  async logout(@Body() body: RefreshTokenDto) {
+    await this.authService.logout(body.refresh_token);
+    return { message: 'Logged out' };
+  }
+
   @Get("verify-email")
   verifyEmail(@Query("token") token: string, @Query("app") app: string, @Res() res: Response) {
     return this.authService.verifyEmail(token, app, res);
@@ -59,11 +71,15 @@ export class AuthController {
   }
 
   /*
-  Sem limite: o frontend faz polling nessa rota a cada 3s enquanto
-  espera a confirmação do email (ver VerifyEmailModal no Oratio),
-  o que já passaria do limite padrão do controller.
+  Limite mais alto que o padrão (30/min) em vez de isento: o frontend
+  faz polling nessa rota a cada 3s enquanto espera a confirmação do
+  email (ver VerifyEmailModal no Oratio) — isso já dá ~20/min de uso
+  legítimo, então 30/min cobre com folga sem deixar a rota totalmente
+  livre pra alguém varrer emails em sequência sem limite nenhum. A
+  resposta em si já não vaza se a conta existe (retorna `false` tanto
+  pra "não existe" quanto pra "existe mas não verificado").
   */
-  @SkipThrottle()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get("check-verification")
   checkVerification(@Query("email") email: string) {
     return this.authService.checkVerification(email);

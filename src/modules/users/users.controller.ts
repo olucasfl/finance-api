@@ -19,6 +19,7 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from 'src/cravou/admin/admin.guard';
+import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 
 @Controller('users')
 export class UsersController {
@@ -181,8 +182,14 @@ export class UsersController {
   =============================
   */
 
+  /*
+  Rate limit: sem isso, alguém com um access token válido (roubado ou
+  de sessão comprometida) podia tentar `currentPassword` infinitas
+  vezes até acertar por força bruta.
+  */
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Post('me/change-password')
-  @UseGuards(JwtAuthGuard)
   changePassword(
     @Req() req: any,
     @Body() body: ChangePasswordDto,
@@ -207,8 +214,9 @@ export class UsersController {
   =============================
   */
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Post('me/email')
-  @UseGuards(JwtAuthGuard)
   requestEmailChange(
     @Req() req: any,
     @Body() body: ChangeEmailDto,
