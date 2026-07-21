@@ -6,6 +6,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './jwt.strategy';
 import { MailModule } from '../mail/mail.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -21,6 +22,20 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         signOptions: { expiresIn: '15m' },
       }),
     }),
+
+    /*
+    Rate limit escopado só nas rotas de auth (aplicado via ThrottlerGuard
+    diretamente no AuthController, não como guard global) — evita afetar
+    rotas de outros módulos (VoxAI, Cravou, etc.) que já têm seus próprios
+    limites ou nenhum.
+    */
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: 60_000,
+        limit: 10,
+      },
+    ]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

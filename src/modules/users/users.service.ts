@@ -44,6 +44,7 @@ export class UsersService {
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
 
     const user = await this.prisma.user.create({
       data: {
@@ -52,6 +53,7 @@ export class UsersService {
         password: hashedPassword,
         emailVerified: false,
         emailVerificationToken: token,
+        emailVerificationTokenExpires: expires,
       },
     });
 

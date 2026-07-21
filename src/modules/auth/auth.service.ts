@@ -16,6 +16,24 @@ export class AuthService {
     private readonly mailService: MailService,
   ) {}
 
+  /*
+  Secret exclusivo do refresh token — diferente do JWT_SECRET_KEY usado
+  pelo access token. Assim, um refresh token vazado não pode ser usado
+  como Bearer em rotas protegidas (a assinatura simplesmente não bate
+  com o secret que o JwtStrategy usa pra validar access tokens).
+  */
+  private getRefreshSecret(): string {
+
+    const secret = process.env.JWT_REFRESH_SECRET;
+
+    if (!secret) {
+      throw new Error('JWT_REFRESH_SECRET não configurada no ambiente');
+    }
+
+    return secret;
+
+  }
+
   async login(email: string, password: string) {
 
     const user = await this.prisma.user.findUnique({
@@ -49,7 +67,15 @@ export class AuthService {
     });
 
     const refresh_token = this.jwtService.sign(payload, {
-      expiresIn: '30d',
+      /*
+      Longo de propósito: o Oratio funciona como um app, não como uma
+      sessão de site — a pessoa não deve precisar logar de novo toda hora.
+      Como o refresh token rotaciona a cada uso (um novo é emitido em toda
+      renovação), na prática quem abre o app pelo menos 1x nesse período
+      nunca vê tela de login de novo.
+      */
+      expiresIn: '180d',
+      secret: this.getRefreshSecret(),
     });
 
     const hashedRefresh = await bcrypt.hash(refresh_token, 10);
@@ -71,7 +97,9 @@ export class AuthService {
     let payload: any;
 
     try {
-      payload = this.jwtService.verify(refreshToken);
+      payload = this.jwtService.verify(refreshToken, {
+        secret: this.getRefreshSecret(),
+      });
     } catch {
       throw new UnauthorizedException("Invalid or expired refresh token");
     }
@@ -93,7 +121,21 @@ export class AuthService {
     return this.generateTokens(user.id, user.email);
   }
 
-  async verifyEmail(token: string, app: string, res: Response) {
+  /*
+  Núcleo idempotente da confirmação de email, usado tanto pelo endpoint
+  legado (GET, redirect) quanto pelo novo endpoint (POST, JSON) chamado
+  via fetch pelo frontend.
+
+  O token NÃO é limpo ao confirmar com sucesso. Isso é proposital: links de
+  verificação em email são frequentemente pré-carregados automaticamente
+  (proteção de privacidade do Mail/Safari no iOS, scanners antiphishing)
+  antes do clique real do usuário. Se o token fosse zerado nessa primeira
+  requisição "fantasma", o clique real do usuário cairia em 401 por não
+  achar mais o token. Mantendo o token e checando `emailVerified` antes de
+  tudo, uma segunda (ou terceira) confirmação do mesmo token é inofensiva
+  e sempre responde sucesso.
+  */
+  async confirmEmailToken(token: string) {
 
     const user = await this.prisma.user.findFirst({
       where: {
@@ -105,13 +147,31 @@ export class AuthService {
       throw new UnauthorizedException("Invalid verification token");
     }
 
+    if (user.emailVerified) {
+      return { alreadyVerified: true };
+    }
+
+    if (
+      user.emailVerificationTokenExpires &&
+      user.emailVerificationTokenExpires < new Date()
+    ) {
+      throw new UnauthorizedException("Verification token expired");
+    }
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerified: true,
-        emailVerificationToken: null,
       },
     });
+
+    return { alreadyVerified: false };
+
+  }
+
+  async verifyEmail(token: string, app: string, res: Response) {
+
+    await this.confirmEmailToken(token);
 
     let redirectUrl = "https://finance-api-front.vercel.app/login";
 
@@ -141,11 +201,13 @@ export class AuthService {
     }
 
     const token = randomBytes(32).toString('hex');
+    const expires = new Date(Date.now() + 1000 * 60 * 60 * 24);
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerificationToken: token,
+        emailVerificationTokenExpires: expires,
       },
     });
 

@@ -468,7 +468,14 @@ export class MailService {
 
   async sendOratioVerificationEmail(email: string, token: string) {
 
-    const link = `https://finance-api-y0ol.onrender.com/auth/verify-email?token=${token}&app=oratio`;
+    /*
+    Aponta pro FRONTEND (não direto pra API) — a página /verificar-email
+    chama a API via fetch depois de carregada, em vez do link do email
+    navegar direto pra rota da API. Isso evita que pré-carregamento
+    automático de link (Mail/Safari no iOS, scanners de segurança de
+    provedores de email) consuma o token antes do clique real do usuário.
+    */
+    const link = `https://oratio-phi.vercel.app/verificar-email?token=${token}`;
 
     const htmlContent = this.buildOratioTemplate(
       "Confirme seu email",
