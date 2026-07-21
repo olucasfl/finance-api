@@ -1,6 +1,8 @@
+import { getBrazilToday } from "./brazil-date"
+
 export function parseNaturalDate(message: string): Date | null {
   const text = message.toLowerCase()
-  const today = new Date()
+  const today = getBrazilToday()
 
   const clone = (d: Date) => new Date(d)
 
@@ -176,14 +178,15 @@ export function parseNaturalDate(message: string): Date | null {
     dezembro: 11
   }
 
-  const dateText = text.match(/(\d{1,2}) de ([a-zçã]+)/)
+  const dateText = text.match(/(\d{1,2}) de ([a-zçã]+)(?: de (\d{4}))?/)
 
   if (dateText) {
     const day = Number(dateText[1])
     const monthName = dateText[2]
+    const year = dateText[3] ? Number(dateText[3]) : today.getFullYear()
 
     if (months[monthName] !== undefined) {
-      return normalize(new Date(today.getFullYear(), months[monthName], day))
+      return normalize(new Date(year, months[monthName], day))
     }
   }
 

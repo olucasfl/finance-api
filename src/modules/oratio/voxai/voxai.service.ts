@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common"
 import axios from "axios"
+import https from "https"
 
 import { PrismaService } from "src/prisma/prisma.service"
 
@@ -9,7 +10,13 @@ import { contentFilter } from "./filters/vox.content-filter"
 import { VoxRateLimiter } from "./guards/vox.rate-limiter"
 import { LiturgicalCalendarService } from "./services/liturgical-calendar.service"
 import { parseNaturalDate } from "./utils/date-parser"
+import { getBrazilToday } from "./utils/brazil-date"
 import { ActivityService } from '../activity/activity.service'
+
+// Só vale acionar o parser/busca de data litúrgica quando a mensagem
+// realmente tem a ver com liturgia — evita forçar o Vox a comentar a
+// liturgia do dia em perguntas que não têm nada a ver com isso.
+const LITURGY_KEYWORDS = /liturgia|evangelho|leituras?\b|santos? do dia|missal|calend[aá]rio lit[uú]rgico|o que a igreja celebra|celebra[cç][aã]o (de|do) (hoje|dia)|que dia lit[uú]rgico/i
 
 @Injectable()
 export class VoxAiService{
@@ -27,11 +34,22 @@ export class VoxAiService{
 
  private model = "gpt-4.1-mini"
 
+ // Conexão HTTPS reaproveitada entre requisições (keep-alive) em vez de
+ // abrir um socket TLS novo para a OpenAI a cada mensagem.
+ private httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 50 })
+
  private get headers(){
   return {
    Authorization: `Bearer ${this.apiKey}`,
    "Content-Type": "application/json"
   }
+ }
+
+ private toISODate(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, "0")
+  const d = String(date.getDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
  }
 
  /* =========================
@@ -75,11 +93,13 @@ ${evangelho?.texto?.slice(0, 800)}
 }
 
  /* =========================
-    🧠 EXTRAIR DATA COM IA
+    🧠 EXTRAIR DATA COM IA (fallback quando o parser local não reconhece)
  ========================= */
- private async extractDateWithAI(message: string): Promise<Date | null>{
+ private async extractDateWithAI(message: string, referenceDate: Date): Promise<Date | null>{
 
   try{
+
+   const referenceStr = this.toISODate(referenceDate)
 
    const response = await axios.post(
     this.url,
@@ -88,7 +108,7 @@ ${evangelho?.texto?.slice(0, 800)}
      messages:[
       {
        role:"user",
-       content:`Extraia a data da frase abaixo.
+       content:`Hoje é ${referenceStr} (formato YYYY-MM-DD). Extraia a data mencionada na frase abaixo, calculando datas relativas (ex: "amanhã", "semana que vem", "daqui a 3 dias") a partir de hoje.
 
 Regras MUITO IMPORTANTES:
 - Responda SOMENTE no formato YYYY-MM-DD (ex: 2026-03-22)
@@ -103,7 +123,7 @@ Frase: "${message}"`
      ],
      max_tokens: 20
     },
-    { headers: this.headers }
+    { headers: this.headers, httpsAgent: this.httpsAgent }
    )
 
    const text = response?.data?.choices?.[0]?.message?.content?.trim()
@@ -151,6 +171,23 @@ Frase: "${message}"`
     hasMessages:false
    }
   })
+ }
+
+ /* =========================
+    BOOTSTRAP (lista + conversa ativa numa só ida ao backend)
+ ========================= */
+ async getBootstrap(userId: string){
+
+  // sequencial de propósito: garante que, se uma conversa nova precisar
+  // ser criada, ela já apareça na lista devolvida logo em seguida
+  const active = await this.getOrCreateActiveConversation(userId)
+
+  const conversations = await this.prisma.conversation.findMany({
+   where:{ userId },
+   orderBy:{ updatedAt:"desc" }
+  })
+
+  return { active, conversations }
  }
 
  /* =========================
@@ -252,39 +289,57 @@ Frase: "${message}"`
    }
 
    /* =========================
-      🧠 DATA INTELIGENTE
+      🧠 DATA ATUAL (sempre disponível ao Vox, para "que dia é hoje",
+      "amanhã" etc. — independente de a mensagem falar de liturgia)
    ========================= */
 
-   const now = new Date()
-   const brazilToday = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })
-
-   let parsedDate = await this.extractDateWithAI(data.message)
-
-   if (!parsedDate) {
-    parsedDate = parseNaturalDate(data.message)
-   }
-
-   if (!parsedDate) {
-    parsedDate = now
-   }
-
-   const requestedDateText = parsedDate.toLocaleDateString("pt-BR", {
-    timeZone: "America/Sao_Paulo"
-   })
+   const brazilNow = getBrazilToday()
+   const brazilToday = this.toISODate(brazilNow)
 
    /* =========================
-      📅 LITURGIA
+      📅 LITURGIA (só entra em jogo quando a mensagem realmente
+      menciona liturgia/evangelho/santo do dia — senão o Vox fica
+      "obrigado" a comentar liturgia em qualquer pergunta)
    ========================= */
 
-   let targetLiturgical: unknown = null
+   let liturgySection = ""
 
-   try{
-    targetLiturgical = await this.liturgicalCalendarService.getLiturgicalData(parsedDate)
-   }catch{
-    targetLiturgical = null
+   if (LITURGY_KEYWORDS.test(data.message)) {
+
+    // parser local primeiro (instantâneo); IA só entra se o parser
+    // não reconhecer nenhuma data na frase
+    let parsedDate = parseNaturalDate(data.message)
+
+    if (!parsedDate) {
+     parsedDate = await this.extractDateWithAI(data.message, brazilNow)
+    }
+
+    if (!parsedDate) {
+     parsedDate = brazilNow
+    }
+
+    const requestedDateText = this.toISODate(parsedDate)
+
+    let targetLiturgical: unknown = null
+
+    try{
+     targetLiturgical = await this.liturgicalCalendarService.getLiturgicalData(parsedDate)
+    }catch{
+     targetLiturgical = null
+    }
+
+    const liturgySummarized = this.formatLiturgicalForAI(targetLiturgical)
+
+    liturgySection = `
+⚠️ REGRA ABSOLUTA:
+A seção "Liturgia EXATA" abaixo está aqui porque a pergunta do usuário menciona liturgia, evangelho, santo do dia ou uma data específica. Se os dados estiverem disponíveis, você DEVE usá-los e é PROIBIDO dizer que não tem dados.
+
+Data solicitada: ${requestedDateText}
+
+Liturgia EXATA:
+${liturgySummarized}
+`
    }
-
-   const liturgySummarized = this.formatLiturgicalForAI(targetLiturgical)
 
    /* =========================
       🧠 PROMPT FINAL
@@ -292,16 +347,8 @@ Frase: "${message}"`
 
    const systemPrompt = `${VOX_SYSTEM_PROMPT}
 
-⚠️ REGRA ABSOLUTA:
-Se a seção "Liturgia EXATA" estiver presente, você DEVE usar essas informações.
-É PROIBIDO dizer que não tem dados se eles estiverem disponíveis.
-
 Data atual (Brasil): ${brazilToday}
-Data solicitada: ${requestedDateText}
-
-Liturgia EXATA:
-${liturgySummarized}
-`
+${liturgySection}`
 
    const response = await axios.post(
     this.url,
@@ -316,6 +363,7 @@ ${liturgySummarized}
     },
     {
      headers: this.headers,
+     httpsAgent: this.httpsAgent,
      timeout: 30000
     }
    )

@@ -37,6 +37,18 @@ export class VoxAiController{
  }
 
  /* =========================
+    BOOTSTRAP (lista + conversa ativa numa só chamada)
+ ========================= */
+
+ @Get("bootstrap")
+ async getBootstrap(@Req() req){
+
+  const userId = req.user.userId
+
+  return this.voxAiService.getBootstrap(userId)
+ }
+
+ /* =========================
     CONVERSA ATIVA (🔥 PRINCIPAL)
  ========================= */
 

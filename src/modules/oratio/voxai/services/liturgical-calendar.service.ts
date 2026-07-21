@@ -1,5 +1,8 @@
 import { Injectable } from "@nestjs/common"
 import axios from "axios"
+import https from "https"
+
+import { getBrazilToday } from "../utils/brazil-date"
 
 interface LiturgicalData {
  data?: string
@@ -54,6 +57,10 @@ export class LiturgicalCalendarService {
  private readonly CACHE_EXPIRY = 24 * 60 * 60 * 1000 // 24 horas
  private readonly API_URL = "https://liturgia.up.railway.app/v2/"
 
+ // Reaproveita a conexão HTTPS com a API de liturgia em vez de abrir
+ // um socket novo a cada consulta.
+ private readonly httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 20 })
+
  /**
   * Formata uma data para YYYY-MM-DD
   */
@@ -67,7 +74,7 @@ export class LiturgicalCalendarService {
  /**
   * Busca dados litúrgicos de uma data específica
   */
- async getLiturgicalData(date: Date = new Date()): Promise<LiturgicalData | null> {
+ async getLiturgicalData(date: Date = getBrazilToday()): Promise<LiturgicalData | null> {
   const dateStr = this.formatDate(date)
 
   // Verifica cache
@@ -82,6 +89,7 @@ export class LiturgicalCalendarService {
   const year = date.getFullYear()
   const response = await axios.get(`${this.API_URL}?dia=${day}&mes=${month}&ano=${year}`, {
    validateStatus: (status) => status < 500, // Aceita 404, mas rejeita 5xx
+   httpsAgent: this.httpsAgent,
   })
 
   if (response.status === 404) {
