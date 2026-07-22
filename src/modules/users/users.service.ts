@@ -511,6 +511,7 @@ export class UsersService {
       prayers7d,
       rosaries7d,
       consecrations7d,
+      logins7d,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { emailVerified: true } }),
@@ -536,6 +537,9 @@ export class UsersService {
       this.prisma.consecrationProgress.count({
         where: { createdAt: { gte: sevenDaysAgo } },
       }),
+      this.prisma.userActivity.count({
+        where: { type: 'LOGIN', createdAt: { gte: sevenDaysAgo } },
+      }),
     ]);
 
     return {
@@ -549,6 +553,7 @@ export class UsersService {
         prayers: prayers7d,
         rosaries: rosaries7d,
         consecrations: consecrations7d,
+        logins: logins7d,
       },
     };
   }
@@ -574,6 +579,101 @@ export class UsersService {
       data: { isAdmin },
       select: { id: true, isAdmin: true },
     });
+  }
+
+  /*
+  =============================
+  ADMIN — SÉRIE TEMPORAL (gráficos)
+  =============================
+  */
+
+  async getAdminTimeseries(
+    userId: string,
+    metric: string,
+    months: number,
+  ) {
+    await this.assertAdmin(userId);
+
+    const activityTypeByMetric: Record<
+      string,
+      { type: string; action?: string }
+    > = {
+      prayers: { type: 'PRAYER' },
+      // "Iniciou o terço" também usa type ROSARY — sem o filtro de action
+      // isso contaria início E conclusão como se fossem a mesma coisa.
+      rosaries: { type: 'ROSARY', action: 'Terço concluído' },
+      logins: { type: 'LOGIN' },
+    };
+
+    if (metric !== 'users' && metric !== 'consecrations' && !activityTypeByMetric[metric]) {
+      throw new BadRequestException('Métrica inválida');
+    }
+
+    const clampedMonths = Math.min(Math.max(months || 6, 1), 24);
+
+    const now = new Date();
+    const start = new Date(
+      now.getFullYear(),
+      now.getMonth() - (clampedMonths - 1),
+      1,
+    );
+
+    let dates: Date[];
+
+    if (metric === 'users') {
+      const rows = await this.prisma.user.findMany({
+        where: { createdAt: { gte: start } },
+        select: { createdAt: true },
+      });
+      dates = rows.map((r) => r.createdAt);
+    } else if (metric === 'consecrations') {
+      const rows = await this.prisma.consecrationProgress.findMany({
+        where: { createdAt: { gte: start } },
+        select: { createdAt: true },
+      });
+      dates = rows.map((r) => r.createdAt);
+    } else {
+      const config = activityTypeByMetric[metric];
+      const rows = await this.prisma.userActivity.findMany({
+        where: {
+          type: config.type,
+          ...(config.action ? { action: config.action } : {}),
+          createdAt: { gte: start },
+        },
+        select: { createdAt: true },
+      });
+      dates = rows.map((r) => r.createdAt);
+    }
+
+    const buckets = new Map<string, number>();
+    for (const d of dates) {
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      buckets.set(key, (buckets.get(key) || 0) + 1);
+    }
+
+    const MONTH_LABELS = [
+      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+    ];
+
+    const data: { month: string; label: string; count: number }[] = [];
+
+    for (let i = 0; i < clampedMonths; i++) {
+      const d = new Date(
+        now.getFullYear(),
+        now.getMonth() - (clampedMonths - 1) + i,
+        1,
+      );
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+      data.push({
+        month: key,
+        label: MONTH_LABELS[d.getMonth()],
+        count: buckets.get(key) || 0,
+      });
+    }
+
+    return { metric, months: clampedMonths, data };
   }
 
 }

@@ -118,6 +118,27 @@ export class UsersController {
     return this.userService.getAdminStats(userId);
   }
 
+  @Get('admin/stats/timeseries')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseGuards(JwtAuthGuard, AdminGuard, ThrottlerGuard)
+  getAdminTimeseries(
+    @Req() req: any,
+    @Query('metric') metric?: string,
+    @Query('months') months?: string,
+  ) {
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getAdminTimeseries(
+      userId,
+      metric || 'users',
+      months ? parseInt(months) : 6,
+    );
+  }
+
   @Patch('admin/users/:id')
   @UseGuards(JwtAuthGuard, AdminGuard)
   setAdminStatus(
