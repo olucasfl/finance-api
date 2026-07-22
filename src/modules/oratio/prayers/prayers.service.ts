@@ -79,7 +79,7 @@ export class PrayersService {
 
  }
 
-   async completePrayer(userId: string){
+   async completePrayer(userId: string, title?: string){
 
    const now = new Date()
 
@@ -99,10 +99,24 @@ export class PrayersService {
    await this.activityService.log(
       userId,
       "PRAYER",
-      "Oração rezada"
+      title ? `Rezou: ${title}` : "Oração rezada"
    )
 
    return { success:true }
-   }  
+   }
+
+   /* =========================
+      HISTÓRICO
+   ========================= */
+
+   async getHistory(userId: string){
+
+      return this.prisma.userActivity.findMany({
+         where:{ userId, type:"PRAYER" },
+         orderBy:{ createdAt:"desc" },
+         take:50
+      })
+
+   }
 
 }

@@ -56,6 +56,14 @@ export class PrayersController {
   return this.service.getPrayersByCategory(slug)
  }
 
+ // Precisa vir ANTES de ":id" — senão essa rota estática nunca é
+ // alcançada, "history" seria capturado como se fosse um :id.
+ @Get("history")
+ @UseGuards(JwtAuthGuard)
+ getHistory(@Req() req:any){
+  return this.service.getHistory(req.user.userId)
+ }
+
  @Get(":id")
  getPrayer(@Param("id") id:string){
   return this.service.getPrayer(id)
@@ -63,8 +71,8 @@ export class PrayersController {
 
  @Post("complete")
  @UseGuards(JwtAuthGuard)
- completePrayer(@Req() req:any){
-  return this.service.completePrayer(req.user.userId)
+ completePrayer(@Req() req:any, @Body() body:{ title?:string }){
+  return this.service.completePrayer(req.user.userId, body?.title)
  }
 
 }
