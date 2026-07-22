@@ -110,9 +110,17 @@ getRosary(type:string){
  GET SESSION
  ========================= */
 
+ // Sessão incompleta aberta há mais tempo que isso é tratada como
+ // abandonada, não como "para continuar depois". Sem esse limite, uma
+ // pessoa que abre um terço, não termina, e só volta dias depois
+ // reaproveitava a MESMA sessão — e ao finalizar, a duração calculada
+ // (finishedAt - startedAt) virava um número absurdo (dias, às vezes
+ // meses), porque startedAt continuava sendo o de semanas atrás.
+ private readonly STALE_SESSION_HOURS = 12
+
  async getSession(userId:string, type:string){
 
-  return this.prisma.rosarySession.findFirst({
+  const session = await this.prisma.rosarySession.findFirst({
 
    where:{
     userId,
@@ -123,6 +131,23 @@ getRosary(type:string){
    orderBy:{ startedAt:"desc" }
 
   })
+
+  if(!session) return null
+
+  const cutoff = new Date(Date.now() - this.STALE_SESSION_HOURS * 60 * 60 * 1000)
+
+  if(session.startedAt < cutoff){
+
+   // Descarta a sessão abandonada — quem chamou começa uma nova, fresca.
+   await this.prisma.rosarySession.delete({
+    where:{ id:session.id }
+   })
+
+   return null
+
+  }
+
+  return session
 
  }
 
@@ -159,9 +184,13 @@ getRosary(type:string){
 
  async getActiveProgress(userId:string){
 
+  const cutoff = new Date(Date.now() - this.STALE_SESSION_HOURS * 60 * 60 * 1000)
+
   const sessions = await this.prisma.rosarySession.findMany({
 
-   where:{ userId, completed:false },
+   // Sessões abandonadas há mais de STALE_SESSION_HOURS não aparecem
+   // como "continuar de onde parou" — mesmo critério do getSession().
+   where:{ userId, completed:false, startedAt:{ gte:cutoff } },
 
    orderBy:{ startedAt:"desc" }
 
