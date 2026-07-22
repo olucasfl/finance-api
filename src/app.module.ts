@@ -15,6 +15,7 @@ import { RosaryModule } from './modules/rosary/rosary.module';
 import { ActivityModule } from './modules/oratio/activity/activity.module';
 import { JourneyModule } from './modules/oratio/journey/journey.module';
 import { CravouModule } from './cravou/cravou.module';
+import { SystemLogModule } from './system-log/system-log.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { CravouModule } from './cravou/cravou.module';
     ActivityModule,
     JourneyModule,
     CravouModule,
+    SystemLogModule,
   ],
   controllers: [AppController],
   providers: [AppService],

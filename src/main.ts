@@ -3,12 +3,22 @@ import { AppModule } from './app.module'
 import { ValidationPipe } from '@nestjs/common'
 import { IoAdapter } from '@nestjs/platform-socket.io'
 import helmet from 'helmet'
+import { AllExceptionsFilter } from './system-log/all-exceptions.filter'
+import { SystemLogService } from './system-log/system-log.service'
 
 async function bootstrap() {
 
  const app = await NestFactory.create(AppModule)
 
  app.useWebSocketAdapter(new IoAdapter(app))
+
+ /* =========================
+    OBSERVABILIDADE MÍNIMA
+    (registra erros 5xx num buffer em memória pro painel admin —
+    ver src/system-log)
+ ========================= */
+
+ app.useGlobalFilters(new AllExceptionsFilter(app.get(SystemLogService)))
 
  /* =========================
     HEADERS DE SEGURANÇA
