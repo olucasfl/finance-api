@@ -499,14 +499,44 @@ export class UsersService {
   async getAdminStats(userId: string) {
     await this.assertAdmin(userId);
 
-    const totalUsers = await this.prisma.user.count();
-    const totalVerified = await this.prisma.user.count({
-      where: { emailVerified: true },
-    });
-    const consecrationStarted = await this.prisma.consecrationProgress.count();
-    const totalPrayers = await this.prisma.spiritualStats.aggregate({
-      _sum: { prayersPrayed: true, rosariesPrayed: true },
-    });
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const [
+      totalUsers,
+      totalVerified,
+      consecrationStarted,
+      totalPrayers,
+      newUsers7d,
+      prayers7d,
+      rosaries7d,
+      consecrations7d,
+    ] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { emailVerified: true } }),
+      this.prisma.consecrationProgress.count(),
+      this.prisma.spiritualStats.aggregate({
+        _sum: { prayersPrayed: true, rosariesPrayed: true },
+      }),
+      this.prisma.user.count({
+        where: { createdAt: { gte: sevenDaysAgo } },
+      }),
+      this.prisma.userActivity.count({
+        where: { type: 'PRAYER', createdAt: { gte: sevenDaysAgo } },
+      }),
+      // Só "Terço concluído" — "Iniciou o terço" também usa type ROSARY
+      // e infla a contagem se não filtrar pela ação.
+      this.prisma.userActivity.count({
+        where: {
+          type: 'ROSARY',
+          action: 'Terço concluído',
+          createdAt: { gte: sevenDaysAgo },
+        },
+      }),
+      this.prisma.consecrationProgress.count({
+        where: { createdAt: { gte: sevenDaysAgo } },
+      }),
+    ]);
 
     return {
       totalUsers,
@@ -514,6 +544,12 @@ export class UsersService {
       consecrationStarted,
       prayersPrayed: totalPrayers._sum.prayersPrayed || 0,
       rosariesPrayed: totalPrayers._sum.rosariesPrayed || 0,
+      last7Days: {
+        newUsers: newUsers7d,
+        prayers: prayers7d,
+        rosaries: rosaries7d,
+        consecrations: consecrations7d,
+      },
     };
   }
 
