@@ -6,9 +6,11 @@ import {
  Body,
  UseGuards,
  Req,
+ Res,
  Delete,
  Patch
 } from "@nestjs/common"
+import type { Request, Response } from "express"
 
 import { VoxAiService } from "./voxai.service"
 import { VoxAiDto } from "./dto/voxai.dto"
@@ -34,6 +36,24 @@ export class VoxAiController{
   const userId = req.user.userId
 
   return this.voxAiService.chat(body, userId)
+ }
+
+ /* =========================
+    CHAT EM STREAMING (IA) — mesma regra, resposta chegando aos
+    pedaços em vez de tudo de uma vez. Endpoint separado do /chat
+    de propósito, pra não arriscar nada no que já funciona.
+ ========================= */
+
+ @Post("chat/stream")
+ async chatStream(
+  @Body() body: VoxAiDto,
+  @Req() req: Request & { user: { userId: string } },
+  @Res() res: Response
+ ){
+
+  const userId = req.user.userId
+
+  await this.voxAiService.chatStream(body, userId, req, res)
  }
 
  /* =========================

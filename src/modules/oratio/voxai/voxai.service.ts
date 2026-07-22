@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common"
 import axios from "axios"
 import https from "https"
+import type { Request, Response } from "express"
 
 import { PrismaService } from "src/prisma/prisma.service"
 
@@ -475,6 +476,342 @@ ${liturgySection}`
     error:"UNKNOWN_ERROR",
     message:"Erro inesperado no servidor."
    }
+
+  }
+ }
+
+ /* =========================
+    CHAT EM STREAMING (SSE)
+
+    Endpoint separado de chat() de propósito — chat() continua
+    exatamente como estava, sem nenhum risco de regressão. Este método
+    duplica as mesmas validações (em vez de compartilhar código com
+    chat()) para que nenhuma mudança aqui possa afetar o fluxo não
+    streaming, que outras partes do app podem vir a usar.
+
+    Contrato com o frontend: cada evento é uma linha
+    `data: {...json...}\n\n`, com "type" podendo ser:
+      - "delta": { text } — um pedaço de texto pra acrescentar
+      - "done": fim normal do streaming
+      - "error": { error, message, retryAfterSeconds? } — mesmos
+        códigos de erro que chat() já usava, pro frontend continuar
+        tratando do mesmo jeito
+ ========================= */
+ async chatStream(data: VoxAiDto, userId: string, req: Request, res: Response){
+
+  res.setHeader("Content-Type", "text/event-stream")
+  res.setHeader("Cache-Control", "no-cache, no-transform")
+  res.setHeader("Connection", "keep-alive")
+  // desativa o buffering de proxies (ex: nginx na frente do Render) —
+  // sem isso o "streaming" pode chegar tudo de uma vez mesmo assim
+  res.setHeader("X-Accel-Buffering", "no")
+  res.flushHeaders?.()
+
+  const send = (payload: Record<string, unknown>) => {
+   if(res.writableEnded) return
+   res.write(`data: ${JSON.stringify(payload)}\n\n`)
+  }
+
+  const abortController = new AbortController()
+
+  // se o usuário sair da tela/fechar a aba no meio da resposta, para de
+  // gastar tokens com uma resposta que ninguém mais vai ler
+  req.on("close", () => {
+   abortController.abort()
+  })
+
+  try{
+
+   if(!this.apiKey){
+    throw new Error("OPENAI_API_KEY not configured")
+   }
+
+   if(!data.message){
+    send({ type:"error", error:"EMPTY_MESSAGE", message:"Mensagem vazia." })
+    return res.end()
+   }
+
+   if(data.message.length > 1000){
+    send({ type:"error", error:"MESSAGE_TOO_LONG", message:"Mensagem muito longa." })
+    return res.end()
+   }
+
+   const conversation = await this.prisma.conversation.findUnique({
+    where:{ id: data.conversationId }
+   })
+
+   if(!conversation){
+    send({ type:"error", error:"INVALID_CONVERSATION", message:"Conversa inválida." })
+    return res.end()
+   }
+
+   if(conversation.userId !== userId){
+    send({ type:"error", error:"FORBIDDEN", message:"Conversa inválida." })
+    return res.end()
+   }
+
+   const rate = this.rateLimiter.check(userId)
+
+   if(!rate.allowed){
+    send({ type:"error", error:"RATE_LIMIT", message:rate.message, retryAfterSeconds:rate.retryAfterSeconds })
+    return res.end()
+   }
+
+   const filter = contentFilter(data.message)
+
+   if(filter.blocked){
+    // mesma regra do chat() não-streaming: resposta do filtro não é
+    // persistida, é só devolvida pro cliente
+    send({ type:"delta", text:filter.message })
+    send({ type:"done" })
+    return res.end()
+   }
+
+   const historyMessages = await this.prisma.message.findMany({
+    where:{ conversationId: data.conversationId },
+    orderBy:{ createdAt:"desc" },
+    take:6
+   })
+
+   const history = historyMessages
+    .reverse()
+    .map(m => ({
+     role: m.role as "user" | "assistant",
+     content: m.content
+    }))
+
+   const existing = await this.prisma.message.findFirst({
+    where:{
+     conversationId: data.conversationId,
+     role:"user",
+     content:data.message,
+     createdAt:{
+      gte: new Date(Date.now() - 5000)
+     }
+    },
+    orderBy:{ createdAt:"desc" }
+   })
+
+   if(existing){
+    send({ type:"delta", text:"Aguarde, processando sua última mensagem..." })
+    send({ type:"done" })
+    return res.end()
+   }
+
+   const brazilNow = getBrazilToday()
+   const brazilToday = this.toISODate(brazilNow)
+
+   let liturgySection = ""
+
+   if (LITURGY_KEYWORDS.test(data.message)) {
+
+    let parsedDate = parseNaturalDate(data.message)
+
+    if (!parsedDate) {
+     parsedDate = await this.extractDateWithAI(data.message, brazilNow)
+    }
+
+    if (!parsedDate) {
+     parsedDate = brazilNow
+    }
+
+    const requestedDateText = this.toISODate(parsedDate)
+
+    let targetLiturgical: unknown = null
+
+    try{
+     targetLiturgical = await this.liturgicalCalendarService.getLiturgicalData(parsedDate)
+    }catch{
+     targetLiturgical = null
+    }
+
+    const liturgySummarized = this.formatLiturgicalForAI(targetLiturgical)
+
+    liturgySection = `
+⚠️ REGRA ABSOLUTA:
+A seção "Liturgia EXATA" abaixo está aqui porque a pergunta do usuário menciona liturgia, evangelho, santo do dia ou uma data específica. Se os dados estiverem disponíveis, você DEVE usá-los e é PROIBIDO dizer que não tem dados.
+
+Data solicitada: ${requestedDateText}
+
+Liturgia EXATA:
+${liturgySummarized}
+`
+   }
+
+   const systemPrompt = `${VOX_SYSTEM_PROMPT}
+
+Data atual (Brasil): ${brazilToday}
+${liturgySection}`
+
+   const requestPayload = {
+    model: this.model,
+    messages:[
+     { role:"system", content: systemPrompt },
+     ...history,
+     { role:"user", content: data.message }
+    ],
+    max_tokens: 2000,
+    stream: true
+   }
+
+   const requestConfig = {
+    headers: this.headers,
+    httpsAgent: this.httpsAgent,
+    timeout: 30000,
+    responseType: "stream" as const,
+    signal: abortController.signal
+   }
+
+   let openaiResponse
+
+   try{
+
+    openaiResponse = await axios.post(this.url, requestPayload, requestConfig)
+
+   }catch(err:any){
+
+    // "!err.response" = a chamada nem chegou a ter uma resposta HTTP
+    // (timeout, conexão caiu no meio, DNS falhou) — isso é o tipo de
+    // falha curta e transitória que vale tentar de novo sem incomodar
+    // o usuário. Erro de verdade da OpenAI (4xx/5xx com resposta) não
+    // se resolve tentando de novo, então segue pro catch de fora.
+    const isTransient = !err.response
+
+    if(!isTransient || abortController.signal.aborted){
+     throw err
+    }
+
+    this.logger.warn(`[chatStream] falha transitória na chamada à OpenAI, tentando de novo: ${err.message}`)
+
+    await new Promise(resolve => setTimeout(resolve, 400))
+
+    openaiResponse = await axios.post(this.url, requestPayload, requestConfig)
+   }
+
+   let fullText = ""
+   // "any" de propósito: é só um log, e o tipo estreito aqui confundia
+   // o narrowing do TS por causa da reatribuição dentro do callback
+   let usage: any = null
+   let buffer = ""
+
+   await new Promise<void>((resolve, reject) => {
+
+    openaiResponse.data.on("data", (chunk: Buffer) => {
+
+     buffer += chunk.toString("utf8")
+
+     const lines = buffer.split("\n")
+     buffer = lines.pop() || "" // guarda linha incompleta pro próximo chunk
+
+     for (const line of lines) {
+
+      const trimmed = line.trim()
+      if (!trimmed.startsWith("data:")) continue
+
+      const payload = trimmed.slice(5).trim()
+      if (payload === "[DONE]") continue
+      if (!payload) continue
+
+      try {
+       const json = JSON.parse(payload)
+       const delta = json?.choices?.[0]?.delta?.content
+
+       if (delta) {
+        fullText += delta
+        send({ type:"delta", text:delta })
+       }
+
+       if (json?.usage) {
+        usage = json.usage
+       }
+      } catch {
+       // linha cortada no meio por um chunk de rede — ignora, o
+       // buffer acima já garante que ela volta inteira no próximo
+      }
+     }
+    })
+
+    openaiResponse.data.on("end", () => resolve())
+    openaiResponse.data.on("error", (err: Error) => reject(err))
+   })
+
+   if (!fullText) {
+    throw new Error("EMPTY_AI_RESPONSE")
+   }
+
+   if(usage){
+    this.logger.log(
+     `[tokens] conversation=${data.conversationId} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
+    )
+   }
+
+   const isFirstMessage = !conversation.hasMessages
+
+   await this.prisma.$transaction([
+
+    this.prisma.message.create({
+     data:{
+      conversationId: data.conversationId,
+      role:"user",
+      content:data.message
+     }
+    }),
+
+    this.prisma.message.create({
+     data:{
+      conversationId: data.conversationId,
+      role:"assistant",
+      content:fullText
+     }
+    }),
+
+    this.prisma.conversation.update({
+     where:{ id: data.conversationId },
+     data:{
+      updatedAt:new Date(),
+      hasMessages:true,
+      ...(isFirstMessage && {
+        title: this.generateTitle(data.message)
+      })
+     }
+    })
+   ])
+
+   await this.activityService.log(
+      conversation.userId,
+      "VOX",
+      "Conversou com o Vox"
+   )
+
+   send({ type:"done" })
+   res.end()
+
+  }catch(error:any){
+
+   if(abortController.signal.aborted){
+    // cliente já foi embora — não tem pra quem mandar erro
+    return res.end()
+   }
+
+   console.error("Erro VoxAI (stream):", {
+    status: error?.response?.status,
+    data: error?.response?.data,
+    message: error.message
+   })
+
+   if(error?.response?.status === 401){
+    send({ type:"error", error:"UNAUTHORIZED", message:"Sessão expirada." })
+   }else if(error?.response?.status === 429){
+    send({ type:"error", error:"LIMIT_EXCEEDED", message:"O VoxAI atingiu o limite diário." })
+   }else if(error.code === "ECONNABORTED"){
+    send({ type:"error", error:"TIMEOUT", message:"O Vox demorou para responder." })
+   }else if(error?.response){
+    send({ type:"error", error:"AI_PROVIDER_ERROR", message:"Erro na comunicação com a IA." })
+   }else{
+    send({ type:"error", error:"UNKNOWN_ERROR", message:"Erro inesperado no servidor." })
+   }
+
+   res.end()
 
   }
  }

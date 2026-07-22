@@ -42,6 +42,46 @@ export class LiturgicalCalendarService {
  // um socket novo a cada consulta.
  private readonly httpsAgent = new https.Agent({ keepAlive: true, maxSockets: 20 })
 
+ /*
+ Circuit breaker: sem timeout, uma API de liturgia fora do ar podia
+ deixar CADA pergunta com tema litúrgico esperando minutos até o
+ pedido falhar sozinho — travando a conversa mesmo já existindo um
+ try/catch do lado de quem chama. Agora, depois de algumas falhas
+ seguidas, o circuito "abre" e devolve null na hora (sem nem tentar a
+ rede) até o tempo de espera passar; aí libera uma tentativa de teste
+ pra ver se a API já voltou.
+ */
+ private consecutiveFailures = 0
+ private readonly FAILURE_THRESHOLD = 3
+ private circuitOpenedAt: number | null = null
+ private readonly COOLDOWN = 60 * 1000 // 1 minuto
+
+ private isCircuitOpen(): boolean {
+
+  if (this.circuitOpenedAt === null) return false
+
+  if (Date.now() - this.circuitOpenedAt > this.COOLDOWN) {
+   // esfriou — libera uma tentativa de teste
+   this.circuitOpenedAt = null
+   return false
+  }
+
+  return true
+ }
+
+ private registerSuccess(){
+  this.consecutiveFailures = 0
+  this.circuitOpenedAt = null
+ }
+
+ private registerFailure(){
+  this.consecutiveFailures++
+
+  if (this.consecutiveFailures >= this.FAILURE_THRESHOLD) {
+   this.circuitOpenedAt = Date.now()
+  }
+ }
+
  /**
   * Formata uma data para YYYY-MM-DD
   */
@@ -64,29 +104,46 @@ export class LiturgicalCalendarService {
    return cached.data
   }
 
+  if (this.isCircuitOpen()) {
+   return null
+  }
+
   // Busca da API
   const day = date.getDate().toString().padStart(2, '0')
   const month = (date.getMonth() + 1).toString().padStart(2, '0')
   const year = date.getFullYear()
-  const response = await axios.get(`${this.API_URL}?dia=${day}&mes=${month}&ano=${year}`, {
-   validateStatus: (status) => status < 500, // Aceita 404, mas rejeita 5xx
-   httpsAgent: this.httpsAgent,
-  })
 
-  if (response.status === 404) {
-   // Dados não disponíveis para esta data
-   return null
+  try{
+
+   const response = await axios.get(`${this.API_URL}?dia=${day}&mes=${month}&ano=${year}`, {
+    validateStatus: (status) => status < 500, // Aceita 404, mas rejeita 5xx
+    httpsAgent: this.httpsAgent,
+    timeout: 5000,
+   })
+
+   if (response.status === 404) {
+    // API respondeu normalmente, só não tem dado pra essa data — não
+    // é falha da API, não conta pro circuit breaker
+    this.registerSuccess()
+    return null
+   }
+
+   const data = response.data
+
+   // Salva em cache
+   this.cache.set(dateStr, {
+    date: dateStr,
+    data,
+    timestamp: Date.now(),
+   })
+
+   this.registerSuccess()
+
+   return data
+
+  }catch(error){
+   this.registerFailure()
+   throw error
   }
-
-  const data = response.data
-
-  // Salva em cache
-  this.cache.set(dateStr, {
-   date: dateStr,
-   data,
-   timestamp: Date.now(),
-  })
-
-  return data
  }
 }
