@@ -4,44 +4,25 @@ import https from "https"
 
 import { getBrazilToday } from "../utils/brazil-date"
 
+interface LiturgicalReading {
+ referencia?: string
+ texto?: string
+ refrao?: string
+}
+
+// Reflete o formato real devolvido pela API (liturgia.up.railway.app) e
+// consumido em voxai.service.ts. Os nomes já bateram errado aqui antes
+// (leitoras/evangelio) e nunca deram erro de tipo porque nada checava
+// contra esta interface de verdade — daí o cuidado de mantê-la fiel.
 interface LiturgicalData {
  data?: string
- festas?: {
-  principal?: {
-   nome: string
-   cor: string
-   grau: string
-   classe: string
-  }
-  primeira?: {
-   nome: string
-   cor: string
-   grau: string
-   classe: string
-  }
-  segunda?: {
-   nome: string
-   cor: string
-   grau: string
-   classe: string
-  }
- }
- leitoras?: {
-  primeira?: {
-   titulo: string
-   referencia: string
-   texto: string
-  }
-  segunda?: {
-   titulo: string
-   referencia: string
-   texto: string
-  }
-  evangelio?: {
-   titulo: string
-   referencia: string
-   texto: string
-  }
+ liturgia?: string
+ cor?: string
+ leituras?: {
+  primeiraLeitura?: LiturgicalReading[]
+  segundaLeitura?: LiturgicalReading[]
+  salmo?: LiturgicalReading[]
+  evangelho?: LiturgicalReading[]
  }
 }
 
@@ -107,101 +88,5 @@ export class LiturgicalCalendarService {
   })
 
   return data
- }
-
- /**
-  * Formata dados litúrgicos em texto amigável para o prompt
-  */
- private formatLiturgicalInfo(data: LiturgicalData): string {
-  if (!data) return ""
-
-  let info = ""
-
-  // Festa principal
-  if (data.festas?.principal) {
-   const festa = data.festas.principal
-   info += `🎎 **Festa**: ${festa.nome} (${festa.cor})\n`
-   info += `   Classe: ${festa.classe}, Grau: ${festa.grau}\n`
-  }
-
-  // Leituras
-  if (data.leitoras) {
-   info += `\n📖 **Leituras Litúrgicas**:\n`
-
-   if (data.leitoras.primeira) {
-    info += `   **1ª Leitura**: ${data.leitoras.primeira.referencia}\n`
-    info += `   ${data.leitoras.primeira.texto?.substring(0, 150)}...\n`
-   }
-
-   if (data.leitoras.segunda) {
-    info += `\n   **2ª Leitura**: ${data.leitoras.segunda.referencia}\n`
-    info += `   ${data.leitoras.segunda.texto?.substring(0, 150)}...\n`
-   }
-
-   if (data.leitoras.evangelio) {
-    info += `\n   **Evangelho**: ${data.leitoras.evangelio.referencia}\n`
-    info += `   ${data.leitoras.evangelio.texto?.substring(0, 150)}...\n`
-   }
-  }
-
-  return info
- }
-
- /**
-  * Busca contexto litúrgico para hoje, ontem, amanhã e data solicitada
-  */
- async getLiturgicalContext(requestedDate?: Date): Promise<string> {
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
-
-  let context = "## 📅 CONTEXTO LITÚRGICO ATUAL\n\n"
-
-  // Ontem
-  const yesterdayData = await this.getLiturgicalData(yesterday)
-  if (yesterdayData) {
-   context += `### 📆 Ontem (${this.formatDate(yesterday)})\n`
-   context += this.formatLiturgicalInfo(yesterdayData)
-  }
-
-  // Hoje
-  const todayData = await this.getLiturgicalData(today)
-  if (todayData) {
-   context += `\n### 📆 Hoje (${this.formatDate(today)})\n`
-   context += this.formatLiturgicalInfo(todayData)
-  }
-
-  // Amanhã
-  const tomorrowData = await this.getLiturgicalData(tomorrow)
-  if (tomorrowData) {
-   context += `\n### 📆 Amanhã (${this.formatDate(tomorrow)})\n`
-   context += this.formatLiturgicalInfo(tomorrowData)
-  }
-
-  if (requestedDate) {
-   const requestedData = await this.getLiturgicalData(requestedDate)
-   context += `\n### 📆 Data solicitada (${this.formatDate(requestedDate)})\n`
-   context += requestedData ? this.formatLiturgicalInfo(requestedData) : "Dados litúrgicos não disponíveis para esta data.\n"
-  }
-
-  return context
- }
-
- /**
-  * Busca dados litúrgicos de data específica com informações amigáveis
-  */
- async getDayInfo(
-  offsetDays: number = 0
- ): Promise<{ date: string; info: string }> {
-  const date = new Date()
-  date.setDate(date.getDate() + offsetDays)
-  const dateStr = this.formatDate(date)
-
-  const data = await this.getLiturgicalData(date)
-  const info = data ? this.formatLiturgicalInfo(data) : "Dados não disponíveis"
-
-  return { date: dateStr, info }
  }
 }

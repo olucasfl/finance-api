@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common"
+import { Injectable, Logger } from "@nestjs/common"
 import axios from "axios"
 import https from "https"
 
@@ -27,6 +27,8 @@ export class VoxAiService{
   private liturgicalCalendarService: LiturgicalCalendarService,
   private activityService: ActivityService
  ){}
+
+ private readonly logger = new Logger(VoxAiService.name)
 
  private apiKey = process.env.OPENAI_API_KEY
 
@@ -243,7 +245,8 @@ Frase: "${message}"`
     return {
      success:false,
      error:"RATE_LIMIT",
-     message:rate.message
+     message:rate.message,
+     retryAfterSeconds:rate.retryAfterSeconds
     }
    }
 
@@ -372,6 +375,16 @@ ${liturgySection}`
 
    if(!text){
     throw new Error("EMPTY_AI_RESPONSE")
+   }
+
+   // Métrica interna de custo — não afeta o comportamento, só dá
+   // visibilidade real de quanto cada conversa consome em tokens.
+   const usage = response?.data?.usage
+
+   if(usage){
+    this.logger.log(
+     `[tokens] conversation=${data.conversationId} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
+    )
    }
 
    const isFirstMessage = !conversation.hasMessages
