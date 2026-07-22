@@ -68,15 +68,30 @@ export class UsersService {
       ? await this.mailService.sendOratioVerificationEmail(user.email, token)
       : await this.mailService.sendCravouVerificationEmail(user.email, token);
 
-    const { password, ...userWithoutPassword } = user;
-
     /*
     A conta já foi criada mesmo se o email falhar — não faz sentido
     reverter a criação por causa disso. Mas o frontend precisa saber
     que o email de verificação pode não ter chegado, pra não deixar a
     pessoa esperando um email que nunca vai vir sem nenhum aviso.
+
+    Retorno é uma lista branca explícita (não um spread do user menos
+    a senha) porque esse endpoint é público e sem autenticação: um
+    spread deixava vazar emailVerificationToken (e os demais tokens)
+    na própria resposta do cadastro, permitindo verificar a conta sem
+    nunca ter acesso ao email informado.
     */
-    return { ...userWithoutPassword, emailSent };
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      emailVerified: user.emailVerified,
+      isAdmin: user.isAdmin,
+      bolaoPoints: user.bolaoPoints,
+      cravadas: user.cravadas,
+      emailSent,
+    };
   }
 
   /*
