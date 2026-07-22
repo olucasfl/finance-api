@@ -583,97 +583,200 @@ export class UsersService {
 
   /*
   =============================
-  ADMIN — SÉRIE TEMPORAL (gráficos)
+  ADMIN — GRÁFICOS (série temporal + heatmap)
   =============================
   */
 
-  async getAdminTimeseries(
-    userId: string,
-    metric: string,
-    months: number,
-  ) {
-    await this.assertAdmin(userId);
+  private readonly ACTIVITY_TYPE_BY_METRIC: Record<
+    string,
+    { type: string; action?: string }
+  > = {
+    prayers: { type: 'PRAYER' },
+    // "Iniciou o terço" também usa type ROSARY — sem o filtro de action
+    // isso contaria início E conclusão como se fossem a mesma coisa.
+    rosaries: { type: 'ROSARY', action: 'Terço concluído' },
+    logins: { type: 'LOGIN' },
+  };
 
-    const activityTypeByMetric: Record<
-      string,
-      { type: string; action?: string }
-    > = {
-      prayers: { type: 'PRAYER' },
-      // "Iniciou o terço" também usa type ROSARY — sem o filtro de action
-      // isso contaria início E conclusão como se fossem a mesma coisa.
-      rosaries: { type: 'ROSARY', action: 'Terço concluído' },
-      logins: { type: 'LOGIN' },
-    };
-
-    if (metric !== 'users' && metric !== 'consecrations' && !activityTypeByMetric[metric]) {
+  private validateMetric(metric: string) {
+    if (
+      metric !== 'users' &&
+      metric !== 'consecrations' &&
+      !this.ACTIVITY_TYPE_BY_METRIC[metric]
+    ) {
       throw new BadRequestException('Métrica inválida');
     }
+  }
 
-    const clampedMonths = Math.min(Math.max(months || 6, 1), 24);
-
-    const now = new Date();
-    const start = new Date(
-      now.getFullYear(),
-      now.getMonth() - (clampedMonths - 1),
-      1,
-    );
-
-    let dates: Date[];
-
+  private async fetchMetricDates(
+    metric: string,
+    since: Date,
+  ): Promise<Date[]> {
     if (metric === 'users') {
       const rows = await this.prisma.user.findMany({
-        where: { createdAt: { gte: start } },
+        where: { createdAt: { gte: since } },
         select: { createdAt: true },
       });
-      dates = rows.map((r) => r.createdAt);
-    } else if (metric === 'consecrations') {
+      return rows.map((r) => r.createdAt);
+    }
+
+    if (metric === 'consecrations') {
       const rows = await this.prisma.consecrationProgress.findMany({
-        where: { createdAt: { gte: start } },
+        where: { createdAt: { gte: since } },
         select: { createdAt: true },
       });
-      dates = rows.map((r) => r.createdAt);
+      return rows.map((r) => r.createdAt);
+    }
+
+    const config = this.ACTIVITY_TYPE_BY_METRIC[metric];
+    const rows = await this.prisma.userActivity.findMany({
+      where: {
+        type: config.type,
+        ...(config.action ? { action: config.action } : {}),
+        createdAt: { gte: since },
+      },
+      select: { createdAt: true },
+    });
+    return rows.map((r) => r.createdAt);
+  }
+
+  // "YYYY-MM-DD" no fuso do Brasil — mesma técnica já usada em
+  // ActivityService pra fronteira de dia do streak. O servidor pode
+  // rodar em UTC; sem isso, um acesso às 21h no Brasil vazaria pro
+  // dia seguinte no agrupamento.
+  private getBrazilDateKey(date: Date): string {
+    return date.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+  }
+
+  private brazilMidnightInstant(dateKey: string): Date {
+    return new Date(`${dateKey}T00:00:00-03:00`);
+  }
+
+  // Dia da semana (0=domingo) e hora (0-23) no fuso do Brasil.
+  private getBrazilDayHour(date: Date): { day: number; hour: number } {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      weekday: 'short',
+      hour: '2-digit',
+      hour12: false,
+    }).formatToParts(date);
+
+    const weekdayMap: Record<string, number> = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    };
+
+    const weekdayPart = parts.find((p) => p.type === 'weekday')?.value ?? 'Sun';
+    let hour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+    if (hour === 24) hour = 0; // alguns ambientes ICU retornam "24" pra meia-noite com hour12:false
+
+    return { day: weekdayMap[weekdayPart] ?? 0, hour };
+  }
+
+  async getAdminTimeseries(userId: string, metric: string, range: string) {
+    await this.assertAdmin(userId);
+    this.validateMetric(metric);
+
+    const RANGE_CONFIG: Record<
+      string,
+      { granularity: 'day' | 'month'; amount: number }
+    > = {
+      '7d': { granularity: 'day', amount: 7 },
+      '30d': { granularity: 'day', amount: 30 },
+      '6m': { granularity: 'month', amount: 6 },
+      '12m': { granularity: 'month', amount: 12 },
+    };
+    const resolvedRange = RANGE_CONFIG[range] ? range : '6m';
+    const config = RANGE_CONFIG[resolvedRange];
+
+    const data: { period: string; label: string; count: number }[] = [];
+
+    if (config.granularity === 'day') {
+      // Datas no calendário do Brasil, não no fuso do servidor.
+      const dayKeys: string[] = [];
+      for (let i = config.amount - 1; i >= 0; i--) {
+        dayKeys.push(this.getBrazilDateKey(new Date(Date.now() - i * 86_400_000)));
+      }
+
+      const start = this.brazilMidnightInstant(dayKeys[0]);
+      const dates = await this.fetchMetricDates(metric, start);
+
+      const buckets = new Map<string, number>();
+      for (const d of dates) {
+        const key = this.getBrazilDateKey(d);
+        buckets.set(key, (buckets.get(key) || 0) + 1);
+      }
+
+      for (const key of dayKeys) {
+        data.push({
+          period: key,
+          label: `${key.slice(8, 10)}/${key.slice(5, 7)}`,
+          count: buckets.get(key) || 0,
+        });
+      }
     } else {
-      const config = activityTypeByMetric[metric];
-      const rows = await this.prisma.userActivity.findMany({
-        where: {
-          type: config.type,
-          ...(config.action ? { action: config.action } : {}),
-          createdAt: { gte: start },
-        },
-        select: { createdAt: true },
-      });
-      dates = rows.map((r) => r.createdAt);
-    }
-
-    const buckets = new Map<string, number>();
-    for (const d of dates) {
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      buckets.set(key, (buckets.get(key) || 0) + 1);
-    }
-
-    const MONTH_LABELS = [
-      'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-      'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
-    ];
-
-    const data: { month: string; label: string; count: number }[] = [];
-
-    for (let i = 0; i < clampedMonths; i++) {
-      const d = new Date(
+      const now = new Date();
+      const start = new Date(
         now.getFullYear(),
-        now.getMonth() - (clampedMonths - 1) + i,
+        now.getMonth() - (config.amount - 1),
         1,
       );
-      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
-      data.push({
-        month: key,
-        label: MONTH_LABELS[d.getMonth()],
-        count: buckets.get(key) || 0,
-      });
+      const dates = await this.fetchMetricDates(metric, start);
+
+      const buckets = new Map<string, number>();
+      for (const d of dates) {
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        buckets.set(key, (buckets.get(key) || 0) + 1);
+      }
+
+      const MONTH_LABELS = [
+        'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
+        'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
+      ];
+
+      for (let i = 0; i < config.amount; i++) {
+        const d = new Date(
+          now.getFullYear(),
+          now.getMonth() - (config.amount - 1) + i,
+          1,
+        );
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+        data.push({
+          period: key,
+          label: MONTH_LABELS[d.getMonth()],
+          count: buckets.get(key) || 0,
+        });
+      }
     }
 
-    return { metric, months: clampedMonths, data };
+    return {
+      metric,
+      range: resolvedRange,
+      granularity: config.granularity,
+      data,
+    };
+  }
+
+  async getActivityHeatmap(userId: string, metric: string, days: number) {
+    await this.assertAdmin(userId);
+    this.validateMetric(metric);
+
+    const clampedDays = Math.min(Math.max(days || 90, 7), 180);
+    const start = new Date(Date.now() - clampedDays * 86_400_000);
+
+    const dates = await this.fetchMetricDates(metric, start);
+
+    const matrix: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+
+    for (const d of dates) {
+      const { day, hour } = this.getBrazilDayHour(d);
+      matrix[day][hour] += 1;
+    }
+
+    const maxCount = Math.max(1, ...matrix.flat());
+
+    return { metric, days: clampedDays, matrix, maxCount };
   }
 
 }

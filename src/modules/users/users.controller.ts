@@ -124,7 +124,7 @@ export class UsersController {
   getAdminTimeseries(
     @Req() req: any,
     @Query('metric') metric?: string,
-    @Query('months') months?: string,
+    @Query('range') range?: string,
   ) {
     const userId = req?.user?.userId;
 
@@ -135,7 +135,28 @@ export class UsersController {
     return this.userService.getAdminTimeseries(
       userId,
       metric || 'users',
-      months ? parseInt(months) : 6,
+      range || '6m',
+    );
+  }
+
+  @Get('admin/stats/heatmap')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @UseGuards(JwtAuthGuard, AdminGuard, ThrottlerGuard)
+  getActivityHeatmap(
+    @Req() req: any,
+    @Query('metric') metric?: string,
+    @Query('days') days?: string,
+  ) {
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getActivityHeatmap(
+      userId,
+      metric || 'logins',
+      days ? parseInt(days) : 90,
     );
   }
 
