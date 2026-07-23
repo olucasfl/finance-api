@@ -33,8 +33,6 @@ model User {
   rosarySessions            RosarySession[]
   spiritualStats            SpiritualStats?
   activities                UserActivity[]
-  journeyMembers            JourneyMember[]
-  journeyIntents            JourneyPrayerIntent[]
 }
 
 // Uma linha por dispositivo/login ativo. Antes disso o refresh token
@@ -175,95 +173,6 @@ model Message {
   conversationId String
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-}
-
-model WeeklyJourneyProgress {
-
-  id String @id @default(uuid())
-
-  memberId String
-
-  weekKey String
-
-  rosariesCompleted Int @default(0)
-
-  goalReached Boolean @default(false)
-
-  rewardCollected Boolean @default(false)
-
-  createdAt DateTime @default(now())
-
-  member JourneyMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
-
-  @@unique([memberId, weekKey])
-
-}
-
-model JourneyMember {
-
-  id String @id @default(uuid())
-
-  journeyId String
-
-  userId String
-
-  role JourneyRole
-
-  totalPoints Int @default(0)
-
-  currentStreak Int @default(0)
-
-  bestStreak Int @default(0)
-
-  createdAt DateTime @default(now())
-
-  journey PrayerJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  weeklyProgress WeeklyJourneyProgress[]
-
-  @@unique([journeyId, userId])
-
-}
-
-model PrayerJourney {
-
-  id String @id @default(uuid())
-
-  createdAt DateTime @default(now())
-
-  members JourneyMember[]
-  intents JourneyPrayerIntent[]
-
-}
-
-model JourneyPrayerIntent {
-
-  id String @id @default(uuid())
-
-  journeyId String
-
-  userId String
-
-  text String
-
-  weekKey String
-
-  createdAt DateTime @default(now())
-
-  journey PrayerJourney @relation(fields: [journeyId], references: [id], onDelete: Cascade)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-}
-
-enum JourneyRole {
-
-  OWNER
-
-  MEMBER
-
 }
 
 // ============================================================

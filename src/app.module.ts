@@ -13,7 +13,6 @@ import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
 import { PrayersModule } from './modules/oratio/prayers/prayers.module';
 import { RosaryModule } from './modules/rosary/rosary.module';
 import { ActivityModule } from './modules/oratio/activity/activity.module';
-import { JourneyModule } from './modules/oratio/journey/journey.module';
 import { CravouModule } from './cravou/cravou.module';
 import { SystemLogModule } from './system-log/system-log.module';
 
@@ -31,7 +30,6 @@ import { SystemLogModule } from './system-log/system-log.module';
     PrayersModule,
     RosaryModule,
     ActivityModule,
-    JourneyModule,
     CravouModule,
     SystemLogModule,
   ],
