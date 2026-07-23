@@ -496,22 +496,50 @@ export class UsersService {
     };
   }
 
+  // Segunda-feira 00h da semana atual, no fuso do Brasil — não é
+  // "últimos 7 dias corridos". Uma janela rolante (agora - 7 dias)
+  // desliza junto com o relógio: a cada dia que passa, o dia mais
+  // antigo cai fora da conta e um dia novo (ainda incompleto) entra,
+  // o que pode fazer o número CAIR de um dia pro outro sem nenhum
+  // dado ter sumido de verdade — só saiu da janela. Com semana civil
+  // fixa, o número só cresce ao longo da semana e reseta na segunda.
+  private getStartOfWeekBrazil(): Date {
+    const now = new Date();
+
+    const weekdayShort = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Sao_Paulo',
+      weekday: 'short',
+    }).format(now);
+
+    const weekdayMap: Record<string, number> = {
+      Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
+    };
+    const dow = weekdayMap[weekdayShort] ?? 1;
+    const daysSinceMonday = (dow + 6) % 7; // dom=6, seg=0, ter=1 ...
+
+    const mondayInstant = new Date(now.getTime() - daysSinceMonday * 86_400_000);
+    const mondayKey = mondayInstant.toLocaleDateString('en-CA', {
+      timeZone: 'America/Sao_Paulo',
+    });
+
+    return new Date(`${mondayKey}T00:00:00-03:00`);
+  }
+
   async getAdminStats(userId: string) {
     await this.assertAdmin(userId);
 
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const startOfWeek = this.getStartOfWeekBrazil();
 
     const [
       totalUsers,
       totalVerified,
       consecrationStarted,
       totalPrayers,
-      newUsers7d,
-      prayers7d,
-      rosaries7d,
-      consecrations7d,
-      logins7d,
+      newUsersWeek,
+      prayersWeek,
+      rosariesWeek,
+      consecrationsWeek,
+      loginsWeek,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { emailVerified: true } }),
@@ -520,10 +548,10 @@ export class UsersService {
         _sum: { prayersPrayed: true, rosariesPrayed: true },
       }),
       this.prisma.user.count({
-        where: { createdAt: { gte: sevenDaysAgo } },
+        where: { createdAt: { gte: startOfWeek } },
       }),
       this.prisma.userActivity.count({
-        where: { type: 'PRAYER', createdAt: { gte: sevenDaysAgo } },
+        where: { type: 'PRAYER', createdAt: { gte: startOfWeek } },
       }),
       // Só "Terço concluído" — "Iniciou o terço" também usa type ROSARY
       // e infla a contagem se não filtrar pela ação.
@@ -531,14 +559,14 @@ export class UsersService {
         where: {
           type: 'ROSARY',
           action: 'Terço concluído',
-          createdAt: { gte: sevenDaysAgo },
+          createdAt: { gte: startOfWeek },
         },
       }),
       this.prisma.consecrationProgress.count({
-        where: { createdAt: { gte: sevenDaysAgo } },
+        where: { createdAt: { gte: startOfWeek } },
       }),
       this.prisma.userActivity.count({
-        where: { type: 'LOGIN', createdAt: { gte: sevenDaysAgo } },
+        where: { type: 'LOGIN', createdAt: { gte: startOfWeek } },
       }),
     ]);
 
@@ -548,12 +576,12 @@ export class UsersService {
       consecrationStarted,
       prayersPrayed: totalPrayers._sum.prayersPrayed || 0,
       rosariesPrayed: totalPrayers._sum.rosariesPrayed || 0,
-      last7Days: {
-        newUsers: newUsers7d,
-        prayers: prayers7d,
-        rosaries: rosaries7d,
-        consecrations: consecrations7d,
-        logins: logins7d,
+      thisWeek: {
+        newUsers: newUsersWeek,
+        prayers: prayersWeek,
+        rosaries: rosariesWeek,
+        consecrations: consecrationsWeek,
+        logins: loginsWeek,
       },
     };
   }
