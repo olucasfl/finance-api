@@ -1,6 +1,7 @@
-import { Body, Controller, Post, Get, Query, Res, Headers, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Get, Query, Res, Req, Headers, UnauthorizedException, UseGuards } from '@nestjs/common';
 import type { Response } from "express";
 import { AuthService } from './auth.service';
+import { getClientIp } from './utils/session-info.util';
 import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
@@ -26,8 +27,11 @@ export class AuthController {
   */
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
-  login(@Body() body: LoginDto) {
-    return this.authService.login(body.email, body.password);
+  login(@Body() body: LoginDto, @Req() req: any) {
+    return this.authService.login(body.email, body.password, {
+      userAgent: req.headers['user-agent'],
+      ipAddress: getClientIp(req),
+    });
   }
 
   @Post('refresh')

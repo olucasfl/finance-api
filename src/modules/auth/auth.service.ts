@@ -6,6 +6,12 @@ import { randomBytes, createHash } from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { Response } from 'express';
 import { AppType } from 'src/enums/app-type.enum';
+import { parseDeviceLabel, resolveLocation } from './utils/session-info.util';
+
+export interface DeviceInfo {
+  userAgent?: string;
+  ipAddress?: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -50,7 +56,7 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, deviceInfo?: DeviceInfo) {
 
     const user = await this.prisma.user.findUnique({
       where: { email: email.trim().toLowerCase() },
@@ -70,13 +76,13 @@ export class AuthService {
       throw new UnauthorizedException('Please verify your email before logging in');
     }
 
-    return this.generateTokens(user.id, user.email);
+    return this.generateTokens(user.id, user.email, deviceInfo);
 
   }
 
   private readonly REFRESH_TTL_MS = 1000 * 60 * 60 * 24 * 180;
 
-  async generateTokens(userId: string, email: string) {
+  private signTokenPair(userId: string, email: string) {
 
     const payload = { sub: userId, email };
 
@@ -96,16 +102,32 @@ export class AuthService {
       secret: this.getRefreshSecret(),
     });
 
-    /*
-    Uma sessão nova por login/renovação, em vez de sobrescrever um
-    campo único — assim logar num segundo aparelho não derruba a
-    sessão persistente do primeiro.
-    */
+    return { access_token, refresh_token };
+
+  }
+
+  // Só chamado num LOGIN de verdade — cria uma sessão nova (um dispositivo
+  // a mais na lista). Renovação de token (refresh()) não passa por aqui.
+  async generateTokens(userId: string, email: string, deviceInfo?: DeviceInfo) {
+
+    const { access_token, refresh_token } = this.signTokenPair(userId, email);
+
+    // best-effort, nunca derruba o login se falhar ou demorar
+    const location = deviceInfo?.ipAddress
+      ? await resolveLocation(deviceInfo.ipAddress)
+      : null;
+
     await this.prisma.refreshSession.create({
       data: {
         userId,
         tokenHash: this.hashToken(refresh_token),
         expiresAt: new Date(Date.now() + this.REFRESH_TTL_MS),
+        userAgent: deviceInfo?.userAgent,
+        deviceLabel: deviceInfo?.userAgent
+          ? parseDeviceLabel(deviceInfo.userAgent)
+          : undefined,
+        ipAddress: deviceInfo?.ipAddress,
+        location,
       },
     });
 
@@ -148,13 +170,26 @@ export class AuthService {
       throw new UnauthorizedException();
     }
 
-    // Rotação: essa sessão específica é substituída por uma nova.
-    // As sessões de outros dispositivos não são tocadas.
-    await this.prisma.refreshSession.delete({
+    const { access_token, refresh_token } = this.signTokenPair(user.id, user.email);
+
+    /*
+    Atualiza a MESMA sessão em vez de apagar e criar outra. O access
+    token dura só 15min, então o app chama refresh() várias vezes por
+    dia pra continuar logado — isso é rotação de token da mesma sessão
+    contínua, não um novo dispositivo. Antes disso, cada renovação
+    empilhava uma linha nova em RefreshSession, e "sessões ativas" no
+    perfil virava uma lista de dezenas de artefatos de renovação em
+    vez de mostrar os dispositivos reais.
+    */
+    await this.prisma.refreshSession.update({
       where: { id: session.id },
+      data: {
+        tokenHash: this.hashToken(refresh_token),
+        expiresAt: new Date(Date.now() + this.REFRESH_TTL_MS),
+      },
     });
 
-    return this.generateTokens(user.id, user.email);
+    return { access_token, refresh_token };
   }
 
   /*

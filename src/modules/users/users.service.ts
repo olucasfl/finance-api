@@ -321,6 +321,50 @@ export class UsersService {
 
   /*
   =============================
+  SESSÕES ATIVAS (dispositivos)
+  =============================
+  */
+
+  async getMySessions(userId: string) {
+
+    const sessions = await this.prisma.refreshSession.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      // nunca devolve tokenHash nem userAgent/ipAddress crus — só os
+      // rótulos já resolvidos, que é o que a tela precisa mostrar
+      select: {
+        id: true,
+        createdAt: true,
+        expiresAt: true,
+        deviceLabel: true,
+        location: true,
+      },
+    });
+
+    return sessions;
+  }
+
+  async revokeMySession(userId: string, sessionId: string) {
+
+    const session = await this.prisma.refreshSession.findUnique({
+      where: { id: sessionId },
+      select: { userId: true },
+    });
+
+    // Confere dono antes de apagar — sem isso, um usuário autenticado
+    // podia encerrar a sessão de QUALQUER outro usuário só adivinhando
+    // um id (que nem é segredo, é só uma chave primária sequencial-ish).
+    if (!session || session.userId !== userId) {
+      throw new NotFoundException('Sessão não encontrada');
+    }
+
+    await this.prisma.refreshSession.delete({ where: { id: sessionId } });
+
+    return { message: 'Sessão encerrada' };
+  }
+
+  /*
+  =============================
   DELETE ACCOUNT
   =============================
   */

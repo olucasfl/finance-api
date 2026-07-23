@@ -289,6 +289,38 @@ export class UsersController {
 
   /*
   =============================
+  SESSÕES ATIVAS (dispositivos)
+  =============================
+  */
+
+  @Get('me/sessions')
+  @UseGuards(JwtAuthGuard)
+  getMySessions(@Req() req: any) {
+
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.getMySessions(userId);
+  }
+
+  @Delete('me/sessions/:id')
+  @UseGuards(JwtAuthGuard)
+  revokeMySession(@Req() req: any, @Param('id') sessionId: string) {
+
+    const userId = req?.user?.userId;
+
+    if (!userId) {
+      throw new UnauthorizedException('Invalid token payload');
+    }
+
+    return this.userService.revokeMySession(userId, sessionId);
+  }
+
+  /*
+  =============================
   DELETE ACCOUNT
   =============================
   */
