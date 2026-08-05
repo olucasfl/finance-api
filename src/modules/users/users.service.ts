@@ -30,7 +30,7 @@ export class UsersService {
 
   async create(data: CreateUserDto, app?: string) {
 
-    if (app !== AppType.ORATIO && app !== AppType.CRAVOU) {
+    if (app !== AppType.ORATIO) {
       throw new BadRequestException('Unknown or missing app');
     }
 
@@ -64,9 +64,7 @@ export class UsersService {
       },
     });
 
-    const emailSent = app === AppType.ORATIO
-      ? await this.mailService.sendOratioVerificationEmail(user.email, token)
-      : await this.mailService.sendCravouVerificationEmail(user.email, token);
+    const emailSent = await this.mailService.sendOratioVerificationEmail(user.email, token);
 
     /*
     A conta já foi criada mesmo se o email falhar — não faz sentido
@@ -88,8 +86,6 @@ export class UsersService {
       updatedAt: user.updatedAt,
       emailVerified: user.emailVerified,
       isAdmin: user.isAdmin,
-      bolaoPoints: user.bolaoPoints,
-      cravadas: user.cravadas,
       emailSent,
     };
   }
@@ -102,8 +98,7 @@ export class UsersService {
 
   async getProfile(userId: string) {
 
-  const [user, pointsAgg, cravasCount] = await Promise.all([
-    this.prisma.user.findUnique({
+  const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         id: true,
@@ -117,27 +112,11 @@ export class UsersService {
         consecrations: true,
         completedConsecrationDays: { select: { id: true } },
       },
-    }),
-    this.prisma.cravouPrediction.aggregate({
-      where: { userId, points: { not: null } },
-      _sum: { points: true },
-    }),
-    this.prisma.cravouPrediction.count({
-      where: {
-        userId,
-        OR: [
-          { points: 10,                   match: { phase: 'group_stage' } },
-          { points: { in: [14, 15, 17] }, match: { phase: { not: 'group_stage' } } },
-        ],
-      },
-    }),
-  ]);
+    });
 
   if (!user) {
     throw new NotFoundException("User not found")
   }
-
-  const bolaoPoints = pointsAgg._sum.points ?? 0;
 
   return {
 
@@ -148,8 +127,6 @@ export class UsersService {
     createdAt: user.createdAt,
     emailVerified: user.emailVerified,
     isAdmin: user.isAdmin,
-    bolaoPoints,
-    cravadas: cravasCount,
 
     spiritualProgress: {
 

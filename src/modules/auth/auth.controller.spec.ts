@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
@@ -13,7 +14,13 @@ describe('AuthController', () => {
         { provide: AuthService, useValue: {} },
         { provide: JwtService, useValue: {} },
       ],
-    }).compile();
+    })
+      // ThrottlerGuard puxa THROTTLER:MODULE_OPTIONS de ThrottlerModule.forRoot(),
+      // que não existe nesse módulo de teste isolado — esse teste só quer
+      // confirmar que o controller instancia, não testar rate limit de verdade.
+      .overrideGuard(ThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
   });

@@ -12,7 +12,7 @@ import {
 
 import { PrayersService } from './prayers.service'
 import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard'
-import { AdminGuard } from 'src/cravou/admin/admin.guard'
+import { AdminGuard } from 'src/modules/auth/admin.guard'
 import { CreatePrayerCategoryDto } from './dto/create-prayer-category.dto'
 import { CreatePrayerDto } from './dto/create-prayer.dto'
 

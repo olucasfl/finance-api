@@ -5,7 +5,6 @@ import {
   HttpException,
   HttpStatus,
 } from '@nestjs/common';
-import { BaseWsExceptionFilter } from '@nestjs/websockets';
 import { SystemLogService } from './system-log.service';
 
 /*
@@ -13,23 +12,12 @@ Filtro global só pra OBSERVAR erros HTTP 5xx e registrar no
 SystemLogService — a resposta enviada ao cliente é reconstruída pra
 ficar idêntica ao comportamento padrão do Nest (mesmo formato de
 sempre), então nenhuma rota existente muda de comportamento.
-
-Contextos que não são HTTP (o gateway de realtime do Cravou usa
-WebSocket) são repassados pro filtro padrão de WS do próprio Nest —
-sem isso, um erro num socket handler ficaria sem resposta nenhuma
-pro cliente, silenciosamente.
 */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
-  private readonly wsFilter = new BaseWsExceptionFilter();
-
   constructor(private readonly systemLog: SystemLogService) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
-    if (host.getType() !== 'http') {
-      return this.wsFilter.catch(exception as any, host);
-    }
-
     const ctx = host.switchToHttp();
     const response = ctx.getResponse();
     const request = ctx.getRequest();

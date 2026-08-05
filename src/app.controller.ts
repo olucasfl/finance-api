@@ -2,7 +2,7 @@ import { Controller, Get, Req, ServiceUnavailableException, UnauthorizedExceptio
 import { AppService } from './app.service';
 import { PrismaService } from './prisma/prisma.service';
 import { JwtAuthGuard } from './modules/auth/jwt-auth.guard';
-import { AdminGuard } from './cravou/admin/admin.guard';
+import { AdminGuard } from './modules/auth/admin.guard';
 import { SystemLogService } from './system-log/system-log.service';
 
 @Controller()

@@ -18,7 +18,7 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { AdminGuard } from 'src/cravou/admin/admin.guard';
+import { AdminGuard } from 'src/modules/auth/admin.guard';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 
 @Controller('users')

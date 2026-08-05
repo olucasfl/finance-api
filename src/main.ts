@@ -1,7 +1,6 @@
 import { NestFactory } from '@nestjs/core'
 import { AppModule } from './app.module'
 import { ValidationPipe } from '@nestjs/common'
-import { IoAdapter } from '@nestjs/platform-socket.io'
 import helmet from 'helmet'
 import { AllExceptionsFilter } from './system-log/all-exceptions.filter'
 import { SystemLogService } from './system-log/system-log.service'
@@ -9,8 +8,6 @@ import { SystemLogService } from './system-log/system-log.service'
 async function bootstrap() {
 
  const app = await NestFactory.create(AppModule)
-
- app.useWebSocketAdapter(new IoAdapter(app))
 
  /* =========================
     OBSERVABILIDADE MÍNIMA

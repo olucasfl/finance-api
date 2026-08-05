@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { JwtModule } from '@nestjs/jwt';
 import { JwtStrategy } from './jwt.strategy';
+import { AdminGuard } from './admin.guard';
 import { MailModule } from '../mail/mail.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -26,7 +27,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     /*
     Rate limit escopado só nas rotas de auth (aplicado via ThrottlerGuard
     diretamente no AuthController, não como guard global) — evita afetar
-    rotas de outros módulos (VoxAI, Cravou, etc.) que já têm seus próprios
+    rotas de outros módulos (VoxAI, etc.) que já têm seus próprios
     limites ou nenhum.
     */
     ThrottlerModule.forRoot([
@@ -38,6 +39,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
     ]),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, AdminGuard],
+  exports: [AdminGuard],
 })
 export class AuthModule {}

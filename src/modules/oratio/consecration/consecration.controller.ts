@@ -12,7 +12,7 @@ import {
 
 import { ConsecrationService } from './consecration.service';
 import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
-import { AdminGuard } from 'src/cravou/admin/admin.guard';
+import { AdminGuard } from 'src/modules/auth/admin.guard';
 import { CreateConsecrationStageDto } from './dto/create-consecration-stage.dto';
 import { CreateConsecrationDayDto } from './dto/create-consecration-day.dto';
 import { CreateConsecrationPrayerDto } from './dto/create-consecration-prayer.dto';

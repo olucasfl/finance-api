@@ -274,10 +274,6 @@ export class AuthService {
       return res.redirect("https://oratio-phi.vercel.app/login");
     }
 
-    if (app === "cravou") {
-      return res.redirect("https://cravou-ashy.vercel.app/login");
-    }
-
     throw new BadRequestException("Unknown app");
   }
 
@@ -348,13 +344,11 @@ export class AuthService {
       },
     });
 
-    if (app !== AppType.ORATIO && app !== AppType.CRAVOU) {
+    if (app !== AppType.ORATIO) {
       throw new BadRequestException('Unknown or missing app');
     }
 
-    const emailSent = app === AppType.ORATIO
-      ? await this.mailService.sendOratioVerificationEmail(user.email, token)
-      : await this.mailService.sendCravouVerificationEmail(user.email, token);
+    const emailSent = await this.mailService.sendOratioVerificationEmail(user.email, token);
 
     /*
     Diferente do forgot-password, essa rota já não é "genérica não
@@ -399,7 +393,7 @@ async requestPasswordReset(email: string, app?: string) {
   um email existe na base testando variações do header x-app.
   */
   if (!user) return;
-  if (app !== AppType.ORATIO && app !== AppType.CRAVOU) return;
+  if (app !== AppType.ORATIO) return;
 
   const token = randomBytes(32).toString("hex");
 
@@ -413,15 +407,7 @@ async requestPasswordReset(email: string, app?: string) {
     }
   });
 
-  if (app === AppType.ORATIO) {
-
-    await this.mailService.sendOratioPasswordResetEmail(user.email, token);
-
-  } else {
-
-    await this.mailService.sendCravouPasswordResetEmail(user.email, token);
-
-  }
+  await this.mailService.sendOratioPasswordResetEmail(user.email, token);
 
 }
 
