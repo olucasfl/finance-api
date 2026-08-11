@@ -156,7 +156,7 @@ export class NotificationsSendService {
 
   updateRule(
     key: string,
-    data: { enabled?: boolean; title?: string; body?: string | null; url?: string | null },
+    data: { enabled?: boolean; title?: string; body?: string | null; url?: string | null; hour?: number | null },
   ) {
     return this.prisma.notificationRule.update({
       where: { key },
@@ -165,8 +165,32 @@ export class NotificationsSendService {
         title: data.title,
         body: data.body,
         url: data.url,
+        hour: data.hour,
       },
     });
+  }
+
+  createRule(data: { title: string; body?: string; url?: string; hour?: number; condition?: string }) {
+    return this.prisma.notificationRule.create({
+      data: {
+        title: data.title,
+        body: data.body ?? null,
+        url: data.url ?? null,
+        hour: data.hour ?? null,
+        condition: data.condition ?? null,
+      },
+    });
+  }
+
+  deleteRule(key: string) {
+    return this.prisma.notificationRule.delete({ where: { key } });
+  }
+
+  // Apaga um envio: some do sino de todos que receberam + remove a campanha
+  async deleteCampaign(id: string) {
+    await this.prisma.notification.deleteMany({ where: { campaignId: id } });
+    await this.prisma.notificationCampaign.delete({ where: { id } }).catch(() => {});
+    return { ok: true };
   }
 
   // Limpeza diária: apaga notificações e campanhas vencidas (15 dias)

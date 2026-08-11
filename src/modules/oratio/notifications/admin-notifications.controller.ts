@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
 import { NotificationsSendService } from './notifications-send.service';
@@ -52,8 +52,26 @@ export class AdminNotificationsController {
   @Patch('rules/:key')
   updateRule(
     @Param('key') key: string,
-    @Body() body: { enabled?: boolean; title?: string; body?: string | null; url?: string | null },
+    @Body() body: { enabled?: boolean; title?: string; body?: string | null; url?: string | null; hour?: number | null },
   ) {
     return this.send.updateRule(key, body);
+  }
+
+  @Post('rules')
+  createRule(
+    @Body() body: { title: string; body?: string; url?: string; hour?: number; condition?: string },
+  ) {
+    return this.send.createRule(body);
+  }
+
+  @Delete('rules/:key')
+  deleteRule(@Param('key') key: string) {
+    return this.send.deleteRule(key);
+  }
+
+  // Apagar um envio (some do sino de quem recebeu)
+  @Delete(':id')
+  deleteCampaign(@Param('id') id: string) {
+    return this.send.deleteCampaign(id);
   }
 }

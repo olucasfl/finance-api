@@ -3,33 +3,52 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationsSendService } from './notifications-send.service';
 
-// Regras padrão — semeadas 1x; o admin edita texto/liga-desliga depois.
+// Regras padrão — semeadas UMA vez (só se a tabela estiver vazia), pra que
+// apagar/editar depois seja permanente. hour = hora local; condition define
+// a lógica especial (senão é diária no horário).
 const DEFAULT_RULES = [
   {
     key: 'LITURGY_MORNING',
     title: 'A liturgia de hoje já está no ar ✝️',
     body: 'Comece o dia com a Palavra: leia as leituras da Missa de hoje.',
     url: '/oratio/liturgia-completa',
+    hour: 7,
+    condition: null as string | null,
   },
   {
     key: 'ANGELUS_MIDDAY',
     title: 'É meio-dia — reze o Angelus 🔔',
     body: '"O Anjo do Senhor anunciou a Maria, e ela concebeu do Espírito Santo…"',
     url: '/oratio/prayers',
+    hour: 12,
+    condition: null as string | null,
   },
   {
     key: 'ROSARY_UNFINISHED',
     title: 'Volte para terminar seu Terço 📿',
     body: 'Você começou um terço e não terminou. Que tal concluir agora?',
     url: '/oratio/rosary',
+    hour: 18,
+    condition: 'ROSARY_UNFINISHED' as string | null,
   },
   {
     key: 'STREAK_AT_RISK',
     title: 'Não perca sua sequência 🔥',
     body: 'Você está com {count} dias seguidos de oração. Reze hoje para manter!',
     url: '/oratio/home',
+    hour: 20,
+    condition: 'STREAK_AT_RISK' as string | null,
   },
 ];
+
+type RuleRow = {
+  key: string;
+  title: string;
+  body: string | null;
+  url: string | null;
+  hour: number | null;
+  condition: string | null;
+};
 
 @Injectable()
 export class NotificationsScheduler implements OnModuleInit {
@@ -41,10 +60,10 @@ export class NotificationsScheduler implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
+    const count = await this.prisma.notificationRule.count().catch(() => 1);
+    if (count > 0) return; // já semeado (ou o admin já mexeu) → não recria
     for (const r of DEFAULT_RULES) {
-      await this.prisma.notificationRule
-        .upsert({ where: { key: r.key }, update: {}, create: r })
-        .catch(() => {});
+      await this.prisma.notificationRule.create({ data: r }).catch(() => {});
     }
   }
 
@@ -76,14 +95,14 @@ export class NotificationsScheduler implements OnModuleInit {
     }
   }
 
-  // Roda a cada 10 min. As automáticas só vão pra quem ATIVOU push (opt-in),
-  // respeitando o fuso de cada aparelho, quiet hours (22h–7h) e dedupe diário.
+  // Roda a cada 10 min. As automáticas só vão pra quem ATIVOU push,
+  // respeitando fuso de cada aparelho, quiet hours (22h–7h) e dedupe diário.
   @Cron('*/10 * * * *')
   async tick() {
-    const rules = await this.prisma.notificationRule.findMany({ where: { enabled: true } });
+    const rules = (await this.prisma.notificationRule.findMany({
+      where: { enabled: true },
+    })) as RuleRow[];
     if (rules.length === 0) return;
-
-    const byKey = new Map(rules.map((r) => [r.key, r]));
 
     const subs = await this.prisma.pushSubscription.findMany({
       select: { userId: true, timezone: true },
@@ -96,20 +115,17 @@ export class NotificationsScheduler implements OnModuleInit {
         const { hours } = this.nowInZone(tz);
         if (hours < 7 || hours >= 22) continue; // quiet hours
 
-        if (hours === 7 && byKey.has('LITURGY_MORNING')) {
-          await this.fire(sub.userId, byKey.get('LITURGY_MORNING')!);
-        }
-        if (hours === 12 && byKey.has('ANGELUS_MIDDAY')) {
-          await this.fire(sub.userId, byKey.get('ANGELUS_MIDDAY')!);
-        }
-        if (hours === 18 && byKey.has('ROSARY_UNFINISHED')) {
-          if (await this.rosaryUnfinished(sub.userId)) {
-            await this.fire(sub.userId, byKey.get('ROSARY_UNFINISHED')!);
+        for (const rule of rules) {
+          if (rule.hour == null || rule.hour !== hours) continue; // só na hora marcada
+
+          if (rule.condition === 'ROSARY_UNFINISHED') {
+            if (await this.rosaryUnfinished(sub.userId)) await this.fire(sub.userId, rule);
+          } else if (rule.condition === 'STREAK_AT_RISK') {
+            const streak = await this.streakAtRisk(sub.userId, tz);
+            if (streak >= 2) await this.fire(sub.userId, rule, streak);
+          } else {
+            await this.fire(sub.userId, rule); // diária no horário
           }
-        }
-        if (hours === 20 && byKey.has('STREAK_AT_RISK')) {
-          const streak = await this.streakAtRisk(sub.userId, tz);
-          if (streak >= 2) await this.fire(sub.userId, byKey.get('STREAK_AT_RISK')!, streak);
         }
       } catch (e: any) {
         this.logger.error(`regra falhou p/ ${sub.userId}: ${e?.message}`);
@@ -117,11 +133,7 @@ export class NotificationsScheduler implements OnModuleInit {
     }
   }
 
-  private async fire(
-    userId: string,
-    rule: { key: string; title: string; body: string | null; url: string | null },
-    count?: number,
-  ) {
+  private async fire(userId: string, rule: RuleRow, count?: number) {
     // dedupe: já mandou essa regra pra essa pessoa nas últimas ~20h?
     const since = new Date(Date.now() - 20 * 60 * 60 * 1000);
     const dup = await this.prisma.notification.findFirst({

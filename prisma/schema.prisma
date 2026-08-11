@@ -271,10 +271,12 @@ model Notification {
 // QUEM disparar é lógica de código, por `key`. Usa {count} no corpo pra
 // interpolar valores (ex.: dias de sequência).
 model NotificationRule {
-  key       String   @id
+  key       String   @id @default(uuid())
   enabled   Boolean  @default(true)
   title     String
   body      String?
   url       String?
+  hour      Int?     // hora local (0-23) das regras por horário
+  condition String?  // "ROSARY_UNFINISHED" | "STREAK_AT_RISK" | null (=diária no horário)
   updatedAt DateTime @updatedAt
 }
