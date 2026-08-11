@@ -13,6 +13,8 @@ import { VoxAiModule } from './modules/oratio/voxai/voxai.module';
 import { PrayersModule } from './modules/oratio/prayers/prayers.module';
 import { RosaryModule } from './modules/rosary/rosary.module';
 import { ActivityModule } from './modules/oratio/activity/activity.module';
+import { ReadingProgressModule } from './modules/oratio/reading-progress/reading-progress.module';
+import { HomeModule } from './modules/oratio/home/home.module';
 import { SystemLogModule } from './system-log/system-log.module';
 
 @Module({
@@ -29,6 +31,8 @@ import { SystemLogModule } from './system-log/system-log.module';
     PrayersModule,
     RosaryModule,
     ActivityModule,
+    ReadingProgressModule,
+    HomeModule,
     SystemLogModule,
   ],
   controllers: [AppController],

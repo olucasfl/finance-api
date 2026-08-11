@@ -31,6 +31,7 @@ model User {
   rosarySessions            RosarySession[]
   spiritualStats            SpiritualStats?
   activities                UserActivity[]
+  readingProgress           ReadingProgress[]
 }
 
 // Uma linha por dispositivo/login ativo. Antes disso o refresh token
@@ -171,4 +172,29 @@ model Message {
   conversationId String
   createdAt      DateTime     @default(now())
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+}
+
+// Tipo de leitura contínua que a Home usa pra sugerir "volte de onde parou".
+enum ReadingKind {
+  BIBLE
+  CATECHISM
+}
+
+// Última posição de leitura da pessoa em cada frente (Bíblia, Catecismo).
+// Só marca ONDE parou — uma linha por (usuário, tipo), sempre sobrescrita.
+// `reference` é o ponteiro que a UI usa pra navegar (ex.: "genesis/3" ou
+// a página do PDF do Catecismo); `label` é o texto amigável ("Gênesis 3").
+// Tabela nova e isolada — não altera nada do que já existe.
+model ReadingProgress {
+  id        String      @id @default(uuid())
+  userId    String
+  kind      ReadingKind
+  reference String
+  label     String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@index([userId])
 }
