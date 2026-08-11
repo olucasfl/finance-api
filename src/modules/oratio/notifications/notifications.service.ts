@@ -51,4 +51,58 @@ export class NotificationsService {
     const count = await this.prisma.pushSubscription.count({ where: { userId } });
     return { enabled: count > 0 };
   }
+
+  /* ===== Sino / caixa de entrada ===== */
+
+  // Lista paginada (10 por vez), só as ainda válidas (não expiradas).
+  async getInbox(userId: string, cursor?: string, limit = 10) {
+    const take = Math.min(Math.max(limit, 1), 30);
+
+    const rows = await this.prisma.notification.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+      select: {
+        id: true,
+        title: true,
+        body: true,
+        url: true,
+        createdAt: true,
+        seenAt: true,
+        source: true,
+      },
+    });
+
+    let nextCursor: string | null = null;
+    if (rows.length > take) {
+      nextCursor = rows.pop()!.id;
+    }
+
+    return { items: rows, nextCursor };
+  }
+
+  // Badge do sino: quantas não-vistas e ainda válidas.
+  async unseenCount(userId: string) {
+    const count = await this.prisma.notification.count({
+      where: { userId, seenAt: null, expiresAt: { gt: new Date() } },
+    });
+    return { count };
+  }
+
+  async markSeen(userId: string, id: string) {
+    await this.prisma.notification.updateMany({
+      where: { id, userId, seenAt: null },
+      data: { seenAt: new Date() },
+    });
+    return { ok: true };
+  }
+
+  async markAllSeen(userId: string) {
+    await this.prisma.notification.updateMany({
+      where: { userId, seenAt: null },
+      data: { seenAt: new Date() },
+    });
+    return { ok: true };
+  }
 }

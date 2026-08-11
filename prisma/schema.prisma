@@ -33,6 +33,7 @@ model User {
   activities                UserActivity[]
   readingProgress           ReadingProgress[]
   pushSubscriptions         PushSubscription[]
+  notifications             Notification[]
 }
 
 model PushSubscription {
@@ -211,4 +212,56 @@ model ReadingProgress {
 
   @@unique([userId, kind])
   @@index([userId])
+}
+
+// De onde a notificação veio: um envio do admin (CAMPAIGN) ou uma
+// regra automática (RULE), como "terço não terminado".
+enum NotificationSource {
+  CAMPAIGN
+  RULE
+}
+
+// Registro do envio feito pelo admin — agrupa as Notifications geradas
+// e guarda os contadores (alvo/enviado/falhou) pro painel. Expira em 15
+// dias, igual aos itens; um cron limpa as vencidas.
+model NotificationCampaign {
+  id         String         @id @default(uuid())
+  title      String
+  body       String?
+  url        String?
+  audience   String         @default("ALL") // "ALL" | "SPECIFIC"
+  createdBy  String?
+  createdAt  DateTime       @default(now())
+  expiresAt  DateTime
+  targeted   Int            @default(0)
+  pushSent   Int            @default(0)
+  pushFailed Int            @default(0)
+  notifications Notification[]
+
+  @@index([expiresAt])
+}
+
+// Um item na "caixa de entrada" (sino) de cada usuário. Toda notificação
+// vira uma linha por pessoa; quem ativou push também recebe fora do app.
+// `seenAt` controla o badge do sino; `expiresAt` (criadaEm + 15 dias)
+// tira do sino e do painel; um cron apaga as vencidas.
+model Notification {
+  id         String                @id @default(uuid())
+  userId     String
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  body       String?
+  url        String?
+  source     NotificationSource    @default(CAMPAIGN)
+  campaignId String?
+  campaign   NotificationCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  ruleKey    String?
+  pushSent   Boolean               @default(false)
+  createdAt  DateTime              @default(now())
+  seenAt     DateTime?
+  expiresAt  DateTime
+
+  @@index([userId, expiresAt])
+  @@index([userId, seenAt])
+  @@index([expiresAt])
 }
