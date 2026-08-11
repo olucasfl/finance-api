@@ -23,39 +23,6 @@ export class ConsecrationController {
 
   constructor(private readonly service: ConsecrationService) {}
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-@Post('start')
-@UseGuards(JwtAuthGuard)
-start(
-  @Req() req: any,
-  @Body() body: { consecrationDate: string }
-) {
-
-  const consecrationDate = new Date(body.consecrationDate)
-
-  const startDate = new Date(consecrationDate)
-  startDate.setDate(startDate.getDate() - 33)
-
-  return this.service.start(
-    req.user.userId,
-    startDate
-  )
-
-}
-=======
-  @Post('start')
-  @UseGuards(JwtAuthGuard)
-  start(@Req() req: any, @Body() body: { startDate: string }) {
-
-    return this.service.start(
-      req.user.userId,
-      new Date(body.startDate)
-    );
-
-  }
->>>>>>> 18a4a863f41a4cbe378ab5723b25370ed6b2bb4c
-=======
   /* ============================= */
   /* START CONSECRATION */
   /* ============================= */
@@ -82,7 +49,6 @@ start(
   /* ============================= */
   /* PROGRESS */
   /* ============================= */
->>>>>>> d51c9694caff7740d98a77903636c958e1f6360d
 
   @Get('progress')
   @UseGuards(JwtAuthGuard)
@@ -214,34 +180,6 @@ start(
 
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-@Put("consecration-date")
-updateStartDate(
- @Req() req:any,
- @Body() body:{consecrationDate:string}
-){
-
- const consecrationDate = new Date(body.consecrationDate)
-
- const startDate = new Date(consecrationDate)
- startDate.setDate(startDate.getDate() - 33)
-
- return this.service.updateStartDate(
-  req.user.userId,
-  startDate
- )
-
-}
-=======
-  @Put("start-date")
-  @UseGuards(JwtAuthGuard)
-  updateStartDate(@Req() req:any, @Body() body:{startDate:string}){
-
-    return this.service.updateStartDate(req.user.userId, new Date(body.startDate));
-  }
->>>>>>> 18a4a863f41a4cbe378ab5723b25370ed6b2bb4c
-=======
   /* ============================= */
   /* UPDATE CONSECRATION DATE */
   /* ============================= */
@@ -268,7 +206,6 @@ updateStartDate(
   /* ============================= */
   /* STAGE DAYS */
   /* ============================= */
->>>>>>> d51c9694caff7740d98a77903636c958e1f6360d
 
   @Get("stage/:stageId/days")
   getStageDays(@Param("stageId") stageId: string) {
