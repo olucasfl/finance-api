@@ -32,6 +32,20 @@ model User {
   spiritualStats            SpiritualStats?
   activities                UserActivity[]
   readingProgress           ReadingProgress[]
+  pushSubscriptions         PushSubscription[]
+}
+
+model PushSubscription {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  timezone  String   @default("UTC")
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // Uma linha por dispositivo/login ativo. Antes disso o refresh token

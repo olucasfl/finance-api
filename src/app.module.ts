@@ -15,6 +15,7 @@ import { RosaryModule } from './modules/rosary/rosary.module';
 import { ActivityModule } from './modules/oratio/activity/activity.module';
 import { ReadingProgressModule } from './modules/oratio/reading-progress/reading-progress.module';
 import { HomeModule } from './modules/oratio/home/home.module';
+import { NotificationsModule } from './modules/oratio/notifications/notifications.module';
 import { SystemLogModule } from './system-log/system-log.module';
 
 @Module({
@@ -33,6 +34,7 @@ import { SystemLogModule } from './system-log/system-log.module';
     ActivityModule,
     ReadingProgressModule,
     HomeModule,
+    NotificationsModule,
     SystemLogModule,
   ],
   controllers: [AppController],
