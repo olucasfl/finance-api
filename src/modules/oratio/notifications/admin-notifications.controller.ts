@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
 import { NotificationsSendService } from './notifications-send.service';
@@ -41,5 +41,19 @@ export class AdminNotificationsController {
   @Get('subscribers')
   subscribers() {
     return this.send.subscribersCount();
+  }
+
+  // Regras automáticas: listar e editar (liga/desliga, texto, link)
+  @Get('rules')
+  rules() {
+    return this.send.listRules();
+  }
+
+  @Patch('rules/:key')
+  updateRule(
+    @Param('key') key: string,
+    @Body() body: { enabled?: boolean; title?: string; body?: string | null; url?: string | null },
+  ) {
+    return this.send.updateRule(key, body);
   }
 }

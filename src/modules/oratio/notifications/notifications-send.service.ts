@@ -148,6 +148,27 @@ export class NotificationsSendService {
     return { totalUsers, subscribedUsers: subs.length };
   }
 
+  /* ===== Regras automáticas (admin) ===== */
+
+  listRules() {
+    return this.prisma.notificationRule.findMany({ orderBy: { key: 'asc' } });
+  }
+
+  updateRule(
+    key: string,
+    data: { enabled?: boolean; title?: string; body?: string | null; url?: string | null },
+  ) {
+    return this.prisma.notificationRule.update({
+      where: { key },
+      data: {
+        enabled: data.enabled,
+        title: data.title,
+        body: data.body,
+        url: data.url,
+      },
+    });
+  }
+
   // Limpeza diária: apaga notificações e campanhas vencidas (15 dias)
   @Cron('15 0 * * *', { timeZone: 'America/Sao_Paulo' })
   async cleanupExpired() {

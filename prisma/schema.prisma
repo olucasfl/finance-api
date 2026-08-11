@@ -265,3 +265,16 @@ model Notification {
   @@index([userId, seenAt])
   @@index([expiresAt])
 }
+
+// Regras de notificação automática (terço não terminado, liturgia, etc.).
+// O texto e o liga/desliga ficam aqui (editáveis no admin); QUANDO e PRA
+// QUEM disparar é lógica de código, por `key`. Usa {count} no corpo pra
+// interpolar valores (ex.: dias de sequência).
+model NotificationRule {
+  key       String   @id
+  enabled   Boolean  @default(true)
+  title     String
+  body      String?
+  url       String?
+  updatedAt DateTime @updatedAt
+}
