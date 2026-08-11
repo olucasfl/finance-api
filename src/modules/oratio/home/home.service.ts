@@ -114,26 +114,26 @@ export class HomeService {
       orderBy: { updatedAt: 'desc' }
     });
 
-    const bible = readings.find((r) => r.kind === 'BIBLE');
-    if (bible) {
+    // Critério: uma única leitura "onde parou" — a mais recente (Bíblia OU
+    // Catecismo, o que a pessoa mexeu por último). Evita empilhar as duas.
+    const lastReading = readings[0]; // já ordenado por updatedAt desc
+
+    if (lastReading?.kind === 'BIBLE') {
       suggestions.push({
         id: 'bible-continue',
         kind: 'bible',
         title: 'Volte à Bíblia',
-        subtitle: bible.label,
+        subtitle: lastReading.label,
         why: 'Onde parou',
         icon: 'bible',
-        path: `/oratio/biblia/${bible.reference}`
+        path: `/oratio/biblia/${lastReading.reference}`
       });
-    }
-
-    const catechism = readings.find((r) => r.kind === 'CATECHISM');
-    if (catechism) {
+    } else if (lastReading?.kind === 'CATECHISM') {
       suggestions.push({
         id: 'catechism-continue',
         kind: 'catechism',
         title: 'Continue no Catecismo',
-        subtitle: catechism.label,
+        subtitle: lastReading.label,
         why: 'Onde parou',
         icon: 'catechism',
         path: '/oratio/catecismo'
