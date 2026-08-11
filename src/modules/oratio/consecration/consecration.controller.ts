@@ -12,6 +12,11 @@ import {
 
 import { ConsecrationService } from './consecration.service';
 import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard';
+import { AdminGuard } from 'src/modules/auth/admin.guard';
+import { CreateConsecrationStageDto } from './dto/create-consecration-stage.dto';
+import { CreateConsecrationDayDto } from './dto/create-consecration-day.dto';
+import { CreateConsecrationPrayerDto } from './dto/create-consecration-prayer.dto';
+import { AddDayPrayerDto } from './dto/add-day-prayer.dto';
 
 @Controller('oratio/consecration')
 export class ConsecrationController {
@@ -64,9 +69,7 @@ start(
 
     const [y,m,d] = body.consecrationDate.split("-").map(Number)
 
-    const consecrationDate = new Date(y, m - 1, d)
-
-    const startDate = new Date(y, m - 1, d)
+    const startDate = new Date(y, m - 1, d, 12, 0, 0)
     startDate.setDate(startDate.getDate() - 33)
 
     return this.service.start(
@@ -105,34 +108,39 @@ start(
   /* ============================= */
 
   @Post('stage')
-  createStage(@Body() body: any) {
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  createStage(@Body() body: CreateConsecrationStageDto) {
 
     return this.service.createStage(body)
 
   }
 
   @Post('day')
-  createDay(@Body() body: any) {
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  createDay(@Body() body: CreateConsecrationDayDto) {
 
     return this.service.createDay(body)
 
   }
 
   @Post('prayer')
-  createPrayer(@Body() body: any) {
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  createPrayer(@Body() body: CreateConsecrationPrayerDto) {
 
     return this.service.createPrayer(body)
 
   }
 
   @Post('day-prayer')
-  addPrayerToDay(@Body() body: any) {
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  addPrayerToDay(@Body() body: AddDayPrayerDto) {
 
     return this.service.addPrayerToDay(body)
 
   }
 
   @Put('day-prayer/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   updateDayPrayer(
     @Param('id') id: string,
     @Body() body: { order: number }
@@ -143,6 +151,7 @@ start(
   }
 
   @Put('prayer/:id')
+  @UseGuards(JwtAuthGuard, AdminGuard)
   updatePrayer(
     @Param('id') id: string,
     @Body() body: { title?: string; content?: string }
@@ -246,9 +255,7 @@ updateStartDate(
 
     const [y,m,d] = body.consecrationDate.split("-").map(Number)
 
-    const consecrationDate = new Date(y, m - 1, d)
-
-    const startDate = new Date(y, m - 1, d)
+    const startDate = new Date(y, m - 1, d, 12, 0, 0)
     startDate.setDate(startDate.getDate() - 33)
 
     return this.service.updateStartDate(

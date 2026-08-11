@@ -1,10 +1,57 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { ActivityService } from '../activity/activity.service'
+import { toZonedTime } from 'date-fns-tz'
+import { format } from 'date-fns'
+import { CreateConsecrationStageDto } from './dto/create-consecration-stage.dto';
+import { CreateConsecrationDayDto } from './dto/create-consecration-day.dto';
+import { CreateConsecrationPrayerDto } from './dto/create-consecration-prayer.dto';
+import { AddDayPrayerDto } from './dto/add-day-prayer.dto';
 
 @Injectable()
 export class ConsecrationService {
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService,
+    private activityService: ActivityService
+  ) {}
+
+  private getTodayBrazil() {
+    const now = toZonedTime(new Date(), "America/Sao_Paulo")
+
+    return new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate()
+    )
+  }
+
+  private toLocalDate(date: Date) {
+    return new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      12, 0, 0
+    );
+}
+
+  private diffDays(start: Date, end: Date) {
+    const msPerDay = 1000 * 60 * 60 * 24;
+
+    const startTime = this.toLocalDate(start).getTime();
+    const endTime = this.toLocalDate(end).getTime();
+
+    return Math.round((endTime - startTime) / msPerDay);
+  }
+
+  private formatLocalDate(date: Date){
+    const local = new Date(date)
+
+    const y = local.getFullYear()
+    const m = String(local.getMonth() + 1).padStart(2, "0")
+    const d = String(local.getDate()).padStart(2, "0")
+
+    return `${y}-${m}-${d}`
+  }
 
   async start(userId: string, startDate: Date) {
 
@@ -16,12 +63,22 @@ export class ConsecrationService {
       return existing;
     }
 
-    return this.prisma.consecrationProgress.create({
-      data: {
+    const utcStartDate = this.toLocalDate(startDate);
+
+    const result = await this.prisma.consecrationProgress.create({
+        data: {
+          userId,
+          startDate: utcStartDate
+        }
+      })
+
+      await this.activityService.log(
         userId,
-        startDate
-      }
-    });
+        "CONSECRATION",
+        "Iniciou a consagração"
+      )
+
+      return result
   }
 
   async progress(userId: string) {
@@ -41,26 +98,16 @@ export class ConsecrationService {
       };
     }
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
+    const today = this.getTodayBrazil();
     const startRaw = new Date(progress.startDate);
+    const start = this.toLocalDate(startRaw);
+    const utcToday = this.toLocalDate(today);
 
-    const start = new Date(
-      startRaw.getFullYear(),
-      startRaw.getMonth(),
-      startRaw.getDate()
-    );
-
-    const diff =
-      Math.floor(
-        (today.getTime() - start.getTime()) /
-        (1000 * 60 * 60 * 24)
-      ) + 1;
+    const diff = this.diffDays(start, utcToday) + 1;
 
     const currentDay = Math.min(diff, 33);
 
-    const startedToday = diff >= 1;
+    const startedToday = diff === 1;
 
     const daysUntilStart =
       diff < 1 ? Math.abs(diff) + 1 : 0;
@@ -72,16 +119,23 @@ export class ConsecrationService {
     const progressPercent =
       Math.floor((completedDays / 33) * 100);
 
+      const consecrationDate = new Date(start)
+      consecrationDate.setDate(consecrationDate.getDate() + 33)
+
+      const startZoned = toZonedTime(progress.startDate, "America/Sao_Paulo")
+      const consecrationZoned = toZonedTime(consecrationDate, "America/Sao_Paulo")
+
     return {
       started: true,
-      startDate: progress.startDate,
+      startDate: format(startZoned, "yyyy-MM-dd"),
+      consecrationDate: format(consecrationZoned, "yyyy-MM-dd"),
       currentDay,
       startedToday,
       daysUntilStart,
       completedDays,
       progress: progressPercent,
       stages
-    };
+    }
 
   }
 
@@ -109,7 +163,7 @@ export class ConsecrationService {
     return day;
   }
 
-  async createStage(data: any) {
+  async createStage(data: CreateConsecrationStageDto) {
 
     return this.prisma.consecrationStage.create({
       data
@@ -117,7 +171,7 @@ export class ConsecrationService {
 
   }
 
-  async createDay(data: any) {
+  async createDay(data: CreateConsecrationDayDto) {
 
     return this.prisma.consecrationDay.create({
       data
@@ -125,7 +179,7 @@ export class ConsecrationService {
 
   }
 
-  async createPrayer(data: any) {
+  async createPrayer(data: CreateConsecrationPrayerDto) {
 
     return this.prisma.prayer.create({
       data
@@ -133,7 +187,7 @@ export class ConsecrationService {
 
   }
 
-  async addPrayerToDay(data: any) {
+  async addPrayerToDay(data: AddDayPrayerDto) {
 
     return this.prisma.dayPrayer.create({
       data
@@ -197,22 +251,12 @@ export class ConsecrationService {
       return null;
     }
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
+    const today = this.getTodayBrazil();
     const startRaw = new Date(progress.startDate);
+    const start = this.toLocalDate(startRaw);
+    const utcToday = this.toLocalDate(today);
 
-    const start = new Date(
-      startRaw.getFullYear(),
-      startRaw.getMonth(),
-      startRaw.getDate()
-    );
-
-    const diff =
-      Math.floor(
-        (today.getTime() - start.getTime()) /
-        (1000 * 60 * 60 * 24)
-      ) + 1;
+    const diff = this.diffDays(start, utcToday) + 1;
 
     if (diff < 1 || diff > 33) {
       return null;
@@ -245,22 +289,12 @@ export class ConsecrationService {
       throw new Error("Consagração não iniciada");
     }
 
-    const today = new Date();
-    today.setHours(0,0,0,0);
-
+    const today = this.getTodayBrazil();
     const startRaw = new Date(progress.startDate);
+    const start = this.toLocalDate(startRaw);
+    const utcToday = this.toLocalDate(today);
 
-    const start = new Date(
-      startRaw.getFullYear(),
-      startRaw.getMonth(),
-      startRaw.getDate()
-    );
-
-    const diff =
-      Math.floor(
-        (today.getTime() - start.getTime()) /
-        (1000 * 60 * 60 * 24)
-      ) + 1;
+    const diff = this.diffDays(start, utcToday) + 1;
 
     if (dayNumber > diff) {
       throw new Error("Dia ainda não liberado");
@@ -288,12 +322,21 @@ export class ConsecrationService {
       throw new Error("Complete o dia anterior primeiro");
     }
 
-    return this.prisma.consecrationCompletedDay.create({
-      data: {
+    const result = await this.prisma.consecrationCompletedDay.create({
+        data: {
+          userId,
+          dayNumber
+        }
+      })
+
+      // 🔥 LOG AQUI
+      await this.activityService.log(
         userId,
-        dayNumber
-      }
-    });
+        "CONSECRATION",
+        `Dia ${dayNumber}/33 concluído`
+      )
+
+      return result
 
   }
 
@@ -307,9 +350,11 @@ export class ConsecrationService {
       throw new NotFoundException("Consagração não iniciada")
     }
 
+    const utcStartDate = this.toLocalDate(startDate);
+
     await this.prisma.consecrationProgress.update({
       where:{id:progress.id},
-      data:{startDate}
+      data:{startDate: utcStartDate}
     })
 
     await this.prisma.consecrationCompletedDay.deleteMany({

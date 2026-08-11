@@ -1,9 +1,0 @@
--- CreateEnum
-CREATE TYPE "PaymentMethod" AS ENUM ('CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'BANK_TRANSFER', 'PIX', 'OTHER');
-
--- CreateEnum
-CREATE TYPE "Category" AS ENUM ('FOOD', 'TRANSPORT', 'ENTERTAINMENT', 'HEALTH', 'BILLS', 'EDUCATION', 'TRAVEL', 'RENT', 'SHOPPING', 'INVESTMENTS', 'SUBSCRIPTIONS', 'OTHER');
-
--- AlterTable
-ALTER TABLE "Expense" ADD COLUMN     "category" "Category" NOT NULL DEFAULT 'OTHER',
-ADD COLUMN     "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'OTHER';

@@ -12,6 +12,9 @@ import {
 
 import { PrayersService } from './prayers.service'
 import { JwtAuthGuard } from 'src/modules/auth/jwt-auth.guard'
+import { AdminGuard } from 'src/modules/auth/admin.guard'
+import { CreatePrayerCategoryDto } from './dto/create-prayer-category.dto'
+import { CreatePrayerDto } from './dto/create-prayer.dto'
 
 @Controller('oratio/prayers')
 export class PrayersController {
@@ -23,8 +26,8 @@ export class PrayersController {
  ========================= */
 
  @Post("category")
- @UseGuards(JwtAuthGuard)
- createCategory(@Body() body:any){
+ @UseGuards(JwtAuthGuard, AdminGuard)
+ createCategory(@Body() body:CreatePrayerCategoryDto){
   return this.service.createCategory(body)
  }
 
@@ -38,8 +41,8 @@ export class PrayersController {
  ========================= */
 
  @Post()
- @UseGuards(JwtAuthGuard)
- createPrayer(@Body() body:any){
+ @UseGuards(JwtAuthGuard, AdminGuard)
+ createPrayer(@Body() body:CreatePrayerDto){
   return this.service.createPrayer(body)
  }
 
@@ -53,6 +56,14 @@ export class PrayersController {
   return this.service.getPrayersByCategory(slug)
  }
 
+ // Precisa vir ANTES de ":id" — senão essa rota estática nunca é
+ // alcançada, "history" seria capturado como se fosse um :id.
+ @Get("history")
+ @UseGuards(JwtAuthGuard)
+ getHistory(@Req() req:any){
+  return this.service.getHistory(req.user.userId)
+ }
+
  @Get(":id")
  getPrayer(@Param("id") id:string){
   return this.service.getPrayer(id)
@@ -60,8 +71,8 @@ export class PrayersController {
 
  @Post("complete")
  @UseGuards(JwtAuthGuard)
- completePrayer(@Req() req:any){
-  return this.service.completePrayer(req.user.userId)
+ completePrayer(@Req() req:any, @Body() body:{ title?:string }){
+  return this.service.completePrayer(req.user.userId, body?.title)
  }
 
 }

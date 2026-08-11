@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Req, UseGuards, Param } from "@nestjs/common"
+import { Controller, Post, Get, Req, UseGuards, Param, Body, Query } from "@nestjs/common"
 import { RosaryService } from "./rosary.service"
 import { JwtAuthGuard } from "../auth/jwt-auth.guard"
 
@@ -11,32 +11,48 @@ export class RosaryController{
 
  @Get("session")
  @UseGuards(JwtAuthGuard)
- session(@Req() req:any){
-  return this.service.getSession(req.user.userId)
+ session(@Req() req:any, @Query("type") type:string){
+  return this.service.getSession(req.user.userId, type)
+ }
+
+ /* ACTIVE PROGRESS */
+
+ @Get("progress")
+ @UseGuards(JwtAuthGuard)
+ progress(@Req() req:any){
+  return this.service.getActiveProgress(req.user.userId)
+ }
+
+ /* HISTORY */
+
+ @Get("history")
+ @UseGuards(JwtAuthGuard)
+ history(@Req() req:any){
+  return this.service.getHistory(req.user.userId)
  }
 
  /* START */
 
  @Post("start")
  @UseGuards(JwtAuthGuard)
- start(@Req() req:any){
-  return this.service.start(req.user.userId)
+ start(@Req() req:any, @Body() body:{ type:string, restart?:boolean }){
+  return this.service.start(req.user.userId, body.type, body.restart)
  }
 
- /* NEXT */
+ /* STEP */
 
- @Post("next")
+ @Post("step")
  @UseGuards(JwtAuthGuard)
- next(@Req() req:any){
-  return this.service.nextStep(req.user.userId)
+ step(@Req() req:any, @Body() body:{ type:string, step:number, elapsedSeconds?:number }){
+  return this.service.updateStep(req.user.userId, body.type, body.step, body.elapsedSeconds)
  }
 
  /* FINISH */
 
  @Post("finish")
  @UseGuards(JwtAuthGuard)
- finish(@Req() req:any){
-  return this.service.finish(req.user.userId)
+ finish(@Req() req:any, @Body() body:{ type:string }){
+  return this.service.finish(req.user.userId, body.type)
  }
 
  @Get(":type")

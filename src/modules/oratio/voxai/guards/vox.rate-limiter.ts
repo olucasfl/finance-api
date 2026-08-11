@@ -23,10 +23,15 @@ export class VoxRateLimiter{
 
   if(filtered.length >= limit){
 
+   // a mais antiga das timestamps dentro da janela é a próxima a expirar
+   const oldest = filtered[0]
+   const retryAfterSeconds = Math.max(1, Math.ceil((oldest + window - now) / 1000))
+
    return {
     allowed:false,
+    retryAfterSeconds,
     message:
-     "Você atingiu o limite de perguntas por minuto. Aguarde alguns instantes."
+     `Você atingiu o limite de perguntas por minuto. Tente de novo em ${retryAfterSeconds} segundo${retryAfterSeconds === 1 ? "" : "s"}.`
    }
 
   }
