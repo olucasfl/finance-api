@@ -74,7 +74,16 @@ export class NotificationsSendService {
 
     let targetIds: string[];
     if (input.audience === 'SPECIFIC') {
-      targetIds = [...new Set(input.userIds ?? [])];
+      const ids = [...new Set(input.userIds ?? [])];
+      // Só quem existe de fato — um userId inválido derrubava o envio
+      // inteiro (FK no createMany). Filtra antes.
+      const existing = ids.length
+        ? await this.prisma.user.findMany({
+            where: { id: { in: ids } },
+            select: { id: true },
+          })
+        : [];
+      targetIds = existing.map((u) => u.id);
     } else {
       const users = await this.prisma.user.findMany({ select: { id: true } });
       targetIds = users.map((u) => u.id);
@@ -92,44 +101,89 @@ export class NotificationsSendService {
       },
     });
 
-    if (targetIds.length === 0) return campaign;
-
-    // Itens do sino em lote (todos os alvos recebem, dentro do app)
-    await this.prisma.notification.createMany({
-      data: targetIds.map((userId) => ({
-        userId,
+    // Entrega em segundo plano, em lotes — a request do admin volta na
+    // hora (não trava com base grande). Os contadores pushSent/pushFailed
+    // vão sendo atualizados na própria campanha conforme a entrega termina.
+    if (targetIds.length > 0) {
+      void this.deliverCampaign(campaign.id, targetIds, {
         title: input.title,
-        body: input.body ?? null,
-        url: input.url ?? null,
-        source: 'CAMPAIGN' as const,
-        campaignId: campaign.id,
+        body: input.body,
+        url: input.url,
         expiresAt,
-      })),
-    });
+      }).catch((e) =>
+        this.logger.error(`entrega da campanha ${campaign.id} falhou: ${e?.message}`),
+      );
+    }
 
-    // Push (fora do app) só pra quem tem inscrição
-    const subs = await this.prisma.pushSubscription.findMany({
-      where: { userId: { in: targetIds } },
-    });
+    return campaign;
+  }
 
-    const { sent, failed } = await this.push.sendToSubs(subs, {
-      title: input.title,
-      body: input.body,
-      url: input.url,
-    });
+  private readonly CHUNK = 500;
 
-    const pushedUserIds = [...new Set(subs.map((s) => s.userId))];
-    if (pushedUserIds.length > 0) {
+  private chunk<T>(arr: T[], size: number): T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  // Cria os itens do sino, dispara os pushes e atualiza os contadores —
+  // tudo em lotes de CHUNK, pra nunca fazer uma query/rajada gigante.
+  private async deliverCampaign(
+    campaignId: string,
+    targetIds: string[],
+    n: { title: string; body?: string; url?: string; expiresAt: Date },
+  ) {
+    // 1) itens do sino (todos os alvos, dentro do app)
+    for (const part of this.chunk(targetIds, this.CHUNK)) {
+      await this.prisma.notification.createMany({
+        data: part.map((userId) => ({
+          userId,
+          title: n.title,
+          body: n.body ?? null,
+          url: n.url ?? null,
+          source: 'CAMPAIGN' as const,
+          campaignId,
+          expiresAt: n.expiresAt,
+        })),
+      });
+    }
+
+    // 2) push (fora do app) só pra quem tem inscrição, agregando contadores
+    let sent = 0;
+    let failed = 0;
+    const pushedUserIds = new Set<string>();
+
+    for (const part of this.chunk(targetIds, this.CHUNK)) {
+      const subs = await this.prisma.pushSubscription.findMany({
+        where: { userId: { in: part } },
+      });
+      if (subs.length === 0) continue;
+
+      const r = await this.push.sendToSubs(subs, {
+        title: n.title,
+        body: n.body,
+        url: n.url,
+      });
+      sent += r.sent;
+      failed += r.failed;
+      subs.forEach((s) => pushedUserIds.add(s.userId));
+    }
+
+    // 3) marca pushSent nos itens de quem recebeu
+    for (const part of this.chunk([...pushedUserIds], this.CHUNK)) {
       await this.prisma.notification.updateMany({
-        where: { campaignId: campaign.id, userId: { in: pushedUserIds } },
+        where: { campaignId, userId: { in: part } },
         data: { pushSent: true },
       });
     }
 
-    return this.prisma.notificationCampaign.update({
-      where: { id: campaign.id },
-      data: { pushSent: sent, pushFailed: failed },
-    });
+    // 4) contadores finais na campanha
+    await this.prisma.notificationCampaign
+      .update({
+        where: { id: campaignId },
+        data: { pushSent: sent, pushFailed: failed },
+      })
+      .catch(() => {});
   }
 
   // Campanhas ativas (últimos 15 dias) — pro painel admin

@@ -2,6 +2,8 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } fro
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
 import { NotificationsSendService } from './notifications-send.service';
+import { CreateCampaignDto } from './dto/create-campaign.dto';
+import { CreateRuleDto, UpdateRuleDto } from './dto/rule.dto';
 
 @Controller('oratio/admin/notifications')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -10,17 +12,7 @@ export class AdminNotificationsController {
 
   // Compor e enviar: Todos ou pessoas específicas
   @Post()
-  create(
-    @Req() req: any,
-    @Body()
-    body: {
-      title: string;
-      body?: string;
-      url?: string;
-      audience: 'ALL' | 'SPECIFIC';
-      userIds?: string[];
-    },
-  ) {
+  create(@Req() req: any, @Body() body: CreateCampaignDto) {
     return this.send.createCampaign({
       title: body.title,
       body: body.body,
@@ -50,17 +42,12 @@ export class AdminNotificationsController {
   }
 
   @Patch('rules/:key')
-  updateRule(
-    @Param('key') key: string,
-    @Body() body: { enabled?: boolean; title?: string; body?: string | null; url?: string | null; hour?: number | null },
-  ) {
+  updateRule(@Param('key') key: string, @Body() body: UpdateRuleDto) {
     return this.send.updateRule(key, body);
   }
 
   @Post('rules')
-  createRule(
-    @Body() body: { title: string; body?: string; url?: string; hour?: number; condition?: string },
-  ) {
+  createRule(@Body() body: CreateRuleDto) {
     return this.send.createRule(body);
   }
 

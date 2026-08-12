@@ -54,10 +54,25 @@ type RuleRow = {
 export class NotificationsScheduler implements OnModuleInit {
   private readonly logger = new Logger(NotificationsScheduler.name);
 
+  private readonly QUIET_END = 7;     // não incomodar antes disso (hora local)
+  private readonly QUIET_START = 22;  // nem a partir disso
+  private readonly CATCHUP_HOURS = 2; // janela de recuperação se o tick da hora exata foi perdido
+
   constructor(
     private prisma: PrismaService,
     private send: NotificationsSendService,
   ) {}
+
+  /*
+  true se `hours` (hora local do usuário) está na janela de disparo da
+  regra: da hora marcada até +CATCHUP_HOURS — assim, se o tick exato foi
+  perdido (restart/deploy no minuto), o próximo dentro da janela ainda
+  dispara. Sempre fora do quiet hours. Pública para teste unitário.
+  */
+  shouldFireAtHour(hours: number, ruleHour: number): boolean {
+    if (hours < this.QUIET_END || hours >= this.QUIET_START) return false;
+    return hours >= ruleHour && hours < ruleHour + this.CATCHUP_HOURS;
+  }
 
   async onModuleInit() {
     const count = await this.prisma.notificationRule.count().catch(() => 1);
@@ -96,7 +111,8 @@ export class NotificationsScheduler implements OnModuleInit {
   }
 
   // Roda a cada 10 min. As automáticas só vão pra quem ATIVOU push,
-  // respeitando fuso de cada aparelho, quiet hours (22h–7h) e dedupe diário.
+  // respeitando o fuso de cada aparelho, quiet hours, janela de catch-up
+  // e dedupe (~20h).
   @Cron('*/10 * * * *')
   async tick() {
     const rules = (await this.prisma.notificationRule.findMany({
@@ -104,31 +120,41 @@ export class NotificationsScheduler implements OnModuleInit {
     })) as RuleRow[];
     if (rules.length === 0) return;
 
+    // Um usuário pode ter vários aparelhos, possivelmente em fusos
+    // diferentes — agrupa os fusos por usuário e dispara se a janela bater
+    // em QUALQUER um deles (o dedupe evita mandar duas vezes).
     const subs = await this.prisma.pushSubscription.findMany({
       select: { userId: true, timezone: true },
-      distinct: ['userId'],
     });
+    const tzByUser = new Map<string, Set<string>>();
+    for (const s of subs) {
+      const set = tzByUser.get(s.userId) ?? new Set<string>();
+      set.add(s.timezone || 'UTC');
+      tzByUser.set(s.userId, set);
+    }
 
-    for (const sub of subs) {
+    for (const [userId, tzs] of tzByUser) {
       try {
-        const tz = sub.timezone || 'UTC';
-        const { hours } = this.nowInZone(tz);
-        if (hours < 7 || hours >= 22) continue; // quiet hours
-
         for (const rule of rules) {
-          if (rule.hour == null || rule.hour !== hours) continue; // só na hora marcada
+          if (rule.hour == null) continue;
+
+          // fuso do usuário em que a regra está na janela agora (se houver)
+          const tzHit = [...tzs].find((tz) =>
+            this.shouldFireAtHour(this.nowInZone(tz).hours, rule.hour!),
+          );
+          if (!tzHit) continue;
 
           if (rule.condition === 'ROSARY_UNFINISHED') {
-            if (await this.rosaryUnfinished(sub.userId)) await this.fire(sub.userId, rule);
+            if (await this.rosaryUnfinished(userId)) await this.fire(userId, rule);
           } else if (rule.condition === 'STREAK_AT_RISK') {
-            const streak = await this.streakAtRisk(sub.userId, tz);
-            if (streak >= 2) await this.fire(sub.userId, rule, streak);
+            const streak = await this.streakAtRisk(userId, tzHit);
+            if (streak >= 2) await this.fire(userId, rule, streak);
           } else {
-            await this.fire(sub.userId, rule); // diária no horário
+            await this.fire(userId, rule); // diária no horário
           }
         }
       } catch (e: any) {
-        this.logger.error(`regra falhou p/ ${sub.userId}: ${e?.message}`);
+        this.logger.error(`regra falhou p/ ${userId}: ${e?.message}`);
       }
     }
   }
