@@ -56,6 +56,12 @@ export class AdminNotificationsController {
     return this.send.deleteRule(key);
   }
 
+  // Apagar TODOS os envios de uma vez (declarado antes de :id de propósito)
+  @Delete('all')
+  deleteAll() {
+    return this.send.deleteAllCampaigns();
+  }
+
   // Apagar um envio (some do sino de quem recebeu)
   @Delete(':id')
   deleteCampaign(@Param('id') id: string) {

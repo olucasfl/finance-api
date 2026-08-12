@@ -186,12 +186,20 @@ export class NotificationsSendService {
       .catch(() => {});
   }
 
-  // Campanhas ativas (últimos 15 dias) — pro painel admin
+  // Todos os envios criados (mais recentes primeiro) — pro painel admin.
+  // Sem filtro de expiração: o admin vê tudo o que ainda existe na tabela.
   async listCampaigns() {
     return this.prisma.notificationCampaign.findMany({
-      where: { expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  // Apaga TODOS os envios do admin de uma vez — cada um some também do
+  // sino de quem recebeu (itens de campanha). Não mexe nas automáticas.
+  async deleteAllCampaigns() {
+    await this.prisma.notification.deleteMany({ where: { source: 'CAMPAIGN' } });
+    await this.prisma.notificationCampaign.deleteMany({});
+    return { ok: true };
   }
 
   async subscribersCount() {
