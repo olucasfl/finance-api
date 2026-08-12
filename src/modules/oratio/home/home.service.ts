@@ -136,7 +136,9 @@ export class HomeService {
         subtitle: lastReading.label,
         why: 'Onde parou',
         icon: 'catechism',
-        path: '/oratio/catecismo'
+        // Leva a página na URL pra abrir de onde parou até em outro
+        // aparelho (a tela do Catecismo respeita ?page=).
+        path: `/oratio/catecismo?page=${lastReading.reference}`
       });
     }
 
