@@ -34,6 +34,8 @@ model User {
   readingProgress           ReadingProgress[]
   pushSubscriptions         PushSubscription[]
   notifications             Notification[]
+  quaresmaDays              QuaresmaMichaelDay[]
+  quaresmaPenances          QuaresmaMichaelPenance[]
 }
 
 model PushSubscription {
@@ -279,4 +281,36 @@ model NotificationRule {
   hour      Int?     // hora local (0-23) das regras por horário
   condition String?  // "ROSARY_UNFINISHED" | "STREAK_AT_RISK" | null (=diária no horário)
   updatedAt DateTime @updatedAt
+}
+
+// Quaresma de São Miguel — devoção sazonal de 40 dias de oração que vai
+// de 15/08 até a Festa de São Miguel (29/09), pulando os domingos (dia de
+// descanso/Missa). Uma linha por dia concluído.
+//
+// O `year` existe porque a devoção volta sozinha todo ano: sem ele, o
+// progresso da edição de 2026 já deixaria a de 2027 "concluída" no dia 1.
+model QuaresmaMichaelDay {
+  id        String   @id @default(uuid())
+  userId    String
+  year      Int
+  dayNumber Int
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year, dayNumber])
+  @@index([userId, year])
+}
+
+// Texto livre onde a pessoa registra as penitências que ofereceu na
+// edição do ano. Uma linha por (usuário, ano) — o unique cuida do upsert.
+model QuaresmaMichaelPenance {
+  id        String   @id @default(uuid())
+  userId    String
+  year      Int
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year])
 }

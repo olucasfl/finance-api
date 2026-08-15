@@ -16,6 +16,7 @@ import { ActivityModule } from './modules/oratio/activity/activity.module';
 import { ReadingProgressModule } from './modules/oratio/reading-progress/reading-progress.module';
 import { HomeModule } from './modules/oratio/home/home.module';
 import { NotificationsModule } from './modules/oratio/notifications/notifications.module';
+import { QuaresmaModule } from './modules/oratio/quaresma/quaresma.module';
 import { SystemLogModule } from './system-log/system-log.module';
 
 @Module({
@@ -35,6 +36,7 @@ import { SystemLogModule } from './system-log/system-log.module';
     ReadingProgressModule,
     HomeModule,
     NotificationsModule,
+    QuaresmaModule,
     SystemLogModule,
   ],
   controllers: [AppController],
