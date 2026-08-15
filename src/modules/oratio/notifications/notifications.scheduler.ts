@@ -21,7 +21,7 @@ const DEFAULT_RULES = [
     key: 'STREAK_AT_RISK',
     title: 'Não perca sua sequência 🔥',
     body: 'Você está com {count} dias seguidos de oração. Reze hoje para manter!',
-    url: '/oratio/home',
+    url: null as string | null, // basta abrir o app — sem redirecionamento
     hour: 20,
     condition: 'STREAK_AT_RISK' as string | null,
   },
@@ -53,7 +53,7 @@ const DEFAULT_RULES = [
     key: 'COMEBACK',
     title: 'Sentimos sua falta 🙏',
     body: 'Que tal um momento de oração hoje? Estamos aqui por você.',
-    url: '/oratio/home',
+    url: null as string | null, // basta abrir o app — sem redirecionamento
     hour: 10,
     condition: 'COMEBACK' as string | null,
   },
@@ -77,7 +77,7 @@ const DEFAULT_RULES = [
     key: 'EXAMEN_NIGHT',
     title: 'Antes de dormir 🌙',
     body: 'Examine o seu dia com Deus — o que agradecer e o que confiar a Ele.',
-    url: '/oratio/home',
+    url: '/oratio/confissao',
     hour: 21,
     condition: null as string | null,
   },
@@ -139,6 +139,16 @@ export class NotificationsScheduler implements OnModuleInit {
         .catch(() => null);
       if (!exists) {
         await this.prisma.notificationRule.create({ data: r }).catch(() => {});
+        continue;
+      }
+      // Correção de destino: regras antigas caíam no próprio Home (não
+      // levavam a lugar nenhum, já que o sino fica na Home). Aponta pro
+      // destino útil do catálogo. Só toca no valor errado — não sobrescreve
+      // um link que o admin tenha definido de propósito.
+      if (exists.url === '/oratio/home' && r.url !== '/oratio/home') {
+        await this.prisma.notificationRule
+          .update({ where: { key: r.key }, data: { url: r.url } })
+          .catch(() => {});
       }
     }
 
@@ -252,6 +262,14 @@ export class NotificationsScheduler implements OnModuleInit {
         const nudgesToday = sentToday.filter(
           (n) => !n.ruleKey || !this.isUrgent(n.ruleKey),
         ).length;
+
+        // Gap de descanso: não notificar todo dia. As SUPLEMENTARES só
+        // disparam se não houve NENHUMA notificação hoje nem ontem — assim
+        // ficam ~3–4 dias/semana, com dias vazios entre eles. As URGENTES
+        // ignoram esse gap (passam na frente mesmo em dia de folga).
+        const yesterdayStr = this.dateInZone(new Date(now - DAY), tz);
+        const lastDay = hist[0] ? this.dateInZone(hist[0].createdAt, tz) : null;
+        const inRestGap = lastDay === todayStr || lastDay === yesterdayStr;
 
         // última vez de cada regra (cooldown + justiça)
         const lastByRule = new Map<string, number>();
