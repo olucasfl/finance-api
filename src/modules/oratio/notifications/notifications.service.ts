@@ -1,9 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { RETENTION_DAYS } from './notifications-send.service';
 
 @Injectable()
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
+
+  // Corte de visibilidade da caixa de entrada. Além do `expiresAt` gravado
+  // na linha (que segue a janela vigente no momento do envio), aplicamos
+  // este corte por `createdAt` na leitura — assim, se a janela de retenção
+  // mudar, notificações antigas já gravadas com uma janela maior somem
+  // imediatamente, sem precisar de uma migração de dados.
+  private inboxCutoff(): Date {
+    return new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  }
 
   async subscribe(
     userId: string,
@@ -59,7 +69,7 @@ export class NotificationsService {
     const take = Math.min(Math.max(limit, 1), 30);
 
     const rows = await this.prisma.notification.findMany({
-      where: { userId, expiresAt: { gt: new Date() } },
+      where: { userId, expiresAt: { gt: new Date() }, createdAt: { gte: this.inboxCutoff() } },
       orderBy: { createdAt: 'desc' },
       take: take + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -85,7 +95,7 @@ export class NotificationsService {
   // Badge do sino: quantas não-vistas e ainda válidas.
   async unseenCount(userId: string) {
     const count = await this.prisma.notification.count({
-      where: { userId, seenAt: null, expiresAt: { gt: new Date() } },
+      where: { userId, seenAt: null, expiresAt: { gt: new Date() }, createdAt: { gte: this.inboxCutoff() } },
     });
     return { count };
   }

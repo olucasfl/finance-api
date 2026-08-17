@@ -3,7 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PushService } from './push.service';
 
-const RETENTION_DAYS = 15;
+export const RETENTION_DAYS = 7;
 
 type DeliverInput = {
   title: string;

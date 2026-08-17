@@ -245,7 +245,7 @@ model NotificationCampaign {
 
 // Um item na "caixa de entrada" (sino) de cada usuário. Toda notificação
 // vira uma linha por pessoa; quem ativou push também recebe fora do app.
-// `seenAt` controla o badge do sino; `expiresAt` (criadaEm + 15 dias)
+// `seenAt` controla o badge do sino; `expiresAt` (criadaEm + 7 dias)
 // tira do sino e do painel; um cron apaga as vencidas.
 model Notification {
   id         String                @id @default(uuid())
