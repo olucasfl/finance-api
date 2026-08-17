@@ -17,6 +17,7 @@ import { CreateConsecrationStageDto } from './dto/create-consecration-stage.dto'
 import { CreateConsecrationDayDto } from './dto/create-consecration-day.dto';
 import { CreateConsecrationPrayerDto } from './dto/create-consecration-prayer.dto';
 import { AddDayPrayerDto } from './dto/add-day-prayer.dto';
+import { StartConsecrationDto } from './dto/start-consecration.dto';
 
 @Controller('oratio/consecration')
 export class ConsecrationController {
@@ -31,7 +32,7 @@ export class ConsecrationController {
   @UseGuards(JwtAuthGuard)
   start(
     @Req() req: any,
-    @Body() body: { consecrationDate: string }
+    @Body() body: StartConsecrationDto
   ) {
 
     const [y,m,d] = body.consecrationDate.split("-").map(Number)
@@ -163,6 +164,18 @@ export class ConsecrationController {
   }
 
   /* ============================= */
+  /* FINISH (concluir os 33 dias) */
+  /* ============================= */
+
+  @Post('finish')
+  @UseGuards(JwtAuthGuard)
+  finish(@Req() req: any) {
+
+    return this.service.finish(req.user.userId)
+
+  }
+
+  /* ============================= */
   /* COMPLETE DAY */
   /* ============================= */
 
@@ -188,7 +201,7 @@ export class ConsecrationController {
   @UseGuards(JwtAuthGuard)
   updateStartDate(
     @Req() req:any,
-    @Body() body:{consecrationDate:string}
+    @Body() body: StartConsecrationDto
   ){
 
     const [y,m,d] = body.consecrationDate.split("-").map(Number)

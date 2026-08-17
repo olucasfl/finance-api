@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ActivityService } from '../activity/activity.service'
 import { toZonedTime } from 'date-fns-tz'
@@ -7,6 +7,8 @@ import { CreateConsecrationStageDto } from './dto/create-consecration-stage.dto'
 import { CreateConsecrationDayDto } from './dto/create-consecration-day.dto';
 import { CreateConsecrationPrayerDto } from './dto/create-consecration-prayer.dto';
 import { AddDayPrayerDto } from './dto/add-day-prayer.dto';
+
+const TOTAL_DAYS = 33;
 
 @Injectable()
 export class ConsecrationService {
@@ -53,14 +55,44 @@ export class ConsecrationService {
     return `${y}-${m}-${d}`
   }
 
+  // Quantos dias já passaram desde o início (1 = primeiro dia). 0 ou
+  // negativo significa que a preparação ainda não começou.
+  private diffFromStart(startDate: Date) {
+    const today = this.getTodayBrazil();
+    const start = this.toLocalDate(new Date(startDate));
+    const utcToday = this.toLocalDate(today);
+
+    return this.diffDays(start, utcToday) + 1;
+  }
+
+  private async completedDayNumbers(userId: string) {
+    const rows = await this.prisma.consecrationCompletedDay.findMany({
+      where: { userId },
+      orderBy: { dayNumber: 'asc' },
+      select: { dayNumber: true },
+    });
+
+    return rows.map((r) => r.dayNumber);
+  }
+
   async start(userId: string, startDate: Date) {
 
-    const existing = await this.prisma.consecrationProgress.findFirst({
+    const existing = await this.prisma.consecrationProgress.findUnique({
       where: { userId }
     });
 
-    if (existing) {
+    // Já tem uma consagração ativa: idempotente, devolve a mesma (não
+    // reinicia por engano num duplo toque/reenvio).
+    if (existing && !existing.completedAt) {
       return existing;
+    }
+
+    // Já concluiu uma vez e está começando outra: a antiga vira histórico
+    // (já foi registrada no log de atividade ao concluir) — apaga o
+    // registro e os dias marcados antes de abrir um ciclo novo.
+    if (existing && existing.completedAt) {
+      await this.prisma.consecrationCompletedDay.deleteMany({ where: { userId } });
+      await this.prisma.consecrationProgress.delete({ where: { userId } });
     }
 
     const utcStartDate = this.toLocalDate(startDate);
@@ -83,7 +115,7 @@ export class ConsecrationService {
 
   async progress(userId: string) {
 
-    const progress = await this.prisma.consecrationProgress.findFirst({
+    const progress = await this.prisma.consecrationProgress.findUnique({
       where: { userId }
     });
 
@@ -98,29 +130,21 @@ export class ConsecrationService {
       };
     }
 
-    const today = this.getTodayBrazil();
-    const startRaw = new Date(progress.startDate);
-    const start = this.toLocalDate(startRaw);
-    const utcToday = this.toLocalDate(today);
+    const diff = this.diffFromStart(progress.startDate);
 
-    const diff = this.diffDays(start, utcToday) + 1;
-
-    const currentDay = Math.min(diff, 33);
+    // 0 = a preparação ainda não começou (a pessoa escolheu uma data de
+    // consagração a mais de 1 dia no futuro); nunca fica negativo.
+    const currentDay = Math.max(0, Math.min(diff, TOTAL_DAYS));
 
     const startedToday = diff === 1;
 
     const daysUntilStart =
       diff < 1 ? Math.abs(diff) + 1 : 0;
 
-    const completedDays = await this.prisma.consecrationCompletedDay.count({
-      where: { userId }
-    });
+    const completedDays = await this.completedDayNumbers(userId);
 
-    const progressPercent =
-      Math.floor((completedDays / 33) * 100);
-
-      const consecrationDate = new Date(start)
-      consecrationDate.setDate(consecrationDate.getDate() + 33)
+      const consecrationDate = new Date(this.toLocalDate(progress.startDate))
+      consecrationDate.setDate(consecrationDate.getDate() + TOTAL_DAYS)
 
       const startZoned = toZonedTime(progress.startDate, "America/Sao_Paulo")
       const consecrationZoned = toZonedTime(consecrationDate, "America/Sao_Paulo")
@@ -133,7 +157,11 @@ export class ConsecrationService {
       startedToday,
       daysUntilStart,
       completedDays,
-      progress: progressPercent,
+      progress: Math.floor((completedDays.length / TOTAL_DAYS) * 100),
+      finished: !!progress.completedAt,
+      completedAt: progress.completedAt
+        ? format(toZonedTime(progress.completedAt, "America/Sao_Paulo"), "yyyy-MM-dd")
+        : null,
       stages
     }
 
@@ -243,7 +271,7 @@ export class ConsecrationService {
 
   async today(userId: string) {
 
-    const progress = await this.prisma.consecrationProgress.findFirst({
+    const progress = await this.prisma.consecrationProgress.findUnique({
       where: { userId }
     });
 
@@ -251,14 +279,9 @@ export class ConsecrationService {
       return null;
     }
 
-    const today = this.getTodayBrazil();
-    const startRaw = new Date(progress.startDate);
-    const start = this.toLocalDate(startRaw);
-    const utcToday = this.toLocalDate(today);
+    const diff = this.diffFromStart(progress.startDate);
 
-    const diff = this.diffDays(start, utcToday) + 1;
-
-    if (diff < 1 || diff > 33) {
+    if (diff < 1 || diff > TOTAL_DAYS) {
       return null;
     }
 
@@ -279,47 +302,82 @@ export class ConsecrationService {
 
   }
 
-  async completeDay(userId: string, dayNumber: number) {
+  // Fecha o ciclo: só pode acontecer com os 33 dias concluídos. Ao
+  // contrário do reset, mantém a linha (e os dias) — é isso que diferencia
+  // "terminou" de "desistiu" para a tela de finalização e as estatísticas
+  // do admin.
+  async finish(userId: string) {
 
-    const progress = await this.prisma.consecrationProgress.findFirst({
+    const progress = await this.prisma.consecrationProgress.findUnique({
       where: { userId }
     });
 
     if (!progress) {
-      throw new Error("Consagração não iniciada");
+      throw new NotFoundException("Consagração não iniciada");
     }
 
-    const today = this.getTodayBrazil();
-    const startRaw = new Date(progress.startDate);
-    const start = this.toLocalDate(startRaw);
-    const utcToday = this.toLocalDate(today);
+    if (progress.completedAt) {
+      return progress;
+    }
 
-    const diff = this.diffDays(start, utcToday) + 1;
+    const completedCount = await this.prisma.consecrationCompletedDay.count({
+      where: { userId }
+    });
+
+    if (completedCount < TOTAL_DAYS) {
+      throw new BadRequestException(
+        `Complete os ${TOTAL_DAYS} dias antes de concluir a consagração.`
+      );
+    }
+
+    const updated = await this.prisma.consecrationProgress.update({
+      where: { userId },
+      data: { completedAt: new Date() }
+    });
+
+    await this.activityService.log(
+      userId,
+      "CONSECRATION",
+      `Concluiu a consagração de ${TOTAL_DAYS} dias a Nossa Senhora`
+    ).catch(() => {});
+
+    return updated;
+
+  }
+
+  async completeDay(userId: string, dayNumber: number) {
+
+    const progress = await this.prisma.consecrationProgress.findUnique({
+      where: { userId }
+    });
+
+    if (!progress) {
+      throw new BadRequestException("Consagração não iniciada");
+    }
+
+    if (progress.completedAt) {
+      throw new BadRequestException("Esta consagração já foi concluída");
+    }
+
+    const diff = this.diffFromStart(progress.startDate);
 
     if (dayNumber > diff) {
-      throw new Error("Dia ainda não liberado");
+      throw new BadRequestException("Este dia ainda não foi liberado");
     }
 
-    const existing = await this.prisma.consecrationCompletedDay.findFirst({
-      where:{
-        userId,
-        dayNumber
-      }
-    });
+    const completedDays = await this.completedDayNumbers(userId);
 
-    if(existing){
-      return existing;
+    // Já concluído: idempotente, um duplo toque não vira erro.
+    if (completedDays.includes(dayNumber)) {
+      return this.prisma.consecrationCompletedDay.findUnique({
+        where: { userId_dayNumber: { userId, dayNumber } }
+      });
     }
 
-    const previous = await this.prisma.consecrationCompletedDay.findFirst({
-      where: {
-        userId,
-        dayNumber: dayNumber - 1
-      }
-    });
+    const nextExpected = completedDays.length + 1;
 
-    if (dayNumber !== 1 && !previous) {
-      throw new Error("Complete o dia anterior primeiro");
+    if (dayNumber !== nextExpected) {
+      throw new BadRequestException("Complete o dia anterior primeiro");
     }
 
     const result = await this.prisma.consecrationCompletedDay.create({
@@ -329,12 +387,11 @@ export class ConsecrationService {
         }
       })
 
-      // 🔥 LOG AQUI
       await this.activityService.log(
         userId,
         "CONSECRATION",
-        `Dia ${dayNumber}/33 concluído`
-      )
+        `Dia ${dayNumber}/${TOTAL_DAYS} concluído`
+      ).catch(() => {})
 
       return result
 
@@ -342,12 +399,16 @@ export class ConsecrationService {
 
   async updateStartDate(userId: string, startDate: Date) {
 
-    const progress = await this.prisma.consecrationProgress.findFirst({
+    const progress = await this.prisma.consecrationProgress.findUnique({
       where:{userId}
     })
 
     if(!progress){
       throw new NotFoundException("Consagração não iniciada")
+    }
+
+    if (progress.completedAt) {
+      throw new BadRequestException("Não é possível alterar a data de uma consagração já concluída")
     }
 
     const utcStartDate = this.toLocalDate(startDate);
@@ -376,13 +437,28 @@ export class ConsecrationService {
 
   }
 
+  // Só desfaz o ÚLTIMO dia concluído — não deixa abrir buracos no meio
+  // (ex.: desmarcar o dia 2 com os dias 1-5 já concluídos), que travava
+  // permanentemente o avanço porque "próximo dia liberado" é sempre
+  // calculado como completedDays.length + 1.
   async uncompleteDay(userId: string, dayNumber: number){
 
-    const day = await this.prisma.consecrationCompletedDay.findFirst({
-      where:{
-        userId,
-        dayNumber
-      }
+    const progress = await this.prisma.consecrationProgress.findUnique({
+      where: { userId }
+    });
+
+    if (progress?.completedAt) {
+      throw new BadRequestException("Não é possível alterar dias de uma consagração já concluída")
+    }
+
+    const completedDays = await this.completedDayNumbers(userId);
+
+    if (completedDays.length === 0 || dayNumber !== completedDays[completedDays.length - 1]) {
+      throw new BadRequestException("Só é possível desmarcar o último dia concluído")
+    }
+
+    const day = await this.prisma.consecrationCompletedDay.findUnique({
+      where:{ userId_dayNumber: { userId, dayNumber } }
     })
 
     if(!day){

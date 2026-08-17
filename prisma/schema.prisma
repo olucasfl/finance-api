@@ -79,12 +79,21 @@ model UserActivity {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+// Uma linha por usuário representando a consagração ATUAL (ou mais
+// recente). `completedAt` distingue quem terminou os 33 dias de quem
+// cancelou no meio — cancelar apaga a linha, terminar preenche este
+// campo e mantém tudo (a tela de finalização e as estatísticas do admin
+// dependem dessa diferença). Começar de novo depois de terminar apaga a
+// linha antiga (e seus dias) antes de criar a nova.
 model ConsecrationProgress {
-  id        String   @id @default(uuid())
-  startDate DateTime
-  userId    String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  startDate   DateTime
+  userId      String
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId])
 }
 
 model ConsecrationStage {
@@ -127,6 +136,8 @@ model ConsecrationCompletedDay {
   userId    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dayNumber])
 }
 
 model PrayerCategory {

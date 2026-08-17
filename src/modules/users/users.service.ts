@@ -555,6 +555,7 @@ export class UsersService {
       totalUsers,
       totalVerified,
       consecrationStarted,
+      consecrationCompleted,
       totalPrayers,
       newUsersWeek,
       prayersWeek,
@@ -565,6 +566,9 @@ export class UsersService {
       this.prisma.user.count(),
       this.prisma.user.count({ where: { emailVerified: true } }),
       this.prisma.consecrationProgress.count(),
+      // Terminar mantém a linha (só cancelar apaga) — dá pra contar
+      // quantas consagrações realmente chegaram ao dia 33.
+      this.prisma.consecrationProgress.count({ where: { completedAt: { not: null } } }),
       this.prisma.spiritualStats.aggregate({
         _sum: { prayersPrayed: true, rosariesPrayed: true },
       }),
@@ -595,6 +599,7 @@ export class UsersService {
       totalUsers,
       totalVerified,
       consecrationStarted,
+      consecrationCompleted,
       prayersPrayed: totalPrayers._sum.prayersPrayed || 0,
       rosariesPrayed: totalPrayers._sum.rosariesPrayed || 0,
       thisWeek: {
