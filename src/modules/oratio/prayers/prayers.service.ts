@@ -79,7 +79,7 @@ export class PrayersService {
 
  }
 
-   async completePrayer(userId: string, title?: string){
+   async completePrayer(userId: string){
 
    const now = new Date()
 
@@ -96,10 +96,13 @@ export class PrayersService {
       }
    })
 
+   // Sem o título da oração de propósito — qual oração específica a
+   // pessoa reza é dado sensível (pode ser um Ato de Contrição, uma
+   // oração de cura, etc.) e não deve aparecer nem pro admin.
    await this.activityService.log(
       userId,
       "PRAYER",
-      title ? `Rezou: ${title}` : "Oração rezada"
+      "Oração rezada"
    )
 
    return { success:true }

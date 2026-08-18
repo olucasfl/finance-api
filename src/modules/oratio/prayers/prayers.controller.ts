@@ -71,8 +71,8 @@ export class PrayersController {
 
  @Post("complete")
  @UseGuards(JwtAuthGuard)
- completePrayer(@Req() req:any, @Body() body:{ title?:string }){
-  return this.service.completePrayer(req.user.userId, body?.title)
+ completePrayer(@Req() req:any){
+  return this.service.completePrayer(req.user.userId)
  }
 
 }
