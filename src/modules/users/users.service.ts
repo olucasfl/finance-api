@@ -10,7 +10,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash, timingSafeEqual } from 'crypto';
 import { MailService } from '../mail/mail.service';
 import { AppType } from 'src/enums/app-type.enum';
 
@@ -346,7 +346,27 @@ export class UsersService {
   =============================
   */
 
-  async deleteAccount(userId: string) {
+  /*
+  Exige a senha atual antes de apagar — sem isso, só a posse do access
+  token (roubável via XSS, dispositivo destravado, etc.) já bastava pra
+  destruir a conta inteira e todo o histórico, sem chance de confirmação
+  nem de estorno.
+  */
+  async deleteAccount(userId: string, password: string) {
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException();
+    }
+
+    const matches = await bcrypt.compare(password, user.password);
+
+    if (!matches) {
+      throw new UnauthorizedException('Senha incorreta');
+    }
 
     await this.prisma.user.delete({
       where: { id: userId },
@@ -612,6 +632,23 @@ export class UsersService {
     };
   }
 
+  /*
+  Compara em tempo constante via hash de tamanho fixo (SHA-256) em vez de
+  comparar as strings direto: `!==` sai assim que acha o primeiro byte
+  diferente, então o tempo de resposta varia com quantos caracteres do
+  começo acertaram — um canal lateral de timing pra adivinhar o segredo
+  aos poucos. Hashear primeiro também evita que `timingSafeEqual` lance
+  erro quando os dois lados têm tamanhos diferentes.
+  */
+  private matchesAdminPassword(candidate: string): boolean {
+    const expected = process.env.ADMIN_PASSWORD ?? '';
+
+    const candidateHash = createHash('sha256').update(candidate ?? '').digest();
+    const expectedHash = createHash('sha256').update(expected).digest();
+
+    return timingSafeEqual(candidateHash, expectedHash);
+  }
+
   async setAdminStatus(
     userId: string,
     targetUserId: string,
@@ -620,7 +657,7 @@ export class UsersService {
   ) {
     await this.assertAdmin(userId);
 
-    if (adminPassword !== process.env.ADMIN_PASSWORD) {
+    if (!this.matchesAdminPassword(adminPassword)) {
       throw new ForbiddenException("Senha de admin inválida");
     }
 

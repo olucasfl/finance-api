@@ -17,6 +17,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ChangeEmailDto } from './dto/change-email.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from 'src/modules/auth/admin.guard';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
@@ -160,8 +161,13 @@ export class UsersController {
     );
   }
 
+  /*
+  Rate limit: sem isso, um admin comprometido podia tentar ADMIN_PASSWORD
+  sem limite nenhum de tentativas.
+  */
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Patch('admin/users/:id')
-  @UseGuards(JwtAuthGuard, AdminGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard, ThrottlerGuard)
   setAdminStatus(
     @Req() req: any,
     @Param('id') id: string,
@@ -325,9 +331,10 @@ export class UsersController {
   =============================
   */
 
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
   @Delete('me')
-  @UseGuards(JwtAuthGuard)
-  deleteAccount(@Req() req: any) {
+  deleteAccount(@Req() req: any, @Body() body: DeleteAccountDto) {
 
     const userId = req?.user?.userId;
 
@@ -335,7 +342,7 @@ export class UsersController {
       throw new UnauthorizedException('Invalid token payload');
     }
 
-    return this.userService.deleteAccount(userId);
+    return this.userService.deleteAccount(userId, body.password);
   }
 
 }
