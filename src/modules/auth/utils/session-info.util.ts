@@ -30,14 +30,14 @@ export function parseDeviceLabel(userAgent?: string | null): string {
   return `${browser} · ${os}`;
 }
 
+/*
+Usa req.ip (Express) em vez de ler X-Forwarded-For na mão: com
+`trust proxy` configurado em main.ts, o Express já sabe quantos hops de
+proxy confiar e pega a entrada certa da cadeia — ler o header direto
+confiava cegamente no primeiro valor, que é justamente a parte que um
+cliente malicioso pode forjar.
+*/
 export function getClientIp(req: any): string | undefined {
-
-  const forwarded = req?.headers?.['x-forwarded-for'];
-
-  if (typeof forwarded === 'string' && forwarded.length > 0) {
-    return forwarded.split(',')[0].trim();
-  }
-
   return req?.ip || req?.socket?.remoteAddress || undefined;
 }
 
