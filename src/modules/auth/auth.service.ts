@@ -437,6 +437,17 @@ async resetPassword(token: string, password: string) {
     }
   });
 
+  /*
+  Reset de senha é o fluxo usado justamente quando a conta pode estar
+  comprometida — sem derrubar as sessões existentes, um refresh_token já
+  vazado continuaria válido por até 180 dias mesmo depois da troca de
+  senha, esvaziando o propósito de segurança do reset. Mesma lógica já
+  aplicada em UsersService.changePassword.
+  */
+  await this.prisma.refreshSession.deleteMany({
+    where: { userId: user.id },
+  });
+
 }
 
 }
