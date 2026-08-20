@@ -641,7 +641,11 @@ export class UsersService {
   erro quando os dois lados têm tamanhos diferentes.
   */
   private matchesAdminPassword(candidate: string): boolean {
-    const expected = process.env.ADMIN_PASSWORD ?? '';
+    const expected = process.env.ADMIN_PASSWORD;
+
+    // ADMIN_PASSWORD não configurado nunca deve "combinar" com nada,
+    // nem com uma string vazia enviada por quem for chamar a rota.
+    if (!expected) return false;
 
     const candidateHash = createHash('sha256').update(candidate ?? '').digest();
     const expectedHash = createHash('sha256').update(expected).digest();

@@ -67,6 +67,14 @@ describe('UsersService', () => {
         service.setAdminStatus('admin-1', 'target-1', true, ''),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('rejects even an empty candidate when ADMIN_PASSWORD itself is unset', async () => {
+      delete process.env.ADMIN_PASSWORD;
+
+      await expect(
+        service.setAdminStatus('admin-1', 'target-1', true, ''),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
   });
 
   describe('deleteAccount', () => {
