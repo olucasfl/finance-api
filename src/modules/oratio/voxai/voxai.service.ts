@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common"
+import { Injectable, Logger, NotFoundException } from "@nestjs/common"
 import axios from "axios"
 import https from "https"
 import type { Request, Response } from "express"
@@ -826,7 +826,7 @@ ${liturgySection}`
   })
 
   if(!conversation || conversation.userId !== userId){
-   throw new Error("CONVERSATION_NOT_FOUND")
+   throw new NotFoundException("CONVERSATION_NOT_FOUND")
   }
 
   await this.prisma.message.deleteMany({
@@ -854,7 +854,7 @@ ${liturgySection}`
   })
 
   if(!conversation || conversation.userId !== userId){
-   throw new Error("CONVERSATION_NOT_FOUND")
+   throw new NotFoundException("CONVERSATION_NOT_FOUND")
   }
 
   return this.prisma.conversation.update({
