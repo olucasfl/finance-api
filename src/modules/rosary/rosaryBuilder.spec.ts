@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { buildRosary } from './rosaryBuilder';
 
 describe('buildRosary', () => {
@@ -28,9 +29,7 @@ describe('buildRosary', () => {
     expect(mysterySteps[4].title).toContain('5º Mistério');
   });
 
-  it('throws for a mystery set that does not exist (no defensive check in the current implementation)', () => {
-    // Documents current behavior: ROSARY_MYSTERIES["invalid"] is undefined,
-    // and .forEach on undefined throws. Not fixing this — tests only.
-    expect(() => buildRosary('invalid-type')).toThrow();
+  it('throws a clear NotFoundException for a mystery set that does not exist, instead of crashing on undefined', () => {
+    expect(() => buildRosary('invalid-type')).toThrow(NotFoundException);
   });
 });

@@ -1,8 +1,17 @@
+import { NotFoundException } from "@nestjs/common"
 import { ROSARY_MYSTERIES } from "./rosaryMysteries"
 
 export function buildRosary(type:string){
 
- const mysteries = ROSARY_MYSTERIES[type]
+ const mysteries = (ROSARY_MYSTERIES as Record<string, typeof ROSARY_MYSTERIES["gozosos"]>)[type]
+
+ // RosaryService.getRosary() já filtra pra só chamar esta função com um
+ // type validado, mas essa função é exportada e pode ser chamada direto —
+ // sem essa checagem, um type desconhecido derrubava com um TypeError cru
+ // (.forEach de undefined) em vez de um erro claro.
+ if (!mysteries) {
+  throw new NotFoundException("Invalid rosary type")
+ }
 
  const steps:any[] = []
 

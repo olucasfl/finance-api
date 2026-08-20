@@ -18,15 +18,19 @@ export function parseNaturalDate(message: string): Date | null {
 
   if (text.includes("hoje")) return normalize(today)
 
-  if (text.includes("ontem")) {
-    const d = clone(today)
-    d.setDate(d.getDate() - 1)
-    return normalize(d)
-  }
-
+  // "anteontem" precisa ser checado ANTES de "ontem": a palavra "anteontem"
+  // contém "ontem" como substring, então checar "ontem" primeiro fazia
+  // qualquer mensagem com "anteontem" nunca alcançar este branch — sempre
+  // resolvia pra "ontem" (1 dia atrás) em vez de 2 dias atrás.
   if (text.includes("anteontem")) {
     const d = clone(today)
     d.setDate(d.getDate() - 2)
+    return normalize(d)
+  }
+
+  if (text.includes("ontem")) {
+    const d = clone(today)
+    d.setDate(d.getDate() - 1)
     return normalize(d)
   }
 

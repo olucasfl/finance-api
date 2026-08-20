@@ -36,16 +36,8 @@ describe('parseNaturalDate', () => {
       expectDate(parseNaturalDate('o que foi a liturgia de ontem?'), 2026, 1, 3);
     });
 
-    /*
-    BUG (not fixed here, see report): "ontem" is checked before
-    "anteontem" in the source, and "anteontem" contains "ontem" as a
-    substring — so this branch is unreachable dead code. Any message with
-    "anteontem" actually matches the "ontem" (yesterday) check first and
-    returns 1 day ago instead of 2. This test documents the real, current
-    behavior, not the intended one.
-    */
-    it('"anteontem" actually resolves to ONE day ago, not two — "ontem" matches first', () => {
-      expectDate(parseNaturalDate('e anteontem, o que foi?'), 2026, 1, 3);
+    it('"anteontem" resolves to two days ago, not one — checked before "ontem" since it contains "ontem" as a substring', () => {
+      expectDate(parseNaturalDate('e anteontem, o que foi?'), 2026, 1, 2);
     });
 
     it('"amanhã" resolves to tomorrow', () => {
