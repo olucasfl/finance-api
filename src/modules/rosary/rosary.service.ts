@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
+import { Injectable, Logger, NotFoundException } from "@nestjs/common"
+import { Cron } from "@nestjs/schedule"
 import { PrismaService } from "src/prisma/prisma.service"
 import { buildRosary } from "./rosaryBuilder"
 import { ActivityService } from '../oratio/activity/activity.service'
@@ -14,6 +15,8 @@ import { buildViaSacra } from "./viaSacraBuilder"
 
 @Injectable()
 export class RosaryService{
+
+  private readonly logger = new Logger(RosaryService.name)
 
   constructor(
     private prisma: PrismaService,
@@ -313,5 +316,34 @@ async finish(userId:string, type:string){
  return { success:true }
 
 }
+
+ /* =========================
+ LIMPEZA
+ ========================= */
+
+ // Sessões incompletas ficam órfãs no banco pra sempre se o usuário nunca
+ // mais voltar àquele MESMO tipo de terço (só getSession()/getActiveProgress()
+ // descartam sessão parada, e só quando alguém consulta aquele tipo de novo).
+ // Isso alimentava notificações "termine seu terço" sobre terços iniciados
+ // há semanas que a própria UI já não mostrava mais. Varredura diária apaga
+ // o que sobrou muito além de qualquer janela de lembrete relevante.
+ private readonly ABANDONED_SESSION_DAYS = 30
+
+ @Cron("30 3 * * *", { timeZone: "America/Sao_Paulo" })
+ async cleanupAbandonedSessions(){
+
+  const cutoff = new Date(
+   Date.now() - this.ABANDONED_SESSION_DAYS * 24 * 60 * 60 * 1000
+  )
+
+  const { count } = await this.prisma.rosarySession.deleteMany({
+   where:{ completed:false, startedAt:{ lt:cutoff } }
+  })
+
+  if(count > 0){
+   this.logger.log(`[cleanup] ${count} sessões de terço abandonadas removidas`)
+  }
+
+ }
 
 }

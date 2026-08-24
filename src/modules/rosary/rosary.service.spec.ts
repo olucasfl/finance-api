@@ -293,4 +293,21 @@ describe('RosaryService', () => {
       expect(prisma.spiritualStats.create).not.toHaveBeenCalled();
     });
   });
+
+  describe('cleanupAbandonedSessions', () => {
+    it('deletes incomplete sessions older than the abandoned-session window', async () => {
+      prisma.rosarySession.deleteMany.mockResolvedValue({ count: 3 });
+
+      await service.cleanupAbandonedSessions();
+
+      expect(prisma.rosarySession.deleteMany).toHaveBeenCalledWith({
+        where: { completed: false, startedAt: { lt: expect.any(Date) } },
+      });
+    });
+
+    it('does not throw when nothing needed cleanup', async () => {
+      prisma.rosarySession.deleteMany.mockResolvedValue({ count: 0 });
+      await expect(service.cleanupAbandonedSessions()).resolves.toBeUndefined();
+    });
+  });
 });
