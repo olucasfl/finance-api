@@ -12,11 +12,36 @@ function normalizeNote(note: string | null | undefined): string | null {
 export class BibleCollectionsService {
   constructor(private prisma: PrismaService) {}
 
-  async list(userId: string) {
-    return this.prisma.bibleCollection.findMany({
+  // Sem `verseRef`: só as coleções + contagem. Com `verseRef` (usado pelo
+  // menu do versículo na leitura): acrescenta `containsItemId` — o id do
+  // item se aquele versículo já está na coleção, senão null — pra UI
+  // poder alternar adicionar/remover num toque.
+  async list(userId: string, verseRef?: { book: string; chapter: number; verse: number }) {
+    const collections = await this.prisma.bibleCollection.findMany({
       where: { userId },
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { items: true } } },
+      include: {
+        _count: { select: { items: true } },
+        ...(verseRef
+          ? {
+              items: {
+                where: {
+                  book: verseRef.book,
+                  chapter: verseRef.chapter,
+                  verse: verseRef.verse,
+                },
+                select: { id: true },
+              },
+            }
+          : {}),
+      },
+    });
+
+    if (!verseRef) return collections;
+
+    return collections.map((c) => {
+      const { items, ...rest } = c as typeof c & { items?: { id: string }[] };
+      return { ...rest, containsItemId: items?.[0]?.id ?? null };
     });
   }
 

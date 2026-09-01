@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 
 import { BibleCollectionsService } from './bible-collections.service';
 import { CreateBibleCollectionDto } from './dto/create-bible-collection.dto';
@@ -12,8 +23,20 @@ export class BibleCollectionsController {
   constructor(private readonly service: BibleCollectionsService) {}
 
   @Get()
-  list(@Req() req: any) {
-    return this.service.list(req.user.userId);
+  list(
+    @Req() req: any,
+    @Query('book') book?: string,
+    @Query('chapter') chapter?: string,
+    @Query('verse') verse?: string,
+  ) {
+    const c = chapter ? Number(chapter) : NaN;
+    const v = verse ? Number(verse) : NaN;
+    const verseRef =
+      book && Number.isInteger(c) && Number.isInteger(v)
+        ? { book, chapter: c, verse: v }
+        : undefined;
+
+    return this.service.list(req.user.userId, verseRef);
   }
 
   @Post()

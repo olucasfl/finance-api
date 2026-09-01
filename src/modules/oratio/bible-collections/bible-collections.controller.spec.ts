@@ -35,9 +35,23 @@ describe('BibleCollectionsController', () => {
     controller = module.get<BibleCollectionsController>(BibleCollectionsController);
   });
 
-  it('list forwards the authenticated user id', () => {
+  it('list forwards the authenticated user id (no verse filter)', () => {
     controller.list(req);
-    expect(service.list).toHaveBeenCalledWith('user-1');
+    expect(service.list).toHaveBeenCalledWith('user-1', undefined);
+  });
+
+  it('list passes a verse reference when book/chapter/verse are given', () => {
+    controller.list(req, 'João', '3', '16');
+    expect(service.list).toHaveBeenCalledWith('user-1', {
+      book: 'João',
+      chapter: 3,
+      verse: 16,
+    });
+  });
+
+  it('list ignores a partial verse reference', () => {
+    controller.list(req, 'João', '3', undefined);
+    expect(service.list).toHaveBeenCalledWith('user-1', undefined);
   });
 
   it('create passes only the name from the body', () => {
