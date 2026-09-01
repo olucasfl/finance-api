@@ -65,6 +65,34 @@ describe('BibleCollectionsService', () => {
       });
       expect(result).toBe(rows);
     });
+
+    it('adds containsItemId per collection when a verse ref is given', async () => {
+      prisma.bibleCollection.findMany.mockResolvedValue([
+        { id: 'c1', name: 'A', _count: { items: 3 }, items: [{ id: 'it9' }] },
+        { id: 'c2', name: 'B', _count: { items: 0 }, items: [] },
+      ]);
+
+      const result = await service.list('user-1', {
+        book: 'João',
+        chapter: 3,
+        verse: 16,
+      });
+
+      expect(prisma.bibleCollection.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            items: {
+              where: { book: 'João', chapter: 3, verse: 16 },
+              select: { id: true },
+            },
+          }),
+        }),
+      );
+      expect(result).toEqual([
+        { id: 'c1', name: 'A', _count: { items: 3 }, containsItemId: 'it9' },
+        { id: 'c2', name: 'B', _count: { items: 0 }, containsItemId: null },
+      ]);
+    });
   });
 
   describe('create', () => {
