@@ -3,6 +3,8 @@ import { NotificationsScheduler } from './notifications.scheduler';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationsSendService } from './notifications-send.service';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 describe('NotificationsScheduler.shouldFireAtHour', () => {
   // shouldFireAtHour é puro (não toca prisma/send), então dá pra instanciar
   // com dependências vazias.
@@ -209,7 +211,7 @@ describe('NotificationsScheduler', () => {
       prisma.notification.findMany.mockResolvedValue([]);
       prisma.spiritualStats.findUnique.mockResolvedValue({
         prayerStreak: 5,
-        lastPrayerDate: new Date('2000-01-01'),
+        lastLoginDate: new Date('2000-01-01'),
       });
 
       await scheduler.tick();
@@ -278,7 +280,7 @@ describe('NotificationsScheduler', () => {
       prisma.notification.findMany.mockResolvedValue([]);
       prisma.spiritualStats.findUnique.mockResolvedValue({
         prayerStreak: 7,
-        lastPrayerDate: new Date('2000-01-01'),
+        lastLoginDate: new Date('2000-01-01'),
       });
 
       await scheduler.tick();
@@ -301,16 +303,29 @@ describe('NotificationsScheduler', () => {
 
       it('is true when an unfinished session exists and nothing was completed since', async () => {
         prisma.rosarySession.findFirst
-          .mockResolvedValueOnce({ startedAt: new Date('2020-01-01') }) // unfinished
+          .mockResolvedValueOnce({ startedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) }) // unfinished
           .mockResolvedValueOnce(null); // no completion since
         await expect(s().rosaryUnfinished('u1')).resolves.toBe(true);
       });
 
       it('is false when a rosary was completed after the unfinished one started', async () => {
         prisma.rosarySession.findFirst
-          .mockResolvedValueOnce({ startedAt: new Date('2020-01-01') })
+          .mockResolvedValueOnce({ startedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) })
           .mockResolvedValueOnce({ id: 'done-1' });
         await expect(s().rosaryUnfinished('u1')).resolves.toBe(false);
+      });
+
+      it('only queries sessions with real engagement (currentStep > 0) within a 1-7 day window', async () => {
+        prisma.rosarySession.findFirst.mockResolvedValueOnce(null);
+        await s().rosaryUnfinished('u1');
+
+        const query = prisma.rosarySession.findFirst.mock.calls[0][0];
+        expect(query.where.currentStep).toEqual({ gt: 0 });
+        expect(query.where.startedAt.lt).toBeInstanceOf(Date);
+        expect(query.where.startedAt.gte).toBeInstanceOf(Date);
+        // a sessão abandonada há semanas não deve mais entrar na janela
+        const staleSpan = query.where.startedAt.lt.getTime() - query.where.startedAt.gte.getTime();
+        expect(staleSpan).toBe(6 * DAY_MS);
       });
     });
 
@@ -323,24 +338,24 @@ describe('NotificationsScheduler', () => {
       it('is 0 when the streak is below 2', async () => {
         prisma.spiritualStats.findUnique.mockResolvedValue({
           prayerStreak: 1,
-          lastPrayerDate: new Date(),
+          lastLoginDate: new Date(),
         });
         await expect(s().streakAtRisk('u1', 'UTC')).resolves.toBe(0);
       });
 
-      it('is 0 when the user already prayed today (streak not actually at risk)', async () => {
+      it('is 0 when the user already opened the app today (streak not actually at risk)', async () => {
         const today = new Date();
         prisma.spiritualStats.findUnique.mockResolvedValue({
           prayerStreak: 5,
-          lastPrayerDate: today,
+          lastLoginDate: today,
         });
         await expect(s().streakAtRisk('u1', 'UTC')).resolves.toBe(0);
       });
 
-      it('returns the streak count when it has not prayed yet today', async () => {
+      it('returns the streak count when it has not opened the app yet today', async () => {
         prisma.spiritualStats.findUnique.mockResolvedValue({
           prayerStreak: 5,
-          lastPrayerDate: new Date('2000-01-01'),
+          lastLoginDate: new Date('2000-01-01'),
         });
         await expect(s().streakAtRisk('u1', 'UTC')).resolves.toBe(5);
       });
@@ -455,6 +470,20 @@ describe('NotificationsScheduler', () => {
           createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
         });
         await expect(s().voxIntro('u1')).resolves.toBe(true);
+      });
+    });
+
+    describe('evalCondition', () => {
+      it('is eligible (fires) when the rule has no condition at all (null)', async () => {
+        await expect(s().evalCondition('u1', null, 'UTC')).resolves.toEqual({});
+      });
+
+      it('never fires for an unrecognized condition string instead of firing unconditionally', async () => {
+        // Regressão: um `condition` custom com typo (ex.: "SUNDAY_MASS" em vez
+        // de "SUNDAY") caía no `default` do switch, que costumava tratar
+        // qualquer string desconhecida como "sem condição" — disparando a
+        // regra todo santo dia em vez de nunca.
+        await expect(s().evalCondition('u1', 'ALGUM_TYPO_QUALQUER', 'UTC')).resolves.toBeNull();
       });
     });
   });

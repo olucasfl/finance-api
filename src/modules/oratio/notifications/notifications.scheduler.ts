@@ -338,8 +338,14 @@ export class NotificationsScheduler implements OnModuleInit {
         return this.nowInZone(tz).weekday === 'Sun' ? {} : null;
       case 'VOX_INTRO':
         return (await this.voxIntro(userId)) ? {} : null;
-      default:
+      case null:
         return {}; // sem condição (ex.: EXAMEN) — elegível quando a hora chega
+      default:
+        // `condition` não reconhecido (typo, regra custom mal configurada):
+        // nunca dispara sozinho — do contrário caía aqui e virava "sempre
+        // elegível", disparando todo dia sem que ninguém tenha pedido isso.
+        this.logger.warn(`condição de regra desconhecida: "${cond}" — regra não disparará`);
+        return null;
     }
   }
 
@@ -364,8 +370,19 @@ export class NotificationsScheduler implements OnModuleInit {
 
   private async rosaryUnfinished(userId: string): Promise<boolean> {
     const cutoff = new Date(Date.now() - DAY);
+    // Mesmo horizonte de "ainda vale lembrar" que `rosaryLapse` usa (7 dias)
+    // — sem isso, uma sessão abandonada há semanas (que a própria UI já não
+    // mostra mais em "continuar", ver rosary.service.ts getActiveProgress)
+    // ficava disparando "termine seu terço" pra sempre, porque a linha no
+    // banco nunca é revisitada se o usuário não voltar àquele MESMO tipo.
+    const staleCutoff = new Date(Date.now() - 7 * DAY);
     const unfinished = await this.prisma.rosarySession.findFirst({
-      where: { userId, completed: false, startedAt: { lt: cutoff } },
+      where: {
+        userId,
+        completed: false,
+        currentStep: { gt: 0 }, // só conta se a pessoa de fato avançou, não um "abrir e sair"
+        startedAt: { lt: cutoff, gte: staleCutoff },
+      },
       orderBy: { startedAt: 'desc' },
       select: { startedAt: true },
     });
@@ -380,11 +397,18 @@ export class NotificationsScheduler implements OnModuleInit {
   private async streakAtRisk(userId: string, tz: string): Promise<number> {
     const s = await this.prisma.spiritualStats.findUnique({
       where: { userId },
-      select: { prayerStreak: true, lastPrayerDate: true },
+      select: { prayerStreak: true, lastLoginDate: true },
     });
-    if (!s || (s.prayerStreak ?? 0) < 2 || !s.lastPrayerDate) return 0;
+    // `prayerStreak` é, na prática, uma sequência de LOGIN (ver
+    // ActivityService.updateLoginStreak, incrementada a cada "entrou no
+    // app" — não a cada oração concluída). O que "mantém" a sequência é
+    // `lastLoginDate`, não `lastPrayerDate` (que só muda ao concluir um
+    // terço/oração). Comparar contra `lastPrayerDate` avisava "vai perder
+    // sua sequência" mesmo em dias em que o usuário já tinha aberto o app
+    // — que é exatamente o que preserva a sequência.
+    if (!s || (s.prayerStreak ?? 0) < 2 || !s.lastLoginDate) return 0;
     const today = this.nowInZone(tz).dateStr;
-    const last = this.dateInZone(s.lastPrayerDate, tz);
+    const last = this.dateInZone(s.lastLoginDate, tz);
     return last !== today ? s.prayerStreak : 0;
   }
 
