@@ -31,8 +31,10 @@ tema sépia/escuro) é 100% frontend/localStorage — **não** entra aqui.
    `book` é o nome em português vindo do JSON estático (`"Gênesis"`, `"João"`) — o
    mesmo que o frontend já usa nas URLs (`/oratio/biblia/:book/:chapter`). Sem tabela
    de livros, sem IDs canônicos: overkill para dado estático.
-4. **Grifo é de versículo inteiro e de cor única.** (O usuário dispensou cores com
-   significado/legenda.) Sem coluna de cor.
+4. **Grifo é de versículo inteiro, com escolha de cor** (`amber`/`green`/`blue`/
+   `pink`/`purple`). Coluna `highlightColor` no `BibleMark`, forçada a `null` quando
+   `highlighted` é false. É só a cor — **sem** legenda/significado/renomear/filtrar
+   (essa parte segue fora de escopo).
 5. **Sem endpoint de busca.** "Minha Bíblia" filtra no cliente sobre a lista de marks
    do próprio usuário — volume é pequeno (dezenas/centenas de itens por pessoa).
 6. **Ownership com `NotFoundException`** para coleção/item inexistente ou de outro

@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpsertBibleMarkDto } from './dto/upsert-bible-mark.dto';
 
+const DEFAULT_HIGHLIGHT_COLOR = 'amber';
+
 // Nota vazia / só espaços conta como "sem nota" — é assim que o cliente
 // apaga uma anotação (manda string vazia).
 function normalizeNote(note: string | null | undefined): string | null {
@@ -38,7 +40,14 @@ export class BibleMarksService {
 
     const existing = await this.prisma.bibleMark.findUnique({ where });
 
-    const highlighted = dto.highlighted ?? existing?.highlighted ?? false;
+    // Mandar uma cor já liga o grifo, mesmo sem `highlighted` explícito.
+    const highlighted =
+      dto.highlighted ?? (dto.highlightColor ? true : (existing?.highlighted ?? false));
+
+    const highlightColor = highlighted
+      ? (dto.highlightColor ?? existing?.highlightColor ?? DEFAULT_HIGHLIGHT_COLOR)
+      : null;
+
     const favorite = dto.favorite ?? existing?.favorite ?? false;
     const note = normalizeNote(dto.note !== undefined ? dto.note : (existing?.note ?? null));
 
@@ -51,7 +60,7 @@ export class BibleMarksService {
 
     return this.prisma.bibleMark.upsert({
       where,
-      update: { reference, text, highlighted, favorite, note },
+      update: { reference, text, highlighted, highlightColor, favorite, note },
       create: {
         userId,
         book,
@@ -60,6 +69,7 @@ export class BibleMarksService {
         reference,
         text,
         highlighted,
+        highlightColor,
         favorite,
         note,
       },

@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -7,6 +8,8 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+
+export const HIGHLIGHT_COLORS = ['amber', 'green', 'blue', 'pink', 'purple'] as const;
 
 export class UpsertBibleMarkDto {
   // Nome do livro em português, como vem do JSON estático da Bíblia e
@@ -41,6 +44,11 @@ export class UpsertBibleMarkDto {
   @IsOptional()
   @IsBoolean()
   highlighted?: boolean;
+
+  // Cor do grifo. Ignorada quando highlighted é false.
+  @IsOptional()
+  @IsIn(HIGHLIGHT_COLORS, { message: 'Cor de grifo inválida' })
+  highlightColor?: (typeof HIGHLIGHT_COLORS)[number];
 
   @IsOptional()
   @IsBoolean()
