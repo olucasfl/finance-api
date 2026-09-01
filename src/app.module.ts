@@ -17,6 +17,8 @@ import { ReadingProgressModule } from './modules/oratio/reading-progress/reading
 import { HomeModule } from './modules/oratio/home/home.module';
 import { NotificationsModule } from './modules/oratio/notifications/notifications.module';
 import { QuaresmaModule } from './modules/oratio/quaresma/quaresma.module';
+import { BibleMarksModule } from './modules/oratio/bible-marks/bible-marks.module';
+import { BibleCollectionsModule } from './modules/oratio/bible-collections/bible-collections.module';
 import { SystemLogModule } from './system-log/system-log.module';
 
 @Module({
@@ -37,6 +39,8 @@ import { SystemLogModule } from './system-log/system-log.module';
     HomeModule,
     NotificationsModule,
     QuaresmaModule,
+    BibleMarksModule,
+    BibleCollectionsModule,
     SystemLogModule,
   ],
   controllers: [AppController],
