@@ -9,35 +9,35 @@ datasource db {
 }
 
 model User {
-  id                        String                     @id @default(uuid())
-  name                      String
-  email                     String                     @unique
-  password                  String
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
-  refreshSessions           RefreshSession[]
-  emailVerificationToken    String?                    @unique
+  id                            String                     @id @default(uuid())
+  name                          String
+  email                         String                     @unique
+  password                      String
+  createdAt                     DateTime                   @default(now())
+  updatedAt                     DateTime                   @updatedAt
+  refreshSessions               RefreshSession[]
+  emailVerificationToken        String?                    @unique
   emailVerificationTokenExpires DateTime?
-  emailVerified             Boolean                    @default(false)
-  passwordResetExpires      DateTime?
-  passwordResetToken        String?
-  pendingEmail              String?
-  pendingEmailToken         String?                    @unique
-  pendingEmailExpires       DateTime?
-  isAdmin                   Boolean                    @default(false)
-  completedConsecrationDays ConsecrationCompletedDay[]
-  consecrations             ConsecrationProgress[]
-  conversations             Conversation[]
-  rosarySessions            RosarySession[]
-  spiritualStats            SpiritualStats?
-  activities                UserActivity[]
-  readingProgress           ReadingProgress[]
-  pushSubscriptions         PushSubscription[]
-  notifications             Notification[]
-  quaresmaDays              QuaresmaMichaelDay[]
-  quaresmaPenances          QuaresmaMichaelPenance[]
-  bibleMarks                BibleMark[]
-  bibleCollections          BibleCollection[]
+  emailVerified                 Boolean                    @default(false)
+  passwordResetExpires          DateTime?
+  passwordResetToken            String?
+  pendingEmail                  String?
+  pendingEmailToken             String?                    @unique
+  pendingEmailExpires           DateTime?
+  isAdmin                       Boolean                    @default(false)
+  completedConsecrationDays     ConsecrationCompletedDay[]
+  consecrations                 ConsecrationProgress[]
+  conversations                 Conversation[]
+  rosarySessions                RosarySession[]
+  spiritualStats                SpiritualStats?
+  activities                    UserActivity[]
+  readingProgress               ReadingProgress[]
+  pushSubscriptions             PushSubscription[]
+  notifications                 Notification[]
+  quaresmaDays                  QuaresmaMichaelDay[]
+  quaresmaPenances              QuaresmaMichaelPenance[]
+  bibleMarks                    BibleMark[]
+  bibleCollections              BibleCollection[]
 }
 
 model PushSubscription {
@@ -240,17 +240,17 @@ enum NotificationSource {
 // e guarda os contadores (alvo/enviado/falhou) pro painel. Expira em 15
 // dias, igual aos itens; um cron limpa as vencidas.
 model NotificationCampaign {
-  id         String         @id @default(uuid())
-  title      String
-  body       String?
-  url        String?
-  audience   String         @default("ALL") // "ALL" | "SPECIFIC"
-  createdBy  String?
-  createdAt  DateTime       @default(now())
-  expiresAt  DateTime
-  targeted   Int            @default(0)
-  pushSent   Int            @default(0)
-  pushFailed Int            @default(0)
+  id            String         @id @default(uuid())
+  title         String
+  body          String?
+  url           String?
+  audience      String         @default("ALL") // "ALL" | "SPECIFIC"
+  createdBy     String?
+  createdAt     DateTime       @default(now())
+  expiresAt     DateTime
+  targeted      Int            @default(0)
+  pushSent      Int            @default(0)
+  pushFailed    Int            @default(0)
   notifications Notification[]
 
   @@index([expiresAt])
@@ -291,8 +291,8 @@ model NotificationRule {
   title     String
   body      String?
   url       String?
-  hour      Int?     // hora local (0-23) das regras por horário
-  condition String?  // "ROSARY_UNFINISHED" | "STREAK_AT_RISK" | null (=diária no horário)
+  hour      Int? // hora local (0-23) das regras por horário
+  condition String? // "ROSARY_UNFINISHED" | "STREAK_AT_RISK" | null (=diária no horário)
   updatedAt DateTime @updatedAt
 }
 
@@ -336,19 +336,22 @@ model QuaresmaMichaelPenance {
 // pelo cliente — o backend não tem o texto bíblico, que vive no bundle do
 // frontend. Texto bíblico é estático, o snapshot não envelhece.
 model BibleMark {
-  id          String   @id @default(uuid())
-  userId      String
-  book        String
-  chapter     Int
-  verse       Int
-  reference   String
-  text        String
-  highlighted Boolean  @default(false)
-  favorite    Boolean  @default(false)
-  note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  userId         String
+  book           String
+  chapter        Int
+  verse          Int
+  reference      String
+  text           String
+  highlighted    Boolean  @default(false)
+  // Cor do grifo quando highlighted=true: amber | green | blue | pink |
+  // purple. null quando não há grifo. Sem legenda/significado — é só a cor.
+  highlightColor String?
+  favorite       Boolean  @default(false)
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, book, chapter, verse])
   @@index([userId])

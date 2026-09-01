@@ -85,7 +85,7 @@ describe('BibleMarksService', () => {
   });
 
   describe('upsert', () => {
-    it('creates a highlighted mark when none exists', async () => {
+    it('creates a highlighted mark (default amber) when none exists', async () => {
       prisma.bibleMark.findUnique.mockResolvedValue(null);
       prisma.bibleMark.upsert.mockResolvedValue({ id: 'm1', highlighted: true });
 
@@ -97,6 +97,7 @@ describe('BibleMarksService', () => {
           reference: base.reference,
           text: base.text,
           highlighted: true,
+          highlightColor: 'amber',
           favorite: false,
           note: null,
         },
@@ -104,10 +105,64 @@ describe('BibleMarksService', () => {
           userId: 'user-1',
           ...base,
           highlighted: true,
+          highlightColor: 'amber',
           favorite: false,
           note: null,
         },
       });
+    });
+
+    it('stores the chosen highlight colour and turns the highlight on implicitly', async () => {
+      prisma.bibleMark.findUnique.mockResolvedValue(null);
+      prisma.bibleMark.upsert.mockResolvedValue({ id: 'm1' });
+
+      await service.upsert('user-1', { ...base, highlightColor: 'green' });
+
+      expect(prisma.bibleMark.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({ highlighted: true, highlightColor: 'green' }),
+        }),
+      );
+    });
+
+    it('clears the colour when the highlight is turned off', async () => {
+      prisma.bibleMark.findUnique.mockResolvedValue({
+        id: 'm1',
+        ...base,
+        highlighted: true,
+        highlightColor: 'blue',
+        favorite: true,
+        note: null,
+      });
+      prisma.bibleMark.upsert.mockResolvedValue({ id: 'm1' });
+
+      await service.upsert('user-1', { ...base, highlighted: false });
+
+      expect(prisma.bibleMark.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({ highlighted: false, highlightColor: null }),
+        }),
+      );
+    });
+
+    it('keeps the existing colour when only the note changes', async () => {
+      prisma.bibleMark.findUnique.mockResolvedValue({
+        id: 'm1',
+        ...base,
+        highlighted: true,
+        highlightColor: 'pink',
+        favorite: false,
+        note: null,
+      });
+      prisma.bibleMark.upsert.mockResolvedValue({ id: 'm1' });
+
+      await service.upsert('user-1', { ...base, note: 'oi' });
+
+      expect(prisma.bibleMark.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          update: expect.objectContaining({ highlightColor: 'pink' }),
+        }),
+      );
     });
 
     it('merges a partial update onto the existing row (favorite stays true when only note changes)', async () => {
