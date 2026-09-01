@@ -130,9 +130,9 @@ deleta a linha e retorna `{ deleted: true }`.
 ## Lista de tarefas
 
 ### Fase B1 — Grifos, favoritos e anotações
-- [ ] **B1.1** `BibleMark` no schema + relação em `User` + `db push`/`generate`
-- [ ] **B1.2** `bible-marks` module: service + controller + DTOs + registro no `app.module.ts`
-- [ ] **B1.3** Testes de `bible-marks` (service + controller, Prisma mockado)
+- [x] **B1.1** `BibleMark` no schema + relação em `User` + `db push`/`generate`
+- [x] **B1.2** `bible-marks` module: service + controller + DTOs + registro no `app.module.ts`
+- [x] **B1.3** Testes de `bible-marks` (service + controller, Prisma mockado)
 
 ### Checkpoint B1
 - [ ] `npm run build` limpo
@@ -140,9 +140,9 @@ deleta a linha e retorna `{ deleted: true }`.
 - [ ] `curl` manual com JWT real: grifar → favoritar → anotar → limpar tudo (linha some)
 
 ### Fase B2 — Coleções
-- [ ] **B2.1** `BibleCollection` + `BibleCollectionItem` no schema + relação em `User` + `db push`/`generate`
-- [ ] **B2.2** `bible-collections` module: service + controller + DTOs + registro no `app.module.ts`
-- [ ] **B2.3** Testes de `bible-collections` (inclui ownership: 404 para coleção de outro usuário)
+- [x] **B2.1** `BibleCollection` + `BibleCollectionItem` no schema + relação em `User` + `db push`/`generate`
+- [x] **B2.2** `bible-collections` module: service + controller + DTOs + registro no `app.module.ts`
+- [x] **B2.3** Testes de `bible-collections` (inclui ownership: 404 para coleção de outro usuário)
 
 ### Checkpoint B2
 - [ ] `npm run build` limpo, `npm run lint` limpo
@@ -151,8 +151,8 @@ deleta a linha e retorna `{ deleted: true }`.
 - [ ] Tentar acessar coleção de outro usuário retorna 404 (não 403, não 500)
 
 ### Fase B3 — Fechamento
-- [ ] **B3.1** Atualizar `docs/ARCHITECTURE.md` §4 (modelo de domínio) e §7 (módulos)
-- [ ] **B3.2** Revisão: rotas batem com `oratio/src/services/bibleMarksService.ts` e `bibleCollectionsService.ts`
+- [x] **B3.1** Atualizar `docs/ARCHITECTURE.md` §4 (modelo de domínio) e §7 (módulos)
+- [x] **B3.2** Revisão: rotas batem com `oratio/src/services/bibleMarksService.ts` e `bibleCollectionsService.ts`
 
 ## Riscos e mitigações
 
