@@ -220,7 +220,10 @@ existe. `ruleTrigger()` passa a descrever com base nos valores reais.
 - [x] O scheduler ainda NÃO filtra por `band` — só semeia e expõe no painel.
       O uso do `band` no tick é a Fase 3 (Task 8).
 - [ ] ⏳ `prisma db push` segue pendente (agora +2 colunas em `NotificationRule`)
-- [ ] Revisar com o usuário antes da Fase 3
+- [x] `prisma db push` das Fases 1–2 aplicado em produção (2026-09-02, com OK
+      do usuário) — diff 100% aditivo (2 colunas nullable em `NotificationRule`
+      + tabela `NotificationSettings`); `migrate diff` pós-push = vazio
+- [x] Revisado com o usuário — seguir pra Fase 3
 
 ---
 
@@ -232,24 +235,26 @@ faixa a partir de `UserActivity` (30 dias, hora local Brasil), cacheando em
 `activeBand`/`bandComputedAt` e recalculando quando passa de 7 dias.
 
 **Critérios de aceite:**
-- [ ] Model `UserNotificationProfile` (`userId` @unique, `activeBand String
-      @default("ANY")`, `bandComputedAt DateTime?`)
-- [ ] `@@index([userId, createdAt])` em `UserActivity`
-- [ ] `classifyBand(userId)`: agrupa `createdAt` das atividades em 3 baldes
-      horários, retorna o dominante; `< N` eventos ⇒ `ANY`
-- [ ] `getBand(userId)`: lê o cache, recalcula se stale, faz upsert do perfil
+- [x] Model `UserNotificationProfile` (`userId @id`, `activeBand String
+      @default("ANY")`, `bandComputedAt DateTime?`, `updatedAt`) + relação em `User`
+- [x] `@@index([userId, createdAt])` em `UserActivity`
+- [x] `classifyBand(userId)`: 30 dias, hora local BR via `toZonedTime`, 3 baldes
+      (MORNING 5–11, AFTERNOON 12–17, EVENING 18–4); `< 5` eventos ⇒ `ANY`;
+      empate → MORNING > AFTERNOON > EVENING
+- [x] `getBand(userId)`: cache no perfil, recalcula se `bandComputedAt` > 7d,
+      upsert; **nunca lança** — qualquer falha ⇒ `ANY`
 
 **Verificação:**
-- [ ] `npx jest` do serviço novo — "usuário matinal → MORNING", "pouca
-      atividade → ANY", "cache fresco não recalcula"
-- [ ] `npm run build` no backend
-- [ ] Manual: seed de atividades e conferir `activeBand`
+- [x] `npx jest user-notification-profile` (8 casos) passa
+- [x] `npm run build` no backend — suíte completa: 749 testes
+- [ ] Manual: seed de atividades e conferir `activeBand` — pós `db push` da Fase 3
 
 **Dependências:** Checkpoint B
 **Arquivos:** `oratio-api/prisma/schema.prisma`,
 `.../notifications/user-notification-profile.service.ts` (novo),
 `.../notifications.module.ts`, spec
 **Escopo:** M
+**Commit:** `oratio-api` branch `feat/notif-faixa-usuario`
 
 ---
 
@@ -259,26 +264,37 @@ usuário case com a `band` da regra (`ANY` de qualquer lado = sempre casa). Sem
 perfil ou `band` da regra `null` ⇒ cai no `shouldFireAtHour(hour)` de hoje.
 
 **Critérios de aceite:**
-- [ ] `MORNING` só recebe regra `MORNING`/`ANY` durante a manhã dele
-- [ ] Fallback pro comportamento por `hour` quando faltam dados
-- [ ] Quiet hours continua valendo por cima
-- [ ] No máximo 1 disparo por tick, como hoje
+- [x] `tick()` chama `profiles.getBand(userId)` (1x por usuário) e filtra
+      candidatas por `bandMatches(userBand, rule.band)`
+- [x] `bandMatches`: `ANY` de qualquer lado, ou `rule.band` null ⇒ casa
+      sempre (vale só a hora, como antes); senão exige igualdade
+- [x] Fallback seguro: `getBand` nunca lança (⇒ ANY); regra sem band ⇒ hora-only
+- [x] Quiet hours continua por cima; no máx. 1 disparo por tick
+- [x] **Fix de tabela:** `shouldFireAtHour` no `tick()` passou a receber
+      `cfg.quietEnd/quietStart` (antes usava os defaults hardcoded mesmo com
+      quiet hours customizado no admin — latente desde a Task 1)
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` — matriz faixa-usuário × faixa-regra
-- [ ] `npm run build` no backend
-- [ ] Manual: usuário EVENING não recebe regra MORNING às 9h
+- [x] `npx jest notifications.scheduler` — matriz faixa-usuário × faixa-regra
+      (5 casos) + `bandMatches` puro
+- [x] `npm run build` no backend — suíte completa: 755 testes
 
 **Dependências:** Task 7
 **Arquivos:** `.../notifications.scheduler.ts`, specs
 **Escopo:** M
+**Commit:** `oratio-api` branch `feat/notif-faixa-usuario`
 
 ---
 
 ## Checkpoint C — Fase 3
-- [ ] Timing por faixa funcionando com fallback seguro
-- [ ] Custo de query do classificador aceitável (index + janela + cache)
-- [ ] Revisar com o usuário
+- [x] Timing por faixa funcionando com fallback seguro (755 testes back)
+- [x] Custo de query aceitável: `@@index([userId, createdAt])` + janela de 30d
+      + cache de 7d no perfil; `getBand` = 1 findUnique por tick na maioria
+      das vezes, recálculo (findMany + upsert) só ~1x/semana por usuário
+- [x] `prisma db push` da Fase 3 aplicado em produção (2026-09-02, com OK do
+      usuário) — `UserNotificationProfile` + índice `UserActivity(userId,createdAt)`
+      + FK; `migrate diff` pós-push = vazio
+- [x] Revisado — seguir pra Fase 4
 
 ---
 

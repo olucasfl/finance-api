@@ -38,6 +38,7 @@ model User {
   quaresmaPenances              QuaresmaMichaelPenance[]
   bibleMarks                    BibleMark[]
   bibleCollections              BibleCollection[]
+  notificationProfile           UserNotificationProfile?
 }
 
 model PushSubscription {
@@ -79,6 +80,24 @@ model UserActivity {
   action    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // O classificador de faixa horária (notifications) varre as atividades
+  // dos últimos ~30 dias por usuário — sem este índice seria um seq scan
+  // na tabela inteira a cada recálculo.
+  @@index([userId, createdAt])
+}
+
+// Faixa horária preferida de cada usuário, derivada da atividade recente
+// (UserActivity, ~30 dias, hora local Brasil) pra alinhar as notificações
+// automáticas ao horário em que a pessoa costuma usar o app. Enxuto de
+// propósito: só o valor e quando foi calculado. Recalculado
+// preguiçosamente pelo próprio tick quando passa de ~7 dias.
+model UserNotificationProfile {
+  userId         String    @id
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeBand     String    @default("ANY") // "MORNING" | "AFTERNOON" | "EVENING" | "ANY"
+  bandComputedAt DateTime?
+  updatedAt      DateTime  @updatedAt
 }
 
 // Uma linha por usuário representando a consagração ATUAL (ou mais

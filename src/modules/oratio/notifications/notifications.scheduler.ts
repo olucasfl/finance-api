@@ -6,6 +6,10 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettingsService,
 } from './notification-settings.service';
+import {
+  ActiveBand,
+  UserNotificationProfileService,
+} from './user-notification-profile.service';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -153,6 +157,7 @@ export class NotificationsScheduler implements OnModuleInit {
     private prisma: PrismaService,
     private send: NotificationsSendService,
     private settings: NotificationSettingsService,
+    private profiles: UserNotificationProfileService,
   ) {}
 
   // Reconcilia o catálogo: cria as regras que faltam (sem sobrescrever o que
@@ -211,6 +216,15 @@ export class NotificationsScheduler implements OnModuleInit {
   ): boolean {
     if (hours < quietEnd || hours >= quietStart) return false;
     return hours >= ruleHour;
+  }
+
+  /*
+  A faixa do usuário casa com a da regra? `ANY` de qualquer lado (ou
+  regra sem `band` definida) sempre casa — aí vale só a hora, como antes.
+  */
+  bandMatches(userBand: ActiveBand, ruleBand: string | null): boolean {
+    if (!ruleBand || ruleBand === 'ANY' || userBand === 'ANY') return true;
+    return userBand === ruleBand;
   }
 
   private priority(key: string): number {
@@ -294,6 +308,10 @@ export class NotificationsScheduler implements OnModuleInit {
         const { hours, dateStr: todayStr } = this.nowInZone(tz);
         if (hours < cfg.quietEnd || hours >= cfg.quietStart) continue; // quiet hours
 
+        // Faixa horária do usuário (cacheada ~7 dias no perfil). ANY =
+        // sem dados suficientes ⇒ elegível o dia todo, como antes.
+        const userBand = await this.profiles.getBand(userId);
+
         const hist = await this.prisma.notification.findMany({
           where: {
             userId,
@@ -331,11 +349,12 @@ export class NotificationsScheduler implements OnModuleInit {
           }
         }
 
-        // candidatas: hora chegou + cooldown ok
+        // candidatas: hora chegou + faixa casa + cooldown ok
         const candidates = rules.filter(
           (r) =>
             r.hour != null &&
-            this.shouldFireAtHour(hours, r.hour) &&
+            this.shouldFireAtHour(hours, r.hour, cfg.quietEnd, cfg.quietStart) &&
+            this.bandMatches(userBand, r.band) &&
             this.cooldownOk(lastByRule.get(r.key), r.key, now),
         );
         if (candidates.length === 0) continue;
