@@ -91,26 +91,36 @@ em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 funil, com salvar explícito e feedback de erro de validação.
 
 **Critérios de aceite:**
-- [ ] Campos: máx por dia, quiet hours (início/fim), espaçamento (h), rest gap
-      (on/off), limiar de urgência
-- [ ] Carrega do `GET`, salva no `PATCH`, mostra estado salvando/salvo/erro
-- [ ] Texto curto explicando o efeito de cada campo
+- [x] Campos: máx por dia, máx convites por dia, quiet hours (início/fim),
+      intervalo mínimo (h), limiar de urgência, toggle do gap de descanso
+- [x] Carrega do `GET`, salva no `PATCH` (objeto inteiro), mostra estado
+      salvando/salvo/erro
+- [x] Texto curto (`.setHint`) explicando o efeito de cada campo
 
 **Verificação:**
-- [ ] `npx vitest run AdminNotifications` passa
-- [ ] `npm run build` no front
+- [x] `npx vitest run AdminNotifications` passa (14 testes, +3 novos)
+- [x] `npm run build` no front — suíte completa: 728 testes passando
 - [ ] Manual: mudar quiet hours no painel e confirmar persistência no reload
+      — depende do `prisma db push` (o endpoint 500 sem a tabela)
 
 **Dependências:** Task 2
 **Arquivos:** `oratio/src/components/AdminNotifications/AdminNotifications.tsx`,
 `.module.css`, `oratio/src/services/adminNotificationsService.ts`, test
 **Escopo:** M
+**Commit:** `oratio@cb1a7e1` (branch `feat/notificacoes-config`)
 
 ---
 
 ## Checkpoint A — Fase 1
-- [ ] Testes de backend e front passam; os dois buildam
-- [ ] Funil configurável ponta a ponta; sem config, comportamento idêntico ao atual
+- [x] Testes de backend (736) e front (728) passam; os dois buildam
+- [x] Funil configurável ponta a ponta; sem config/tabela, o scheduler se
+      comporta igual ao de antes (defaults do serviço = constantes antigas)
+- [x] Bônus (decisão do usuário): gap de descanso ligado — ataca direto a
+      queixa "mesmas notificações a cada 1–2 dias"
+- [ ] ⏳ **Pendente:** `npx prisma db push` + `generate` — schema fica à
+      frente do banco até o Checkpoint E (ou antes, com OK do usuário). Até
+      lá, `GET/PATCH .../settings` retorna 500 em prod; o scheduler segue
+      normal pelo fallback.
 - [ ] Revisar com o usuário antes da Fase 2
 
 ---
