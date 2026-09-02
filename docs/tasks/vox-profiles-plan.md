@@ -91,9 +91,17 @@ que o usuário revisa e vai aceitando na Fase B3.
 | `max_tokens` | **Varia por perfil**: `DIRECT` 600 · `DEFAULT` 1500 · `STUDY` 2600 · `PASTORAL`/`CATECHIST`/`APOLOGETIC` 1800. Substitui o `2000` fixo. |
 | Onboarding | Modal **uma vez**. Não escolher = fica no Padrão, nunca mais aparece (precisa de `voxOnboardingSeenAt`). Trocar depois só pela engrenagem. |
 | Padrão × "dia a dia" | Só inclui aplicação prática quando a pergunta é **claramente prática** ("como faço", hábito, moral vivida, devoção). Factual/histórica/"o que é X"/doutrina abstrata → nunca. |
-| Exemplos | **1 por perfil**, cada um com uma pergunta diferente (a que melhor evidencia o estilo). |
 | Troca de perfil no meio da conversa | Marca uma **linha discreta no chat** ("Perfil alterado para X") no ponto da troca. |
 | Nome da seção da engrenagem | **"Configurações do Vox"**. |
+
+### Ajustes pós-teste (2026-09-02, mesma sessão)
+
+| Item | Decisão nova |
+|---|---|
+| **# Título sempre** | TODA resposta, em **todos** os perfis, começa com um `# Título` curto do tema — inclusive respostas de 1–2 frases. Regra na `VOX_IDENTITY` + reforçada em cada `systemAppend`. O que continua condicional é subtítulo, "como aplicar" e "Em resumo". |
+| Exemplos | **1 por perfil, a MESMA pergunta nos 6** ("Por que rezar aos santos, se posso rezar direto a Deus?") — assim dá pra comparar o que muda. (Antes era 1 pergunta diferente por perfil; virou incomparável.) |
+| Layout da lista de perfis | **Grade 2×2×2**, nunca empilhada — 2 colunas mesmo no celular (`VoxProfileList` = `display:grid`). |
+| Dica da engrenagem | Ao fechar o onboarding (escolher **ou** "Depois"), a engrenagem **pulsa** e aparece um balão "Aqui você troca o estilo de resposta do Vox quando quiser". Some ao tocar, ao abrir as configurações, ou em ~7s. Uma vez por carga da página (`gearHintShown` ref). |
 
 ## 4. Arquitetura
 
@@ -355,8 +363,12 @@ perfil pode quebrar fidelidade doutrinária.**
 
 ## Apêndice A — rascunhos de `systemAppend` (material de revisão da Fase B3)
 
-> O usuário revisa e vai aceitando/ajustando cada bloco. A identidade
-> (`VOX_IDENTITY`) continua valendo por cima de todos.
+> ⚠️ **Estes são os rascunhos originais.** As versões **finais** (com a regra
+> "# Título sempre" e os exemplos com a pergunta comum) estão em
+> `src/modules/oratio/voxai/prompts/vox.prompt.ts` — a fonte da verdade. Os
+> blocos abaixo ficam só como registro do ponto de partida.
+>
+> A identidade (`VOX_IDENTITY`) continua valendo por cima de todos.
 
 ### `DEFAULT` — Padrão (entra na Fase B1)
 
