@@ -2,13 +2,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsScheduler } from './notifications.scheduler';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationsSendService } from './notifications-send.service';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationSettingsService,
+} from './notification-settings.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('NotificationsScheduler.shouldFireAtHour', () => {
-  // shouldFireAtHour é puro (não toca prisma/send), então dá pra instanciar
-  // com dependências vazias.
-  const scheduler = new NotificationsScheduler({} as any, {} as any);
+  // shouldFireAtHour é puro (não toca prisma/send/settings), então dá pra
+  // instanciar com dependências vazias.
+  const scheduler = new NotificationsScheduler({} as any, {} as any, {} as any);
 
   it('elegível da hora marcada em diante (fica na fila o dia todo)', () => {
     expect(scheduler.shouldFireAtHour(7, 7)).toBe(true);
@@ -37,6 +41,7 @@ describe('NotificationsScheduler', () => {
   let scheduler: NotificationsScheduler;
   let prisma: any;
   let send: { deliverToUser: jest.Mock };
+  let settings: { get: jest.Mock; invalidate: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -56,12 +61,17 @@ describe('NotificationsScheduler', () => {
       user: { findUnique: jest.fn() },
     };
     send = { deliverToUser: jest.fn().mockResolvedValue({ pushed: true }) };
+    settings = {
+      get: jest.fn().mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS }),
+      invalidate: jest.fn(),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsScheduler,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsSendService, useValue: send },
+        { provide: NotificationSettingsService, useValue: settings },
       ],
     }).compile();
 
@@ -289,6 +299,48 @@ describe('NotificationsScheduler', () => {
         'u1',
         expect.objectContaining({ body: 'Você está com 7 dias seguidos.' }),
       );
+    });
+
+    it('behaves exactly as before when NotificationSettings falls back to the built-in defaults', async () => {
+      setUtcHour(10);
+      // get() devolvendo os defaults é o mesmo cenário de "banco sem linha"
+      settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS });
+      prisma.notificationRule.findMany.mockResolvedValue([rule({ hour: 9 })]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      prisma.notification.findMany.mockResolvedValue([]);
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ ruleKey: 'EXAMEN_NIGHT' }),
+      );
+    });
+
+    it('honours a customised daily cap from NotificationSettings (maxPerDay: 1)', async () => {
+      const now = setUtcHour(10);
+      settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS, maxPerDay: 1 });
+      prisma.notificationRule.findMany.mockResolvedValue([rule({ hour: 9 })]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      // uma única automática hoje já bate o teto customizado
+      prisma.notification.findMany.mockResolvedValue([{ createdAt: now, ruleKey: 'A' }]);
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).not.toHaveBeenCalled();
+    });
+
+    it('honours a widened quiet-hours window from NotificationSettings (quietStart: 9)', async () => {
+      setUtcHour(10);
+      settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS, quietStart: 9 });
+      prisma.notificationRule.findMany.mockResolvedValue([rule({ hour: 8 })]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      prisma.notification.findMany.mockResolvedValue([]);
+
+      await scheduler.tick();
+
+      // 10h agora cai dentro do quiet hours (>= 9) → ninguém recebe
+      expect(send.deliverToUser).not.toHaveBeenCalled();
     });
   });
 

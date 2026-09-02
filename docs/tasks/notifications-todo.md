@@ -21,24 +21,32 @@ anti-spam e um serviço que a lê com cache curto. O scheduler passa a ler dela
 em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 
 **Critérios de aceite:**
-- [ ] Model `NotificationSettings` (id fixo `"default"`, colunas: `maxPerDay`
+- [x] Model `NotificationSettings` (id fixo `"default"`, colunas: `maxPerDay`
       Int @default(2), `maxNudgesPerDay` Int @default(1), `quietStart` Int
       @default(22), `quietEnd` Int @default(7), `spacingHours` Int @default(6),
       `restGapEnabled` Bool @default(true), `urgentThreshold` Int @default(80),
       `updatedAt`)
-- [ ] `NotificationSettingsService.get()` faz upsert-lazy da linha default e
-      cacheia por ~60s
-- [ ] `notifications.scheduler.ts` usa esses valores no lugar de `MAX_PER_DAY`,
+- [x] `NotificationSettingsService.get()` faz upsert-lazy da linha default e
+      cacheia por ~60s (+ `invalidate()` pro PATCH da Task 2; fallback pros
+      defaults se o banco falhar, sem cachear o fallback)
+- [x] `notifications.scheduler.ts` usa esses valores no lugar de `MAX_PER_DAY`,
       `MAX_NUDGES_PER_DAY`, `QUIET_START/END`, `SPACING_MS`, `URGENT_THRESHOLD`,
       `inRestGap`
-- [ ] Com o banco recém-criado (sem linha), o tick se comporta exatamente como
-      antes
+- [x] Com o banco recém-criado (sem linha), o tick se comporta exatamente como
+      antes — os defaults do serviço reproduzem as constantes antigas
+- [ ] ⚠️ **Achado:** `inRestGap` já era variável morta (calculada, nunca usada) —
+      o "gap de descanso" nunca esteve ligado. É a causa direta da queixa do
+      usuário (mesmas notificações se repetindo a cada 1–2 dias). Mantido
+      igual nesta task (agora sob a flag `restGapEnabled`, mas ainda sem
+      efeito); ligar de fato = decisão do usuário no Checkpoint A (pergunta
+      aberta nº 5 do plano).
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` passa (specs existentes + novos casos
-      "sem linha de settings" e "settings customizado muda o teto")
-- [ ] `npm run build` no backend
-- [ ] Manual: `GET` no banco mostra 1 linha `NotificationSettings` após o 1º tick
+- [x] `npx jest notifications.scheduler` passa (specs existentes + novos casos
+      "sem linha de settings", "maxPerDay customizado", "quiet hours ampliado")
+- [x] `npm run build` no backend — suíte completa: 728 testes passando
+- [ ] Manual: `GET` no banco mostra 1 linha `NotificationSettings` após o 1º
+      tick — depende do `prisma db push` em prod (Checkpoint, com OK do usuário)
 
 **Dependências:** Nenhuma
 **Arquivos:** `oratio-api/prisma/schema.prisma`,

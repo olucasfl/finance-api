@@ -2,6 +2,10 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationsSendService } from './notifications-send.service';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationSettingsService,
+} from './notification-settings.service';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -115,17 +119,16 @@ type FireCtx = { url?: string; vars?: Record<string, string> } | null;
 export class NotificationsScheduler implements OnModuleInit {
   private readonly logger = new Logger(NotificationsScheduler.name);
 
-  private readonly QUIET_END = 7;            // não incomodar antes disso (hora local)
-  private readonly QUIET_START = 22;         // nem a partir disso
-  private readonly MAX_PER_DAY = 2;          // teto de automáticas por pessoa por dia
-  private readonly MAX_NUDGES_PER_DAY = 1;   // teto de "convites" (não-urgentes) por dia
-  private readonly URGENT_THRESHOLD = 80;    // priority >= isso = urgente
-  private readonly SPACING_MS = 6 * 60 * 60 * 1000; // 6h entre duas automáticas
+  // Os parâmetros do funil (quiet hours, tetos, espaçamento, limiar de
+  // urgência, rest gap) agora vêm de `NotificationSettings` via
+  // `NotificationSettingsService` — editáveis no admin sem deploy. Os
+  // defaults do serviço reproduzem os valores que eram constantes aqui.
   private readonly HISTORY_DAYS = 35;        // janela pra olhar o histórico recente
 
   constructor(
     private prisma: PrismaService,
     private send: NotificationsSendService,
+    private settings: NotificationSettingsService,
   ) {}
 
   // Reconcilia o catálogo: cria as regras que faltam (sem sobrescrever o que
@@ -162,8 +165,13 @@ export class NotificationsScheduler implements OnModuleInit {
   marcada em diante (fica "na fila" o dia todo até um slot liberar), sempre
   fora do quiet hours. Pública para teste unitário.
   */
-  shouldFireAtHour(hours: number, ruleHour: number): boolean {
-    if (hours < this.QUIET_END || hours >= this.QUIET_START) return false;
+  shouldFireAtHour(
+    hours: number,
+    ruleHour: number,
+    quietEnd: number = DEFAULT_NOTIFICATION_SETTINGS.quietEnd,
+    quietStart: number = DEFAULT_NOTIFICATION_SETTINGS.quietStart,
+  ): boolean {
+    if (hours < quietEnd || hours >= quietStart) return false;
     return hours >= ruleHour;
   }
 
@@ -171,8 +179,11 @@ export class NotificationsScheduler implements OnModuleInit {
     return RULE_META[key]?.priority ?? 50;
   }
 
-  private isUrgent(key: string): boolean {
-    return this.priority(key) >= this.URGENT_THRESHOLD;
+  private isUrgent(
+    key: string,
+    threshold: number = DEFAULT_NOTIFICATION_SETTINGS.urgentThreshold,
+  ): boolean {
+    return this.priority(key) >= threshold;
   }
 
   private cooldownOk(lastAt: number | undefined, key: string, now: number): boolean {
@@ -227,6 +238,8 @@ export class NotificationsScheduler implements OnModuleInit {
     })) as RuleRow[];
     if (rules.length === 0) return;
 
+    const cfg = await this.settings.get();
+
     // um fuso por usuário (o do primeiro aparelho encontrado)
     const subs = await this.prisma.pushSubscription.findMany({
       select: { userId: true, timezone: true },
@@ -241,7 +254,7 @@ export class NotificationsScheduler implements OnModuleInit {
     for (const [userId, tz] of tzByUser) {
       try {
         const { hours, dateStr: todayStr } = this.nowInZone(tz);
-        if (hours < this.QUIET_END || hours >= this.QUIET_START) continue; // quiet hours
+        if (hours < cfg.quietEnd || hours >= cfg.quietStart) continue; // quiet hours
 
         const hist = await this.prisma.notification.findMany({
           where: {
@@ -254,13 +267,13 @@ export class NotificationsScheduler implements OnModuleInit {
         });
 
         const sentToday = hist.filter((n) => this.dateInZone(n.createdAt, tz) === todayStr);
-        if (sentToday.length >= this.MAX_PER_DAY) continue; // teto do dia
+        if (sentToday.length >= cfg.maxPerDay) continue; // teto do dia
 
         const lastAt = hist[0]?.createdAt?.getTime();
-        if (lastAt && now - lastAt < this.SPACING_MS) continue; // espaçamento 6h
+        if (lastAt && now - lastAt < cfg.spacingHours * 60 * 60 * 1000) continue; // espaçamento
 
         const nudgesToday = sentToday.filter(
-          (n) => !n.ruleKey || !this.isUrgent(n.ruleKey),
+          (n) => !n.ruleKey || !this.isUrgent(n.ruleKey, cfg.urgentThreshold),
         ).length;
 
         // Gap de descanso: não notificar todo dia. As SUPLEMENTARES só
@@ -269,7 +282,8 @@ export class NotificationsScheduler implements OnModuleInit {
         // ignoram esse gap (passam na frente mesmo em dia de folga).
         const yesterdayStr = this.dateInZone(new Date(now - DAY), tz);
         const lastDay = hist[0] ? this.dateInZone(hist[0].createdAt, tz) : null;
-        const inRestGap = lastDay === todayStr || lastDay === yesterdayStr;
+        const inRestGap =
+          cfg.restGapEnabled && (lastDay === todayStr || lastDay === yesterdayStr);
 
         // última vez de cada regra (cooldown + justiça)
         const lastByRule = new Map<string, number>();
@@ -299,7 +313,10 @@ export class NotificationsScheduler implements OnModuleInit {
         // dispara a primeira permitida cuja condição bate
         for (const rule of candidates) {
           // convite (não-urgente) só se ainda houver cota de convite no dia
-          if (!this.isUrgent(rule.key) && nudgesToday >= this.MAX_NUDGES_PER_DAY) {
+          if (
+            !this.isUrgent(rule.key, cfg.urgentThreshold) &&
+            nudgesToday >= cfg.maxNudgesPerDay
+          ) {
             continue;
           }
           if (await this.tryFire(userId, rule, tz)) break;

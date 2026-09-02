@@ -296,6 +296,23 @@ model NotificationRule {
   updatedAt DateTime @updatedAt
 }
 
+// Bloco de configuração do funil anti-spam — linha única (`id = "default"`).
+// Antes esses parâmetros eram constantes privadas em notifications.scheduler.ts;
+// agora ficam editáveis no admin sem deploy. Todos os defaults reproduzem
+// exatamente o comportamento anterior, então um banco sem esta linha (ou com
+// o banco fora do ar) se comporta igual ao de antes.
+model NotificationSettings {
+  id              String   @id @default("default")
+  maxPerDay       Int      @default(2) // teto de automáticas por pessoa por dia
+  maxNudgesPerDay Int      @default(1) // teto de "convites" (não-urgentes) por dia
+  quietStart      Int      @default(22) // hora local a partir da qual não incomodar
+  quietEnd        Int      @default(7) // hora local antes da qual não incomodar
+  spacingHours    Int      @default(6) // horas mínimas entre duas automáticas
+  restGapEnabled  Boolean  @default(true) // gap de descanso (dias vazios entre notificações)
+  urgentThreshold Int      @default(80) // priority >= isso = urgente (passa na frente)
+  updatedAt       DateTime @updatedAt
+}
+
 // Quaresma de São Miguel — devoção sazonal de 40 dias de oração que vai
 // de 15/08 até a Festa de São Miguel (29/09), pulando os domingos (dia de
 // descanso/Missa). Uma linha por dia concluído.
