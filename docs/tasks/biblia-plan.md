@@ -1,7 +1,7 @@
 # Plano de Implementação — Bíblia de Estudo (Backend / oratio-api)
 
 > Parte **backend** da feature "Bíblia de Estudo". O plano do frontend está em
-> `oratio/tasks/biblia-plan.md`. Leia os dois juntos.
+> `oratio/docs/tasks/biblia-plan.md`. Leia os dois juntos.
 
 ## Visão geral
 

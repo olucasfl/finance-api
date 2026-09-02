@@ -1,6 +1,6 @@
 # TODO — Bíblia de Estudo (Backend / oratio-api)
 
-Plano completo: `tasks/biblia-plan.md`. Frontend: `oratio/tasks/biblia-todo.md`.
+Plano completo: `docs/tasks/biblia-plan.md`. Frontend: `oratio/docs/tasks/biblia-todo.md`.
 
 Comandos: `npm run start:dev` · `npm run build` · `npm test -- <pattern>` · `npm run lint`
 Prisma: `npx prisma db push && npx prisma generate` (sem migrations — ver ARCHITECTURE §2)
