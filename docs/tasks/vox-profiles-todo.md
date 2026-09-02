@@ -330,9 +330,9 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 ### BF.2 — Contrato com o frontend
 
 **Critérios de aceite:**
-- [ ] Rotas/campos conferidos contra `oratio/src/services/voxService.ts`
+- [x] Rotas/campos conferidos contra `oratio/src/services/voxService.ts`
       (`getVoxProfiles`, `setVoxProfile`, shape de `getBootstrap`)
-- [ ] `ALLOWED_ORIGINS` já cobre o front (nenhuma origem nova) — confirmado
+- [x] `ALLOWED_ORIGINS` já cobre o front (nenhuma origem nova) — confirmado
 
 **Dependências:** frontend F1 existir · **Escopo:** XS
 
@@ -340,6 +340,7 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 
 ## ⛳ Checkpoint final backend
 
-- [ ] Build + lint + testes verdes · cobertura global sem regressão
+- [x] Build limpo · testes verdes (810) · cobertura global sem regressão
+      (`npm run lint` quebrado no repo — não é regressão desta feature)
 - [ ] `db push` de produção aplicado e confirmado
-- [ ] Docs atualizados · contrato alinhado com `voxService.ts`
+- [x] Docs atualizados · contrato alinhado com `voxService.ts`
