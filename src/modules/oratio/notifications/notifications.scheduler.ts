@@ -312,10 +312,12 @@ export class NotificationsScheduler implements OnModuleInit {
 
         // dispara a primeira permitida cuja condição bate
         for (const rule of candidates) {
-          // convite (não-urgente) só se ainda houver cota de convite no dia
+          // convite (não-urgente): só se ainda houver cota de convite no dia
+          // E não estivermos no gap de descanso (nenhuma notificação hoje
+          // nem ontem). As urgentes ignoram os dois.
           if (
             !this.isUrgent(rule.key, cfg.urgentThreshold) &&
-            nudgesToday >= cfg.maxNudgesPerDay
+            (inRestGap || nudgesToday >= cfg.maxNudgesPerDay)
           ) {
             continue;
           }

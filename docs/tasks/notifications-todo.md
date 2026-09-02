@@ -34,12 +34,14 @@ em vez das constantes privadas, com defaults idênticos aos valores de hoje.
       `inRestGap`
 - [x] Com o banco recém-criado (sem linha), o tick se comporta exatamente como
       antes — os defaults do serviço reproduzem as constantes antigas
-- [ ] ⚠️ **Achado:** `inRestGap` já era variável morta (calculada, nunca usada) —
-      o "gap de descanso" nunca esteve ligado. É a causa direta da queixa do
-      usuário (mesmas notificações se repetindo a cada 1–2 dias). Mantido
-      igual nesta task (agora sob a flag `restGapEnabled`, mas ainda sem
-      efeito); ligar de fato = decisão do usuário no Checkpoint A (pergunta
-      aberta nº 5 do plano).
+- [x] ⚠️ **Achado + fix:** `inRestGap` era variável morta (calculada, nunca
+      usada) — o "gap de descanso" nunca esteve ligado. Era a causa direta da
+      queixa do usuário (mesmas notificações a cada 1–2 dias). **Ligado nesta
+      fase** (decisão do usuário, 2026-09-02): notificação não-urgente só
+      dispara se não houve NENHUMA notificação hoje nem ontem; urgentes
+      (streak/terço não terminado) ignoram o gap. Sob a flag `restGapEnabled`
+      (default on, desligável pelo painel). Testes: `describe('rest gap')` em
+      `notifications.scheduler.spec.ts`.
 
 **Verificação:**
 - [x] `npx jest notifications.scheduler` passa (specs existentes + novos casos

@@ -342,6 +342,68 @@ describe('NotificationsScheduler', () => {
       // 10h agora cai dentro do quiet hours (>= 9) → ninguém recebe
       expect(send.deliverToUser).not.toHaveBeenCalled();
     });
+
+    describe('rest gap (dias vazios entre notificações não-urgentes)', () => {
+      // notificação de ONTEM: dentro do histórico, fora do "hoje", e a >6h
+      // (não trava por espaçamento nem pelo teto do dia)
+      const yesterday = () => new Date(Date.now() - DAY_MS);
+
+      it('suppresses a non-urgent nudge when anything was delivered yesterday', async () => {
+        setUtcHour(10);
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'EXAMEN_NIGHT', hour: 9, condition: null }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([
+          { createdAt: yesterday(), ruleKey: 'SUNDAY_MASS' },
+        ]);
+
+        await scheduler.tick();
+
+        expect(send.deliverToUser).not.toHaveBeenCalled();
+      });
+
+      it('still lets an URGENT rule through during the rest gap', async () => {
+        setUtcHour(10);
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'STREAK_AT_RISK', hour: 9, condition: 'STREAK_AT_RISK' }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([
+          { createdAt: yesterday(), ruleKey: 'SUNDAY_MASS' },
+        ]);
+        prisma.spiritualStats.findUnique.mockResolvedValue({
+          prayerStreak: 5,
+          lastLoginDate: new Date('2000-01-01'),
+        });
+
+        await scheduler.tick();
+
+        expect(send.deliverToUser).toHaveBeenCalledWith(
+          'u1',
+          expect.objectContaining({ ruleKey: 'STREAK_AT_RISK' }),
+        );
+      });
+
+      it('does not apply the gap when restGapEnabled is false', async () => {
+        setUtcHour(10);
+        settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS, restGapEnabled: false });
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'EXAMEN_NIGHT', hour: 9, condition: null }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([
+          { createdAt: yesterday(), ruleKey: 'SUNDAY_MASS' },
+        ]);
+
+        await scheduler.tick();
+
+        expect(send.deliverToUser).toHaveBeenCalledWith(
+          'u1',
+          expect.objectContaining({ ruleKey: 'EXAMEN_NIGHT' }),
+        );
+      });
+    });
   });
 
   describe('condition evaluators', () => {
