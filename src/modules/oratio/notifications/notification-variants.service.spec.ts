@@ -19,10 +19,16 @@ describe('NotificationVariantsService', () => {
 
   beforeEach(async () => {
     prisma = {
-      notificationRule: { findMany: jest.fn().mockResolvedValue([]) },
+      notificationRule: {
+        findMany: jest.fn().mockResolvedValue([]),
+        findUnique: jest.fn().mockResolvedValue({ key: 'R' }),
+      },
       notificationRuleVariant: {
         count: jest.fn().mockResolvedValue(0),
         create: jest.fn().mockResolvedValue({}),
+        update: jest.fn().mockResolvedValue({}),
+        delete: jest.fn().mockResolvedValue({}),
+        findUnique: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
     };
@@ -101,6 +107,60 @@ describe('NotificationVariantsService', () => {
       const a = v({ id: 'a', enabled: true });
       const b = v({ id: 'b', enabled: false });
       expect(service.pickVariant([a, b], ['a', 'a'])?.id).toBe('a');
+    });
+  });
+
+  describe('CRUD guards (piso de 1 variante ativa)', () => {
+    it('createForRule appends after the existing variants and 404s an unknown rule', async () => {
+      prisma.notificationRuleVariant.count.mockResolvedValue(2);
+      await service.createForRule('R', { body: 'nova' });
+      expect(prisma.notificationRuleVariant.create).toHaveBeenCalledWith({
+        data: { ruleKey: 'R', title: null, body: 'nova', url: null, order: 2 },
+      });
+
+      prisma.notificationRule.findUnique.mockResolvedValue(null);
+      await expect(service.createForRule('X', {})).rejects.toThrow('Regra não encontrada');
+    });
+
+    it('update refuses to disable the last enabled variant', async () => {
+      prisma.notificationRuleVariant.findUnique.mockResolvedValue({
+        id: 'v1', ruleKey: 'R', enabled: true,
+      });
+      prisma.notificationRuleVariant.count.mockResolvedValue(1);
+
+      await expect(service.update('v1', { enabled: false })).rejects.toThrow(
+        'pelo menos uma variante ativa',
+      );
+    });
+
+    it('update allows disabling when another enabled variant remains', async () => {
+      prisma.notificationRuleVariant.findUnique.mockResolvedValue({
+        id: 'v1', ruleKey: 'R', enabled: true,
+      });
+      prisma.notificationRuleVariant.count.mockResolvedValue(2);
+
+      await service.update('v1', { enabled: false });
+      expect(prisma.notificationRuleVariant.update).toHaveBeenCalled();
+    });
+
+    it('remove refuses when it is the rule\'s only variant', async () => {
+      prisma.notificationRuleVariant.findUnique.mockResolvedValue({
+        id: 'v1', ruleKey: 'R', enabled: true,
+      });
+      prisma.notificationRuleVariant.count.mockResolvedValue(1);
+
+      await expect(service.remove('v1')).rejects.toThrow('pelo menos uma variante');
+      expect(prisma.notificationRuleVariant.delete).not.toHaveBeenCalled();
+    });
+
+    it('remove works when other variants remain', async () => {
+      prisma.notificationRuleVariant.findUnique.mockResolvedValue({
+        id: 'v1', ruleKey: 'R', enabled: false,
+      });
+      prisma.notificationRuleVariant.count.mockResolvedValue(3);
+
+      await expect(service.remove('v1')).resolves.toEqual({ ok: true });
+      expect(prisma.notificationRuleVariant.delete).toHaveBeenCalledWith({ where: { id: 'v1' } });
     });
   });
 });

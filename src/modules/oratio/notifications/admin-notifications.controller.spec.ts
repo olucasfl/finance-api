@@ -9,6 +9,7 @@ describe('AdminNotificationsController', () => {
   let controller: AdminNotificationsController;
   let send: Record<string, jest.Mock>;
   let settings: Record<string, jest.Mock>;
+  let variants: Record<string, jest.Mock>;
 
   const req = (userId = 'admin-1') => ({ user: { userId } });
 
@@ -28,8 +29,14 @@ describe('AdminNotificationsController', () => {
       getFull: jest.fn().mockResolvedValue({ id: 'default', maxPerDay: 2 }),
       update: jest.fn().mockResolvedValue({ id: 'default', maxPerDay: 3 }),
     };
+    variants = {
+      listForRule: jest.fn().mockResolvedValue([]),
+      createForRule: jest.fn().mockResolvedValue({ id: 'v1' }),
+      update: jest.fn().mockResolvedValue({ id: 'v1' }),
+      remove: jest.fn().mockResolvedValue({ ok: true }),
+    };
 
-    controller = new AdminNotificationsController(send as any, settings as any);
+    controller = new AdminNotificationsController(send as any, settings as any, variants as any);
   });
 
   it('getSettings() delegates to the settings service', async () => {
@@ -104,6 +111,24 @@ describe('AdminNotificationsController', () => {
   it('deleteRule() delegates the key', () => {
     controller.deleteRule('rule-1');
     expect(send.deleteRule).toHaveBeenCalledWith('rule-1');
+  });
+
+  it('listVariants() / createVariant() delegate the rule key', () => {
+    controller.listVariants('R');
+    expect(variants.listForRule).toHaveBeenCalledWith('R');
+
+    const body = { title: 'T', body: 'B' } as any;
+    controller.createVariant('R', body);
+    expect(variants.createForRule).toHaveBeenCalledWith('R', body);
+  });
+
+  it('updateVariant() / deleteVariant() delegate the variant id', () => {
+    const body = { enabled: false } as any;
+    controller.updateVariant('v9', body);
+    expect(variants.update).toHaveBeenCalledWith('v9', body);
+
+    controller.deleteVariant('v9');
+    expect(variants.remove).toHaveBeenCalledWith('v9');
   });
 
   it('deleteAll() delegates to deleteAllCampaigns', () => {
