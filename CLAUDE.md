@@ -28,6 +28,7 @@ the single source of truth — this file stays a thin pointer so it can't drift.
 |---|---|---|
 | **Reformulação das notificações** (torna regras/timing/textos configuráveis sem deploy) | `docs/tasks/notifications-plan.md` · `docs/tasks/notifications-todo.md` | Ativo. Plano-mestre cross-repo — o frontend tem só um ponteiro em `oratio/docs/tasks/notifications.md`. |
 | **Bíblia de Estudo** (backend: bible-marks, bible-collections) | `docs/tasks/biblia-plan.md` · `docs/tasks/biblia-todo.md` | Frontend em `oratio/docs/tasks/biblia-*.md` — ler os dois juntos. |
+| **Perfis de resposta do VoxAI** (identidade fixa + 6 perfis de estilo por usuário) | `docs/tasks/vox-profiles-plan.md` · `docs/tasks/vox-profiles-todo.md` | Fases B1+B2 na develop. Falta B3 (conteúdo dos 5 perfis, aceite do usuário um a um) e o `prisma db push` no deploy. Frontend em `oratio/docs/tasks/vox-profiles-todo.md`. |
 
 When you finish a task, tick it in its `*-todo.md` and, if behavior changed,
 update `docs/ARCHITECTURE.md` in the same commit.

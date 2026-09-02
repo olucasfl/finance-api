@@ -308,13 +308,13 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 ### BF.1 — `docs/ARCHITECTURE.md` §6
 
 **Critérios de aceite:**
-- [ ] §6 descreve: `VOX_IDENTITY` + `VOX_PROFILES` (o prompt não é mais bloco único),
+- [x] §6 descreve: `VOX_IDENTITY` + `VOX_PROFILES` (o prompt não é mais bloco único),
       `buildSystemPrompt` unificando `chat`/`chatStream`, `max_tokens` por perfil,
       `User.voxProfile` (null = DEFAULT) + `voxOnboardingSeenAt`, rotas
       `GET /profiles` · `PATCH /profile` · `POST /profile/intro-seen`,
       `showVoxIntro` no bootstrap, `profile=` no log
-- [ ] Nota: conteúdo dos perfis é código; migração para admin é fase futura (plano §8)
-- [ ] Tabela de `docs/tasks/` no `CLAUDE.md` (raiz) ganha a linha desta feature
+- [x] Nota: conteúdo dos perfis é código; migração para admin é fase futura (plano §8)
+- [x] Tabela de `docs/tasks/` no `CLAUDE.md` (raiz) ganha a linha desta feature
 
 **Dependências:** B1–B3 · **Arquivos:** `docs/ARCHITECTURE.md`, `CLAUDE.md`
 **Escopo:** XS

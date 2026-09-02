@@ -109,13 +109,13 @@ The largest and most stateful module (`voxai.service.ts` is ~870 lines). Structu
 
 ```
 voxai/
-  voxai.controller.ts      routes: chat, chat/stream, bootstrap, conversation CRUD
-  voxai.service.ts          conversation state, prompt assembly, OpenAI call, streaming
+  voxai.controller.ts      routes: chat, chat/stream, bootstrap, conversation CRUD, profile(s)
+  voxai.service.ts          conversation state, prompt assembly, OpenAI call, streaming, profiles
   voxai.cron.ts              warms the daily liturgical-calendar cache at 00:01 America/Sao_Paulo
-  dto/voxai.dto.ts
+  dto/voxai.dto.ts, dto/set-vox-profile.dto.ts
   guards/vox.rate-limiter.ts    in-memory per-user rate limit (5 req / 60s)
   filters/vox.content-filter.ts  keyword blocklist (horoscope, tarot, occultism, ...)
-  prompts/vox.prompt.ts           the system prompt defining VOX's persona and doctrinal boundaries
+  prompts/vox.prompt.ts           VOX_IDENTITY (invariant persona/doctrine) + VOX_PROFILES (response styles)
   services/liturgical-calendar.service.ts  fetches/caches the day's liturgical data for the assistant to reference
   utils/brazil-date.ts, date-parser.ts
 ```
@@ -126,6 +126,7 @@ Key points:
 - **Calls OpenAI directly over HTTP** (`axios.post("https://api.openai.com/v1/chat/completions", ...)`), model `gpt-4.1-mini`. There is no `openai` npm package in `package.json` — don't go looking for an SDK client. `chat` and `chat/stream` are separate endpoints/code paths by design ("don't risk what already works" — the streaming path was added later, alongside the non-streaming one, not replacing it).
 - **Rate limiting is per-instance, in-memory** (`VoxRateLimiter`, a `Map<userId, timestamp[]>`) — 5 requests/minute per user. This resets on every restart/deploy and does **not** work correctly across multiple server instances (each instance has its own map). If this service is ever scaled horizontally, this needs to move to a shared store (Redis, DB) — it currently silently under-enforces the limit when there's more than one instance.
 - **Content filtering is a keyword blocklist** (`contentFilter`), checked before the model is called — not a model-based classifier. It's a first line of defense (occult/esoteric topics), not a complete safety system; the system prompt (`vox.prompt.ts`) is the primary control on what VOX will and won't say, restricting it to Scripture, the Catechism, and Catholic doctrine.
+- **Response profiles (2026-09).** `vox.prompt.ts` is no longer one string: `VOX_IDENTITY` is the invariant persona/doctrine/formatting/liturgy block; `VOX_PROFILES` is a map of 6 style profiles (`DEFAULT` "Padrão", `DIRECT`, `STUDY`, `PASTORAL`, `CATECHIST`, `APOLOGETIC`), each with a `systemAppend` (glued to the *end* of the prompt), a `maxTokens` budget, and user-facing `label`/`short`/`details`/`examples`. The 3 sections that used to force every answer into the same mould ("Aplicação prática", "Arquitetura de uma resposta completa", "Resumo final") were removed from the identity and are now per-profile. `resolveVoxProfile(key)` falls back to `DEFAULT` for `null`/unknown. `buildSystemPrompt()` is the single assembly point used by both `chat` and `chatStream` (was duplicated). Per-user choice lives in `User.voxProfile` (`null` → behaves as `DEFAULT`); `User.voxOnboardingSeenAt` gates the first-run card. Routes: `GET /oratio/voxai/profiles` (catalog, never leaks `systemAppend`/`maxTokens`), `PATCH /oratio/voxai/profile` (`@IsIn(VOX_PROFILE_KEYS)`, also stamps `voxOnboardingSeenAt`), `POST /oratio/voxai/profile/intro-seen` (dismiss without choosing). `getBootstrap` returns `profile` + `showVoxIntro`. The token log line carries `profile=<key>`. The 5 non-default profiles ship with empty `systemAppend`/`examples` until they are written and signed off (plan `docs/tasks/vox-profiles-plan.md`, phase B3).
 - **`getOrCreateActiveConversation`** — VoxAI keeps one "active" conversation per user rather than always starting fresh; `POST /conversation` is intentionally the same call as `GET /conversation/active` under the hood ("não cria duplicada" in the source) — calling create twice does not create two conversations.
 - `deleteConversation`/`renameConversation` throw NestJS's `NotFoundException` (not a raw `Error`) for a missing or non-owned conversation id — both cases return the same "not found" rather than distinguishing them, so a non-owner can't tell whether an id exists at all. Keep using proper `HttpException` subclasses for expected failure cases in this file; a plain `throw new Error(...)` here becomes an uncaught 500 (the controller has no try/catch) and gets logged into the admin panel's 5xx ring buffer (§7) as if it were a real incident.
 - **`utils/date-parser.ts`: "anteontem" must be checked before "ontem"**, not after — `"anteontem"` contains `"ontem"` as a substring, so checking `text.includes("ontem")` first makes it match before the `"anteontem"` branch is ever reached. If you add more relative-date keywords here, check whether one is a substring of another and order the more specific check first.
