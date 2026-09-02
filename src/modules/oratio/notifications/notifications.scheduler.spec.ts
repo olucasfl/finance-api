@@ -87,11 +87,15 @@ describe('NotificationsScheduler', () => {
       expect(prisma.notificationRule.create).toHaveBeenCalledTimes(9);
     });
 
-    it('does not touch a rule that already exists and has a normal url', async () => {
-      prisma.notificationRule.findUnique.mockResolvedValue({
-        key: 'ROSARY_UNFINISHED',
-        url: '/oratio/rosary',
-      });
+    // findUnique é chamado 1x por regra do catálogo — devolve o mesmo shape
+    // pra qualquer key, com os overrides do teste.
+    const existingRow = (over: Record<string, unknown> = {}) =>
+      prisma.notificationRule.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve({ key: where.key, url: '/whatever', band: 'MORNING', thresholdDays: 99, ...over }),
+      );
+
+    it('does not touch a rule that already exists with url and knobs set', async () => {
+      existingRow();
 
       await scheduler.onModuleInit();
 
@@ -100,10 +104,7 @@ describe('NotificationsScheduler', () => {
     });
 
     it('fixes a stale url pointing at /oratio/home without overwriting an admin-chosen url', async () => {
-      prisma.notificationRule.findUnique.mockResolvedValue({
-        key: 'ROSARY_UNFINISHED',
-        url: '/oratio/home',
-      });
+      existingRow({ url: '/oratio/home' });
 
       await scheduler.onModuleInit();
 
@@ -111,6 +112,30 @@ describe('NotificationsScheduler', () => {
         where: { key: 'ROSARY_UNFINISHED' },
         data: { url: '/oratio/rosary' },
       });
+    });
+
+    it('backfills band/thresholdDays on a legacy rule where they are still null', async () => {
+      existingRow({ band: null, thresholdDays: null });
+
+      await scheduler.onModuleInit();
+
+      expect(prisma.notificationRule.update).toHaveBeenCalledWith({
+        where: { key: 'BIBLE_RESUME' },
+        data: { band: 'MORNING', thresholdDays: 3 },
+      });
+      // regra sem janela: só a band é semeada, sem thresholdDays
+      expect(prisma.notificationRule.update).toHaveBeenCalledWith({
+        where: { key: 'EXAMEN_NIGHT' },
+        data: { band: 'EVENING' },
+      });
+    });
+
+    it('never overwrites band/thresholdDays the admin already customised', async () => {
+      existingRow({ band: 'EVENING', thresholdDays: 10 });
+
+      await scheduler.onModuleInit();
+
+      expect(prisma.notificationRule.update).not.toHaveBeenCalled();
     });
 
     it('prunes rules that fell out of the catalog', async () => {
@@ -589,7 +614,9 @@ describe('NotificationsScheduler', () => {
 
     describe('evalCondition', () => {
       it('is eligible (fires) when the rule has no condition at all (null)', async () => {
-        await expect(s().evalCondition('u1', null, 'UTC')).resolves.toEqual({});
+        await expect(
+          s().evalCondition('u1', { condition: null, thresholdDays: null }, 'UTC'),
+        ).resolves.toEqual({});
       });
 
       it('never fires for an unrecognized condition string instead of firing unconditionally', async () => {
@@ -597,7 +624,47 @@ describe('NotificationsScheduler', () => {
         // de "SUNDAY") caía no `default` do switch, que costumava tratar
         // qualquer string desconhecida como "sem condição" — disparando a
         // regra todo santo dia em vez de nunca.
-        await expect(s().evalCondition('u1', 'ALGUM_TYPO_QUALQUER', 'UTC')).resolves.toBeNull();
+        await expect(
+          s().evalCondition('u1', { condition: 'ALGUM_TYPO_QUALQUER', thresholdDays: null }, 'UTC'),
+        ).resolves.toBeNull();
+      });
+
+      it('reads thresholdDays from the rule for a window condition (BIBLE_RESUME)', async () => {
+        prisma.readingProgress.findFirst.mockResolvedValue({
+          reference: 'genesis/3',
+          label: 'Gênesis 3',
+          updatedAt: new Date(Date.now() - 2 * DAY_MS), // parado há 2 dias
+        });
+
+        // limiar custom de 1 dia → 2 dias parado já dispara
+        await expect(
+          s().evalCondition('u1', { condition: 'BIBLE_RESUME', thresholdDays: 1 }, 'UTC'),
+        ).resolves.toMatchObject({ url: '/oratio/biblia/genesis/3' });
+
+        // sem limiar → cai no default de código (3 dias) → 2 dias ainda não
+        await expect(
+          s().evalCondition('u1', { condition: 'BIBLE_RESUME', thresholdDays: null }, 'UTC'),
+        ).resolves.toBeNull();
+      });
+
+      it('reads thresholdDays for ROSARY_LAPSE / COMEBACK too', async () => {
+        prisma.spiritualStats.findUnique.mockResolvedValue({
+          rosariesPrayed: 3,
+          lastLoginDate: new Date(Date.now() - 4 * DAY_MS),
+        });
+        prisma.rosarySession.findFirst.mockResolvedValue({
+          finishedAt: new Date(Date.now() - 4 * DAY_MS),
+        });
+
+        // ROSARY_LAPSE: último terço há 4 dias, limiar custom 3 → dispara
+        await expect(
+          s().evalCondition('u1', { condition: 'ROSARY_LAPSE', thresholdDays: 3 }, 'UTC'),
+        ).resolves.toEqual({});
+
+        // COMEBACK: sem abrir há 4 dias, limiar custom 5 → ainda não
+        await expect(
+          s().evalCondition('u1', { condition: 'COMEBACK', thresholdDays: 5 }, 'UTC'),
+        ).resolves.toBeNull();
       });
     });
   });

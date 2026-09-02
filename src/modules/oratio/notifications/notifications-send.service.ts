@@ -218,7 +218,15 @@ export class NotificationsSendService {
 
   updateRule(
     key: string,
-    data: { enabled?: boolean; title?: string; body?: string | null; url?: string | null; hour?: number | null },
+    data: {
+      enabled?: boolean;
+      title?: string;
+      body?: string | null;
+      url?: string | null;
+      hour?: number | null;
+      thresholdDays?: number | null;
+      band?: string | null;
+    },
   ) {
     return this.prisma.notificationRule.update({
       where: { key },
@@ -228,6 +236,8 @@ export class NotificationsSendService {
         body: data.body,
         url: data.url,
         hour: data.hour,
+        thresholdDays: data.thresholdDays,
+        band: data.band,
       },
     });
   }

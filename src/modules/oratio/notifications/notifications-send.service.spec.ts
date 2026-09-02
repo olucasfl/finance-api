@@ -272,6 +272,14 @@ describe('NotificationsSendService', () => {
       });
     });
 
+    it('updateRule forwards the Fase 2 knobs (band / thresholdDays)', () => {
+      service.updateRule('rule-1', { band: 'EVENING', thresholdDays: 5 });
+      expect(prisma.notificationRule.update).toHaveBeenCalledWith({
+        where: { key: 'rule-1' },
+        data: expect.objectContaining({ band: 'EVENING', thresholdDays: 5 }),
+      });
+    });
+
     it('createRule defaults optional fields to null', () => {
       service.createRule({ title: 'Nova regra' });
       expect(prisma.notificationRule.create).toHaveBeenCalledWith({
