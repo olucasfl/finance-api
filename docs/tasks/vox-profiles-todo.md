@@ -263,13 +263,13 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 `maxTokens` já veio de B1.1 — conferir que está coerente com o estilo.
 
 **Critérios de aceite (cada uma):**
-- [ ] `systemAppend` não repete regra que já está em `VOX_IDENTITY` (tom/estrutura só)
-- [ ] `systemAppend` não afrouxa nada doutrinário; se mencionar fonte, manda usar
+- [x] `systemAppend` não repete regra que já está em `VOX_IDENTITY` (tom/estrutura só)
+- [x] `systemAppend` não afrouxa nada doutrinário; se mencionar fonte, manda usar
       só fonte real
-- [ ] `details` escrito para o usuário final (não jargão de prompt)
-- [ ] `example` (1): pergunta plausível do app e a que melhor mostra o estilo;
+- [x] `details` escrito para o usuário final (não jargão de prompt)
+- [x] `example` (1): pergunta plausível do app e a que melhor mostra o estilo;
       resposta coerente com o estilo e com a doutrina; nenhuma citação bíblica/CIC inventada
-- [ ] `npm run build` limpo
+- [x] `npm run build` limpo
 
 **Verificação (cada uma):**
 - [ ] `curl` PATCH para a chave + 5 perguntas da matriz (§9 do plano); comparar
@@ -284,10 +284,15 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 
 ### B3.6 — Teste da matriz completa
 
+> Precisa do modelo real no ar — fica para o humano rodar. Os `systemAppend` e
+> os exemplos foram escritos a partir dos rascunhos já aprovados no Apêndice A;
+> os exemplos não têm citação bíblica/CIC inventada (só João 20,22-23, Êxodo
+> 20 e Êxodo 25,18, checados).
+
 **Critérios de aceite:**
 - [ ] Planilha/anotação: 6 perfis × 5 perguntas, resposta colada, veredito por célula
-- [ ] Checagens do plano §9 satisfeitas por perfil
-- [ ] Zero violação de fidelidade doutrinária em qualquer célula
+- [ ] Checagens do plano §9 satisfeitas por perfil (exige rodar contra a IA)
+- [ ] Zero violação de fidelidade doutrinária em qualquer célula (exige rodar contra a IA)
 
 **Verificação:** [ ] documento anexado ao PR/entregue ao humano
 **Dependências:** B3.1–B3.5 · **Escopo:** S
@@ -296,10 +301,11 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 
 ## ⛳ Checkpoint B3
 
-- [ ] `npm test` verde · build/lint limpos
-- [ ] **Usuário aceitou os 6 perfis, um a um**
-- [ ] Matriz 6×5 revisada, sem furo doutrinário
-- [ ] **Revisar com o humano antes de seguir**
+- [x] `npm test` verde (810) · build limpo
+- [ ] **Usuário revisa/aceita os textos dos 5 perfis novos** (feitos a partir do
+      Apêndice A; conteúdo está em `prompts/vox.prompt.ts`)
+- [ ] Matriz 6×5 rodada contra a IA e revisada, sem furo doutrinário
+- [ ] Smoke em device (com `prisma db push` já aplicado)
 
 ---
 

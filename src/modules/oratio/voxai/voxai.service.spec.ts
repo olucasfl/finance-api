@@ -268,8 +268,8 @@ describe('VoxAiService', () => {
       await service.chat({ message: 'Oi', conversationId: 'c1' } as any, 'user-1');
 
       const [, payload] = mockedAxios.post.mock.calls[0];
-      // DIRECT has an empty systemAppend until phase B3, so the prompt is just
-      // the identity — but the token budget already follows the profile
+      const systemContent = (payload as any).messages[0].content as string;
+      expect(systemContent).toContain('# Estilo de resposta ativo: Direto ao ponto');
       expect((payload as any).max_tokens).toBe(600);
       expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('profile=DIRECT'));
     });
