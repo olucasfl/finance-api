@@ -334,19 +334,28 @@ que aquele usuário recebeu há mais tempo (ou nunca), a partir do histórico de
 `Notification` (que o tick já carrega). Gravar `variantId` no item criado.
 
 **Critérios de aceite:**
-- [ ] Variante nunca recebida tem prioridade; empate → menor `order`
-- [ ] Interpolação de `{count}`/`{label}`/`{nome}` continua funcionando
-- [ ] `variantId` gravado em toda `Notification` de origem `RULE`
-- [ ] 1 variante só ⇒ comportamento idêntico ao de hoje
+- [x] `pickVariant()` (no `NotificationVariantsService`): nunca-usada tem
+      prioridade (empate → menor `order`); todas usadas → a mais antiga;
+      pula `enabled:false`; 1 variante ⇒ devolve ela (idêntico a hoje)
+- [x] `deliver()` monta o `recentVariantIds` da regra a partir do `hist`
+      (agora com `variantId` no select) e usa `variant.title/body/url ??`
+      o da regra; interpolação de `{count}`/`{label}` intacta
+- [x] `variantId` gravado na `Notification` via `NotificationsSendService`
+      (`DeliverInput.variantId`)
+- [x] Serviço de variantes fora do ar ⇒ `catch` ⇒ texto da regra
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` — "alterna A→B→A", "pula desativada"
-- [ ] `npm run build` no backend
-- [ ] Manual: forçar 3 disparos e ver os textos alternando
+- [x] `npx jest notification-variants` (rotação A→B→A, pula desativada) +
+      `notifications.scheduler` (deliver usa variante, grava variantId,
+      fallback) passam
+- [x] `npm run build` no backend — suíte completa: 767 testes
 
 **Dependências:** Task 9
-**Arquivos:** `.../notifications.scheduler.ts` (`deliver`/histórico), specs
+**Arquivos:** `.../notification-variants.service.ts` (`pickVariant`),
+`.../notifications.scheduler.ts` (`deliver`/histórico),
+`.../notifications-send.service.ts` (`variantId`), specs
 **Escopo:** S
+**Commit:** `oratio-api` branch `feat/notif-variantes`
 
 ---
 

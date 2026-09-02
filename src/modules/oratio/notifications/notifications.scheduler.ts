@@ -324,7 +324,7 @@ export class NotificationsScheduler implements OnModuleInit {
             source: 'RULE',
             createdAt: { gte: new Date(now - this.HISTORY_DAYS * DAY) },
           },
-          select: { createdAt: true, ruleKey: true },
+          select: { createdAt: true, ruleKey: true, variantId: true },
           orderBy: { createdAt: 'desc' },
         });
 
@@ -373,6 +373,16 @@ export class NotificationsScheduler implements OnModuleInit {
           return (lastByRule.get(a.key) ?? 0) - (lastByRule.get(b.key) ?? 0);
         });
 
+        // variantIds já recebidos por regra (mais recente → mais antigo),
+        // pro rodízio de variantes na entrega
+        const recentVariantsByRule = new Map<string, (string | null)[]>();
+        for (const n of hist) {
+          if (!n.ruleKey) continue;
+          const list = recentVariantsByRule.get(n.ruleKey) ?? [];
+          list.push(n.variantId ?? null);
+          recentVariantsByRule.set(n.ruleKey, list);
+        }
+
         // dispara a primeira permitida cuja condição bate
         for (const rule of candidates) {
           // convite (não-urgente): só se ainda houver cota de convite no dia
@@ -384,7 +394,8 @@ export class NotificationsScheduler implements OnModuleInit {
           ) {
             continue;
           }
-          if (await this.tryFire(userId, rule, tz)) break;
+          const recent = recentVariantsByRule.get(rule.key) ?? [];
+          if (await this.tryFire(userId, rule, tz, recent)) break;
         }
       } catch (e: any) {
         this.logger.error(`regra falhou p/ ${userId}: ${e?.message}`);
@@ -393,10 +404,17 @@ export class NotificationsScheduler implements OnModuleInit {
   }
 
   // Avalia a condição e, se bater, entrega. Retorna se disparou.
-  private async tryFire(userId: string, rule: RuleRow, tz: string): Promise<boolean> {
+  // `recentVariantIds` = variantes já recebidas por este usuário nesta
+  // regra (mais recente → mais antigo), pro rodízio de textos.
+  private async tryFire(
+    userId: string,
+    rule: RuleRow,
+    tz: string,
+    recentVariantIds: (string | null)[] = [],
+  ): Promise<boolean> {
     const ctx = await this.evalCondition(userId, rule, tz);
     if (!ctx) return false;
-    await this.deliver(userId, rule, ctx);
+    await this.deliver(userId, rule, ctx, recentVariantIds);
     return true;
   }
 
@@ -439,8 +457,19 @@ export class NotificationsScheduler implements OnModuleInit {
     }
   }
 
-  private async deliver(userId: string, rule: RuleRow, ctx: NonNullable<FireCtx>) {
-    let body = rule.body ?? undefined;
+  private async deliver(
+    userId: string,
+    rule: RuleRow,
+    ctx: NonNullable<FireCtx>,
+    recentVariantIds: (string | null)[] = [],
+  ) {
+    // Escolhe a variante menos usada recentemente por este usuário. Sem
+    // variantes (ou serviço fora do ar) ⇒ cai no texto da própria regra,
+    // idêntico ao de antes.
+    const pool = await this.variants.listEnabledForRule(rule.key).catch(() => []);
+    const variant = this.variants.pickVariant(pool, recentVariantIds);
+
+    let body = (variant?.body ?? rule.body) ?? undefined;
     if (body && ctx.vars) {
       for (const [k, v] of Object.entries(ctx.vars)) {
         body = body.split(`{${k}}`).join(v);
@@ -448,11 +477,12 @@ export class NotificationsScheduler implements OnModuleInit {
     }
 
     await this.send.deliverToUser(userId, {
-      title: rule.title,
+      title: variant?.title ?? rule.title,
       body,
-      url: ctx.url ?? rule.url ?? undefined,
+      url: ctx.url ?? variant?.url ?? rule.url ?? undefined,
       source: 'RULE',
       ruleKey: rule.key,
+      variantId: variant?.id,
     });
   }
 
