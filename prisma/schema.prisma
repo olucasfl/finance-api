@@ -290,6 +290,10 @@ model Notification {
   campaignId String?
   campaign   NotificationCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   ruleKey    String?
+  // Qual variante de texto foi usada (Fase 4). Nullable/aditivo: campanhas
+  // e notificações antigas não têm. O scheduler usa isto pra rodar as
+  // variantes ("a menos usada recentemente por este usuário").
+  variantId  String?
   pushSent   Boolean               @default(false)
   createdAt  DateTime              @default(now())
   seenAt     DateTime?
@@ -320,6 +324,27 @@ model NotificationRule {
   thresholdDays Int?
   band          String?
   updatedAt     DateTime @updatedAt
+  variants      NotificationRuleVariant[]
+}
+
+// Pool de textos de uma regra (Fase 4). Cada disparo escolhe a variante
+// que aquele usuário recebeu há mais tempo (ou nunca) — assim a mesma
+// regra deixa de mandar sempre a MESMA frase. Toda regra é semeada com
+// 1 variante a partir do seu title/body/url atuais; o piso de "1 variante
+// ativa por regra" é garantido pela API e pela UI, não pelo schema.
+model NotificationRuleVariant {
+  id        String           @id @default(uuid())
+  ruleKey   String
+  rule      NotificationRule @relation(fields: [ruleKey], references: [key], onDelete: Cascade)
+  title     String?
+  body      String?
+  url       String?
+  enabled   Boolean          @default(true)
+  order     Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([ruleKey])
 }
 
 // Bloco de configuração do funil anti-spam — linha única (`id = "default"`).

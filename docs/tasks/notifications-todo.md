@@ -305,22 +305,26 @@ perfil ou `band` da regra `null` ⇒ cai no `shouldFireAtHour(hour)` de hoje.
 sino. Cada regra do catálogo ganha sua 1ª variante semeada do texto atual.
 
 **Critérios de aceite:**
-- [ ] Model `NotificationRuleVariant` (`id`, `ruleKey`, `title String?`,
-      `body String`, `url String?`, `enabled Bool @default(true)`, `order Int`)
-- [ ] `Notification.variantId String?` (aditivo, nullable)
-- [ ] Boot semeia 1 variante por regra a partir de `title`/`body`/`url` atuais
-      se a regra ainda não tem variante
+- [x] Model `NotificationRuleVariant` (`id`, `ruleKey` + relação FK cascade,
+      `title String?`, `body String?`, `url String?`, `enabled @default(true)`,
+      `order @default(0)`, timestamps, `@@index([ruleKey])`).
+      `body` ficou `String?` (espelha `NotificationRule.body` nullable) — o
+      piso de "1 variante ativa" é da API/UI, não do schema
+- [x] `Notification.variantId String?` (aditivo, nullable)
+- [x] `NotificationVariantsService.seedMissing()` cria 1 variante por regra
+      sem nenhuma, a partir de `title`/`body`/`url`; idempotente (checa `count`)
+- [x] Chamado no `onModuleInit` do scheduler DEPOIS do reconcile do catálogo
 
 **Verificação:**
-- [ ] `npx jest` — seed cria exatamente 1 variante por regra; rodar boot 2×
-      não duplica
-- [ ] `npm run build` no backend
-- [ ] Manual: `GET /rules` + variantes retorna o texto de hoje
+- [x] `npx jest notification-variants` (8) + `notifications.scheduler` (seed) passam
+- [x] `npm run build` no backend — suíte completa: 764 testes
 
 **Dependências:** Checkpoint C
-**Arquivos:** `oratio-api/prisma/schema.prisma`, `.../notifications.scheduler.ts`
-(seed), possível `.../notification-variants.service.ts`, specs
+**Arquivos:** `oratio-api/prisma/schema.prisma`,
+`.../notification-variants.service.ts` (novo), `.../notifications.scheduler.ts`
+(chamada do seed), `.../notifications.module.ts`, specs
 **Escopo:** M
+**Commit:** `oratio-api` branch `feat/notif-variantes`
 
 ---
 

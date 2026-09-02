@@ -7,13 +7,16 @@ import {
   NotificationSettingsService,
 } from './notification-settings.service';
 import { UserNotificationProfileService } from './user-notification-profile.service';
+import { NotificationVariantsService } from './notification-variants.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('NotificationsScheduler.shouldFireAtHour', () => {
-  // shouldFireAtHour é puro (não toca prisma/send/settings/profiles), então
-  // dá pra instanciar com dependências vazias.
-  const scheduler = new NotificationsScheduler({} as any, {} as any, {} as any, {} as any);
+  // shouldFireAtHour é puro (não toca prisma/send/settings/profiles/variants),
+  // então dá pra instanciar com dependências vazias.
+  const scheduler = new NotificationsScheduler(
+    {} as any, {} as any, {} as any, {} as any, {} as any,
+  );
 
   it('elegível da hora marcada em diante (fica na fila o dia todo)', () => {
     expect(scheduler.shouldFireAtHour(7, 7)).toBe(true);
@@ -44,6 +47,11 @@ describe('NotificationsScheduler', () => {
   let send: { deliverToUser: jest.Mock };
   let settings: { get: jest.Mock; invalidate: jest.Mock };
   let profiles: { getBand: jest.Mock };
+  let variants: {
+    seedMissing: jest.Mock;
+    listEnabledForRule: jest.Mock;
+    pickVariant: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -69,6 +77,12 @@ describe('NotificationsScheduler', () => {
     };
     // default ANY = comportamento de antes (elegível o dia todo)
     profiles = { getBand: jest.fn().mockResolvedValue('ANY') };
+    // default: sem variantes → deliver usa o texto da própria regra
+    variants = {
+      seedMissing: jest.fn().mockResolvedValue(undefined),
+      listEnabledForRule: jest.fn().mockResolvedValue([]),
+      pickVariant: jest.fn().mockReturnValue(null),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,6 +91,7 @@ describe('NotificationsScheduler', () => {
         { provide: NotificationsSendService, useValue: send },
         { provide: NotificationSettingsService, useValue: settings },
         { provide: UserNotificationProfileService, useValue: profiles },
+        { provide: NotificationVariantsService, useValue: variants },
       ],
     }).compile();
 
@@ -151,6 +166,14 @@ describe('NotificationsScheduler', () => {
       expect(prisma.notificationRule.deleteMany).toHaveBeenCalledWith({
         where: { key: { notIn: expect.arrayContaining(['ROSARY_UNFINISHED', 'EXAMEN_NIGHT']) } },
       });
+    });
+
+    it('seeds the missing text variants after reconciling the catalog', async () => {
+      prisma.notificationRule.findUnique.mockResolvedValue(null);
+
+      await scheduler.onModuleInit();
+
+      expect(variants.seedMissing).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -10,6 +10,7 @@ import {
   ActiveBand,
   UserNotificationProfileService,
 } from './user-notification-profile.service';
+import { NotificationVariantsService } from './notification-variants.service';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -158,6 +159,7 @@ export class NotificationsScheduler implements OnModuleInit {
     private send: NotificationsSendService,
     private settings: NotificationSettingsService,
     private profiles: UserNotificationProfileService,
+    private variants: NotificationVariantsService,
   ) {}
 
   // Reconcilia o catálogo: cria as regras que faltam (sem sobrescrever o que
@@ -201,6 +203,10 @@ export class NotificationsScheduler implements OnModuleInit {
     await this.prisma.notificationRule
       .deleteMany({ where: { key: { notIn: keys } } })
       .catch(() => {});
+
+    // Depois de o catálogo estar reconciliado: garante 1 variante de texto
+    // por regra (Fase 4). Idempotente.
+    await this.variants.seedMissing().catch(() => {});
   }
 
   /*
