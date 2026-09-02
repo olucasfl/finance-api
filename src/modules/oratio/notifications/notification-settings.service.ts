@@ -73,8 +73,36 @@ export class NotificationSettingsService {
     }
   }
 
-  // Chamado pelo endpoint de PATCH (Task 2) depois de gravar — a próxima
-  // leitura pega o valor novo na hora, sem esperar o TTL expirar.
+  // Linha inteira (id/updatedAt inclusos) pro GET do admin. Cria
+  // preguiçosamente igual `get()`.
+  async getFull() {
+    return this.prisma.notificationSettings.upsert({
+      where: { id: SINGLETON_ID },
+      update: {},
+      create: { id: SINGLETON_ID },
+    });
+  }
+
+  /*
+  PATCH parcial vindo do admin. Só grava os campos definidos (o resto do
+  DTO chega `undefined`) e invalida o cache pra próxima leitura do
+  scheduler pegar o valor novo na hora.
+  */
+  async update(patch: Partial<NotificationSettingsValues>) {
+    const data = Object.fromEntries(
+      Object.entries(patch).filter(([, v]) => v !== undefined),
+    );
+    const row = await this.prisma.notificationSettings.upsert({
+      where: { id: SINGLETON_ID },
+      update: data,
+      create: { id: SINGLETON_ID, ...data },
+    });
+    this.invalidate();
+    return row;
+  }
+
+  // Chamado pelo endpoint de PATCH depois de gravar — a próxima leitura
+  // pega o valor novo na hora, sem esperar o TTL expirar.
   invalidate(): void {
     this.cache = null;
     this.cachedAt = 0;

@@ -61,19 +61,25 @@ em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 `AdminGuard`, reusando o `NotificationSettingsService`.
 
 **Critérios de aceite:**
-- [ ] `GET /oratio/admin/notifications/settings` devolve a linha atual
-- [ ] `PATCH /oratio/admin/notifications/settings` valida faixas (`quietStart/End`
-      0–23, `maxPerDay` 0–10, etc.) via DTO e invalida o cache
-- [ ] Só admin acessa (401/403 sem token/sem `isAdmin`)
+- [x] `GET /oratio/admin/notifications/settings` devolve a linha atual
+      (`getFull()`, upsert preguiçoso)
+- [x] `PATCH /oratio/admin/notifications/settings` valida faixas via
+      `UpdateSettingsDto` (`quietStart/End` 0–23, `maxPerDay`/`maxNudgesPerDay`
+      0–10, `spacingHours` 0–24, `urgentThreshold` 0–100, `restGapEnabled` bool)
+      e invalida o cache (`settings.update()` chama `invalidate()`)
+- [x] Só admin acessa — `@UseGuards(JwtAuthGuard, AdminGuard)` a nível de
+      classe já cobre as rotas novas
 
 **Verificação:**
-- [ ] `npx jest admin-notifications.controller` passa com casos novos
-- [ ] `npm run build` no backend
-- [ ] Manual: `curl` PATCH muda `maxPerDay` e o `GET` reflete
+- [x] `npx jest notification` passa com casos novos (getSettings/updateSettings
+      no controller; getFull/update no serviço)
+- [x] `npm run build` no backend — suíte completa: 733 testes passando
+- [ ] Manual: `curl` PATCH muda `maxPerDay` e o `GET` reflete — depende do
+      `prisma db push` em prod (Checkpoint, com OK do usuário)
 
 **Dependências:** Task 1
 **Arquivos:** `.../admin-notifications.controller.ts`, `.../dto/settings.dto.ts` (novo),
-`.../notifications-send.service.ts` ou service dedicado, specs
+`.../notification-settings.service.ts` (getFull/update), specs
 **Escopo:** S
 
 ---

@@ -24,7 +24,9 @@ describe('NotificationSettingsService', () => {
 
   beforeEach(async () => {
     prisma = {
-      notificationSettings: { upsert: jest.fn().mockResolvedValue(row()) },
+      notificationSettings: {
+        upsert: jest.fn().mockResolvedValue(row()),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -104,5 +106,43 @@ describe('NotificationSettingsService', () => {
     prisma.notificationSettings.upsert.mockResolvedValue(row({ maxPerDay: 9 }));
     const cfg2 = await service.get();
     expect(cfg2.maxPerDay).toBe(9);
+  });
+
+  describe('getFull() / update()', () => {
+    it('getFull() returns the whole persisted row (incl. id/updatedAt)', async () => {
+      const full = await service.getFull();
+      expect(full).toEqual(expect.objectContaining({ id: 'default', updatedAt: expect.any(Date) }));
+    });
+
+    it('update() writes the patch to the singleton and invalidates the cache', async () => {
+      prisma.notificationSettings.upsert.mockResolvedValue(row({ maxPerDay: 4 }));
+
+      // esquenta o cache
+      await service.get();
+      expect(prisma.notificationSettings.upsert).toHaveBeenCalledTimes(1);
+
+      await service.update({ maxPerDay: 4 });
+
+      expect(prisma.notificationSettings.upsert).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: { id: 'default' },
+          update: { maxPerDay: 4 },
+          create: expect.objectContaining({ id: 'default', maxPerDay: 4 }),
+        }),
+      );
+
+      // cache invalidado: a próxima leitura vai ao banco de novo
+      const cfg = await service.get();
+      expect(cfg.maxPerDay).toBe(4);
+      expect(prisma.notificationSettings.upsert).toHaveBeenCalledTimes(3);
+    });
+
+    it('update() ignores undefined fields (only patches what was sent)', async () => {
+      await service.update({ restGapEnabled: false });
+
+      expect(prisma.notificationSettings.upsert).toHaveBeenLastCalledWith(
+        expect.objectContaining({ update: { restGapEnabled: false } }),
+      );
+    });
   });
 });
