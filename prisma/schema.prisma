@@ -38,6 +38,7 @@ model User {
   quaresmaPenances              QuaresmaMichaelPenance[]
   bibleMarks                    BibleMark[]
   bibleCollections              BibleCollection[]
+  notificationProfile           UserNotificationProfile?
 }
 
 model PushSubscription {
@@ -79,6 +80,24 @@ model UserActivity {
   action    String
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // O classificador de faixa horária (notifications) varre as atividades
+  // dos últimos ~30 dias por usuário — sem este índice seria um seq scan
+  // na tabela inteira a cada recálculo.
+  @@index([userId, createdAt])
+}
+
+// Faixa horária preferida de cada usuário, derivada da atividade recente
+// (UserActivity, ~30 dias, hora local Brasil) pra alinhar as notificações
+// automáticas ao horário em que a pessoa costuma usar o app. Enxuto de
+// propósito: só o valor e quando foi calculado. Recalculado
+// preguiçosamente pelo próprio tick quando passa de ~7 dias.
+model UserNotificationProfile {
+  userId         String    @id
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeBand     String    @default("ANY") // "MORNING" | "AFTERNOON" | "EVENING" | "ANY"
+  bandComputedAt DateTime?
+  updatedAt      DateTime  @updatedAt
 }
 
 // Uma linha por usuário representando a consagração ATUAL (ou mais
@@ -271,6 +290,10 @@ model Notification {
   campaignId String?
   campaign   NotificationCampaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   ruleKey    String?
+  // Qual variante de texto foi usada (Fase 4). Nullable/aditivo: campanhas
+  // e notificações antigas não têm. O scheduler usa isto pra rodar as
+  // variantes ("a menos usada recentemente por este usuário").
+  variantId  String?
   pushSent   Boolean               @default(false)
   createdAt  DateTime              @default(now())
   seenAt     DateTime?
@@ -293,7 +316,52 @@ model NotificationRule {
   url       String?
   hour      Int? // hora local (0-23) das regras por horário
   condition String? // "ROSARY_UNFINISHED" | "STREAK_AT_RISK" | null (=diária no horário)
-  updatedAt DateTime @updatedAt
+  // Knobs editáveis no admin (Fase 2). Aditivos e nullable: regra sem valor
+  // usa o default de código de sempre, então banco antigo se comporta igual.
+  // `thresholdDays` = "parado há N dias" das condições que usam janela
+  // (readingResume, rosaryLapse, comeback). `band` = faixa de horário
+  // preferida: "MORNING" | "AFTERNOON" | "EVENING" | "ANY".
+  thresholdDays Int?
+  band          String?
+  updatedAt     DateTime @updatedAt
+  variants      NotificationRuleVariant[]
+}
+
+// Pool de textos de uma regra (Fase 4). Cada disparo escolhe a variante
+// que aquele usuário recebeu há mais tempo (ou nunca) — assim a mesma
+// regra deixa de mandar sempre a MESMA frase. Toda regra é semeada com
+// 1 variante a partir do seu title/body/url atuais; o piso de "1 variante
+// ativa por regra" é garantido pela API e pela UI, não pelo schema.
+model NotificationRuleVariant {
+  id        String           @id @default(uuid())
+  ruleKey   String
+  rule      NotificationRule @relation(fields: [ruleKey], references: [key], onDelete: Cascade)
+  title     String?
+  body      String?
+  url       String?
+  enabled   Boolean          @default(true)
+  order     Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@index([ruleKey])
+}
+
+// Bloco de configuração do funil anti-spam — linha única (`id = "default"`).
+// Antes esses parâmetros eram constantes privadas em notifications.scheduler.ts;
+// agora ficam editáveis no admin sem deploy. Todos os defaults reproduzem
+// exatamente o comportamento anterior, então um banco sem esta linha (ou com
+// o banco fora do ar) se comporta igual ao de antes.
+model NotificationSettings {
+  id              String   @id @default("default")
+  maxPerDay       Int      @default(2) // teto de automáticas por pessoa por dia
+  maxNudgesPerDay Int      @default(1) // teto de "convites" (não-urgentes) por dia
+  quietStart      Int      @default(22) // hora local a partir da qual não incomodar
+  quietEnd        Int      @default(7) // hora local antes da qual não incomodar
+  spacingHours    Int      @default(6) // horas mínimas entre duas automáticas
+  restGapEnabled  Boolean  @default(true) // gap de descanso (dias vazios entre notificações)
+  urgentThreshold Int      @default(80) // priority >= isso = urgente (passa na frente)
+  updatedAt       DateTime @updatedAt
 }
 
 // Quaresma de São Miguel — devoção sazonal de 40 dias de oração que vai

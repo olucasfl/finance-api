@@ -2,13 +2,22 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationsScheduler } from './notifications.scheduler';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationsSendService } from './notifications-send.service';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationSettingsService,
+} from './notification-settings.service';
+import { UserNotificationProfileService } from './user-notification-profile.service';
+import { NotificationVariantsService } from './notification-variants.service';
+import { NotificationContextService } from './notification-context.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('NotificationsScheduler.shouldFireAtHour', () => {
-  // shouldFireAtHour é puro (não toca prisma/send), então dá pra instanciar
-  // com dependências vazias.
-  const scheduler = new NotificationsScheduler({} as any, {} as any);
+  // shouldFireAtHour é puro (não toca nas dependências), então dá pra
+  // instanciar com objetos vazios.
+  const scheduler = new NotificationsScheduler(
+    {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
+  );
 
   it('elegível da hora marcada em diante (fica na fila o dia todo)', () => {
     expect(scheduler.shouldFireAtHour(7, 7)).toBe(true);
@@ -37,6 +46,14 @@ describe('NotificationsScheduler', () => {
   let scheduler: NotificationsScheduler;
   let prisma: any;
   let send: { deliverToUser: jest.Mock };
+  let settings: { get: jest.Mock; invalidate: jest.Mock };
+  let profiles: { getBand: jest.Mock };
+  let variants: {
+    seedMissing: jest.Mock;
+    listEnabledForRule: jest.Mock;
+    pickVariant: jest.Mock;
+  };
+  let context: { varsIn: jest.Mock; resolve: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -56,12 +73,30 @@ describe('NotificationsScheduler', () => {
       user: { findUnique: jest.fn() },
     };
     send = { deliverToUser: jest.fn().mockResolvedValue({ pushed: true }) };
+    settings = {
+      get: jest.fn().mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS }),
+      invalidate: jest.fn(),
+    };
+    // default ANY = comportamento de antes (elegível o dia todo)
+    profiles = { getBand: jest.fn().mockResolvedValue('ANY') };
+    // default: sem variantes → deliver usa o texto da própria regra
+    variants = {
+      seedMissing: jest.fn().mockResolvedValue(undefined),
+      listEnabledForRule: jest.fn().mockResolvedValue([]),
+      pickVariant: jest.fn().mockReturnValue(null),
+    };
+    // default: nenhuma variável de contexto no texto
+    context = { varsIn: jest.fn().mockReturnValue([]), resolve: jest.fn().mockResolvedValue({}) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         NotificationsScheduler,
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsSendService, useValue: send },
+        { provide: NotificationSettingsService, useValue: settings },
+        { provide: UserNotificationProfileService, useValue: profiles },
+        { provide: NotificationVariantsService, useValue: variants },
+        { provide: NotificationContextService, useValue: context },
       ],
     }).compile();
 
@@ -77,11 +112,15 @@ describe('NotificationsScheduler', () => {
       expect(prisma.notificationRule.create).toHaveBeenCalledTimes(9);
     });
 
-    it('does not touch a rule that already exists and has a normal url', async () => {
-      prisma.notificationRule.findUnique.mockResolvedValue({
-        key: 'ROSARY_UNFINISHED',
-        url: '/oratio/rosary',
-      });
+    // findUnique é chamado 1x por regra do catálogo — devolve o mesmo shape
+    // pra qualquer key, com os overrides do teste.
+    const existingRow = (over: Record<string, unknown> = {}) =>
+      prisma.notificationRule.findUnique.mockImplementation(({ where }: any) =>
+        Promise.resolve({ key: where.key, url: '/whatever', band: 'MORNING', thresholdDays: 99, ...over }),
+      );
+
+    it('does not touch a rule that already exists with url and knobs set', async () => {
+      existingRow();
 
       await scheduler.onModuleInit();
 
@@ -90,10 +129,7 @@ describe('NotificationsScheduler', () => {
     });
 
     it('fixes a stale url pointing at /oratio/home without overwriting an admin-chosen url', async () => {
-      prisma.notificationRule.findUnique.mockResolvedValue({
-        key: 'ROSARY_UNFINISHED',
-        url: '/oratio/home',
-      });
+      existingRow({ url: '/oratio/home' });
 
       await scheduler.onModuleInit();
 
@@ -101,6 +137,30 @@ describe('NotificationsScheduler', () => {
         where: { key: 'ROSARY_UNFINISHED' },
         data: { url: '/oratio/rosary' },
       });
+    });
+
+    it('backfills band/thresholdDays on a legacy rule where they are still null', async () => {
+      existingRow({ band: null, thresholdDays: null });
+
+      await scheduler.onModuleInit();
+
+      expect(prisma.notificationRule.update).toHaveBeenCalledWith({
+        where: { key: 'BIBLE_RESUME' },
+        data: { band: 'MORNING', thresholdDays: 3 },
+      });
+      // regra sem janela: só a band é semeada, sem thresholdDays
+      expect(prisma.notificationRule.update).toHaveBeenCalledWith({
+        where: { key: 'EXAMEN_NIGHT' },
+        data: { band: 'EVENING' },
+      });
+    });
+
+    it('never overwrites band/thresholdDays the admin already customised', async () => {
+      existingRow({ band: 'EVENING', thresholdDays: 10 });
+
+      await scheduler.onModuleInit();
+
+      expect(prisma.notificationRule.update).not.toHaveBeenCalled();
     });
 
     it('prunes rules that fell out of the catalog', async () => {
@@ -111,6 +171,14 @@ describe('NotificationsScheduler', () => {
       expect(prisma.notificationRule.deleteMany).toHaveBeenCalledWith({
         where: { key: { notIn: expect.arrayContaining(['ROSARY_UNFINISHED', 'EXAMEN_NIGHT']) } },
       });
+    });
+
+    it('seeds the missing text variants after reconciling the catalog', async () => {
+      prisma.notificationRule.findUnique.mockResolvedValue(null);
+
+      await scheduler.onModuleInit();
+
+      expect(variants.seedMissing).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -289,6 +357,263 @@ describe('NotificationsScheduler', () => {
         'u1',
         expect.objectContaining({ body: 'Você está com 7 dias seguidos.' }),
       );
+    });
+
+    it('behaves exactly as before when NotificationSettings falls back to the built-in defaults', async () => {
+      setUtcHour(10);
+      // get() devolvendo os defaults é o mesmo cenário de "banco sem linha"
+      settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS });
+      prisma.notificationRule.findMany.mockResolvedValue([rule({ hour: 9 })]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      prisma.notification.findMany.mockResolvedValue([]);
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ ruleKey: 'EXAMEN_NIGHT' }),
+      );
+    });
+
+    it('honours a customised daily cap from NotificationSettings (maxPerDay: 1)', async () => {
+      const now = setUtcHour(10);
+      settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS, maxPerDay: 1 });
+      prisma.notificationRule.findMany.mockResolvedValue([rule({ hour: 9 })]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      // uma única automática hoje já bate o teto customizado
+      prisma.notification.findMany.mockResolvedValue([{ createdAt: now, ruleKey: 'A' }]);
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).not.toHaveBeenCalled();
+    });
+
+    it('honours a widened quiet-hours window from NotificationSettings (quietStart: 9)', async () => {
+      setUtcHour(10);
+      settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS, quietStart: 9 });
+      prisma.notificationRule.findMany.mockResolvedValue([rule({ hour: 8 })]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      prisma.notification.findMany.mockResolvedValue([]);
+
+      await scheduler.tick();
+
+      // 10h agora cai dentro do quiet hours (>= 9) → ninguém recebe
+      expect(send.deliverToUser).not.toHaveBeenCalled();
+    });
+
+    describe('rest gap (dias vazios entre notificações não-urgentes)', () => {
+      // notificação de ONTEM: dentro do histórico, fora do "hoje", e a >6h
+      // (não trava por espaçamento nem pelo teto do dia)
+      const yesterday = () => new Date(Date.now() - DAY_MS);
+
+      it('suppresses a non-urgent nudge when anything was delivered yesterday', async () => {
+        setUtcHour(10);
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'EXAMEN_NIGHT', hour: 9, condition: null }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([
+          { createdAt: yesterday(), ruleKey: 'SUNDAY_MASS' },
+        ]);
+
+        await scheduler.tick();
+
+        expect(send.deliverToUser).not.toHaveBeenCalled();
+      });
+
+      it('still lets an URGENT rule through during the rest gap', async () => {
+        setUtcHour(10);
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'STREAK_AT_RISK', hour: 9, condition: 'STREAK_AT_RISK' }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([
+          { createdAt: yesterday(), ruleKey: 'SUNDAY_MASS' },
+        ]);
+        prisma.spiritualStats.findUnique.mockResolvedValue({
+          prayerStreak: 5,
+          lastLoginDate: new Date('2000-01-01'),
+        });
+
+        await scheduler.tick();
+
+        expect(send.deliverToUser).toHaveBeenCalledWith(
+          'u1',
+          expect.objectContaining({ ruleKey: 'STREAK_AT_RISK' }),
+        );
+      });
+
+      it('does not apply the gap when restGapEnabled is false', async () => {
+        setUtcHour(10);
+        settings.get.mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS, restGapEnabled: false });
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'EXAMEN_NIGHT', hour: 9, condition: null }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([
+          { createdAt: yesterday(), ruleKey: 'SUNDAY_MASS' },
+        ]);
+
+        await scheduler.tick();
+
+        expect(send.deliverToUser).toHaveBeenCalledWith(
+          'u1',
+          expect.objectContaining({ ruleKey: 'EXAMEN_NIGHT' }),
+        );
+      });
+    });
+
+    describe('band matching (faixa do usuário × faixa da regra)', () => {
+      const setup = (userBand: string, ruleBand: string | null) => {
+        setUtcHour(10);
+        profiles.getBand.mockResolvedValue(userBand);
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'EXAMEN_NIGHT', hour: 9, condition: null, band: ruleBand }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([]);
+      };
+
+      it('delivers when the user band matches the rule band', async () => {
+        setup('MORNING', 'MORNING');
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+
+      it('suppresses a rule whose band does not match the user band', async () => {
+        setup('EVENING', 'MORNING');
+        await scheduler.tick();
+        expect(send.deliverToUser).not.toHaveBeenCalled();
+      });
+
+      it('a rule with band ANY reaches every user', async () => {
+        setup('EVENING', 'ANY');
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+
+      it('a rule without a band falls back to hour-only (reaches everyone)', async () => {
+        setup('EVENING', null);
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+
+      it('a user classified ANY (not enough data) still gets banded rules', async () => {
+        setup('ANY', 'MORNING');
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('rodízio de variantes (deliver)', () => {
+    afterEach(() => jest.useRealTimers());
+    function setUtcHour(hour: number) {
+      jest.useFakeTimers();
+      const now = new Date();
+      now.setUTCHours(hour, 0, 0, 0);
+      jest.setSystemTime(now);
+      return now;
+    }
+
+    const fireRule = () => {
+      setUtcHour(10);
+      prisma.notificationRule.findMany.mockResolvedValue([
+        {
+          key: 'EXAMEN_NIGHT',
+          title: 'Título da regra',
+          body: 'Corpo da regra',
+          url: '/oratio/confissao',
+          hour: 9,
+          condition: null,
+          band: null,
+        },
+      ]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+    };
+
+    it('entrega o texto da variante escolhida e grava o variantId', async () => {
+      fireRule();
+      prisma.notification.findMany.mockResolvedValue([]);
+      variants.listEnabledForRule.mockResolvedValue([{ id: 'b', title: 'Título B', body: 'Corpo B', url: null }]);
+      variants.pickVariant.mockReturnValue({ id: 'b', title: 'Título B', body: 'Corpo B', url: null });
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: 'Título B', body: 'Corpo B', variantId: 'b' }),
+      );
+    });
+
+    it('passa pro pickVariant as variantes que o usuário já recebeu nessa regra (recente→antigo)', async () => {
+      fireRule();
+      prisma.notification.findMany.mockResolvedValue([
+        { createdAt: new Date(Date.now() - 3 * DAY_MS), ruleKey: 'EXAMEN_NIGHT', variantId: 'a' },
+        { createdAt: new Date(Date.now() - 9 * DAY_MS), ruleKey: 'EXAMEN_NIGHT', variantId: 'b' },
+        { createdAt: new Date(Date.now() - 5 * DAY_MS), ruleKey: 'OUTRA', variantId: 'z' },
+      ]);
+      variants.listEnabledForRule.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+      variants.pickVariant.mockReturnValue({ id: 'b', title: null, body: null, url: null });
+
+      await scheduler.tick();
+
+      expect(variants.pickVariant).toHaveBeenCalledWith(
+        [{ id: 'a' }, { id: 'b' }],
+        ['a', 'b'], // só as dessa regra, na ordem do histórico (desc)
+      );
+    });
+
+    it('resolve e interpola variáveis de contexto ({nome}) no título e no corpo', async () => {
+      setUtcHour(10);
+      prisma.notificationRule.findMany.mockResolvedValue([
+        {
+          key: 'EXAMEN_NIGHT',
+          title: 'Boa noite, {nome}',
+          body: 'Reze um pouco hoje, {nome}.',
+          url: null,
+          hour: 9,
+          condition: null,
+          band: null,
+        },
+      ]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      prisma.notification.findMany.mockResolvedValue([]);
+      context.varsIn.mockReturnValue(['nome']);
+      context.resolve.mockResolvedValue({ nome: 'Lucas' });
+
+      await scheduler.tick();
+
+      expect(context.resolve).toHaveBeenCalledWith('u1', ['nome']);
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: 'Boa noite, Lucas', body: 'Reze um pouco hoje, Lucas.' }),
+      );
+    });
+
+    it('sem variante escolhida cai no texto da própria regra, sem variantId', async () => {
+      fireRule();
+      prisma.notification.findMany.mockResolvedValue([]);
+      variants.listEnabledForRule.mockResolvedValue([]);
+      variants.pickVariant.mockReturnValue(null);
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: 'Título da regra', body: 'Corpo da regra', variantId: undefined }),
+      );
+    });
+  });
+
+  describe('bandMatches', () => {
+    const s = () => scheduler as any;
+    it('matches on ANY (either side), on a null rule band, and on an exact band', () => {
+      expect(s().bandMatches('MORNING', 'MORNING')).toBe(true);
+      expect(s().bandMatches('MORNING', 'EVENING')).toBe(false);
+      expect(s().bandMatches('ANY', 'EVENING')).toBe(true);
+      expect(s().bandMatches('EVENING', 'ANY')).toBe(true);
+      expect(s().bandMatches('EVENING', null)).toBe(true);
     });
   });
 
@@ -475,7 +800,9 @@ describe('NotificationsScheduler', () => {
 
     describe('evalCondition', () => {
       it('is eligible (fires) when the rule has no condition at all (null)', async () => {
-        await expect(s().evalCondition('u1', null, 'UTC')).resolves.toEqual({});
+        await expect(
+          s().evalCondition('u1', { condition: null, thresholdDays: null }, 'UTC'),
+        ).resolves.toEqual({});
       });
 
       it('never fires for an unrecognized condition string instead of firing unconditionally', async () => {
@@ -483,7 +810,47 @@ describe('NotificationsScheduler', () => {
         // de "SUNDAY") caía no `default` do switch, que costumava tratar
         // qualquer string desconhecida como "sem condição" — disparando a
         // regra todo santo dia em vez de nunca.
-        await expect(s().evalCondition('u1', 'ALGUM_TYPO_QUALQUER', 'UTC')).resolves.toBeNull();
+        await expect(
+          s().evalCondition('u1', { condition: 'ALGUM_TYPO_QUALQUER', thresholdDays: null }, 'UTC'),
+        ).resolves.toBeNull();
+      });
+
+      it('reads thresholdDays from the rule for a window condition (BIBLE_RESUME)', async () => {
+        prisma.readingProgress.findFirst.mockResolvedValue({
+          reference: 'genesis/3',
+          label: 'Gênesis 3',
+          updatedAt: new Date(Date.now() - 2 * DAY_MS), // parado há 2 dias
+        });
+
+        // limiar custom de 1 dia → 2 dias parado já dispara
+        await expect(
+          s().evalCondition('u1', { condition: 'BIBLE_RESUME', thresholdDays: 1 }, 'UTC'),
+        ).resolves.toMatchObject({ url: '/oratio/biblia/genesis/3' });
+
+        // sem limiar → cai no default de código (3 dias) → 2 dias ainda não
+        await expect(
+          s().evalCondition('u1', { condition: 'BIBLE_RESUME', thresholdDays: null }, 'UTC'),
+        ).resolves.toBeNull();
+      });
+
+      it('reads thresholdDays for ROSARY_LAPSE / COMEBACK too', async () => {
+        prisma.spiritualStats.findUnique.mockResolvedValue({
+          rosariesPrayed: 3,
+          lastLoginDate: new Date(Date.now() - 4 * DAY_MS),
+        });
+        prisma.rosarySession.findFirst.mockResolvedValue({
+          finishedAt: new Date(Date.now() - 4 * DAY_MS),
+        });
+
+        // ROSARY_LAPSE: último terço há 4 dias, limiar custom 3 → dispara
+        await expect(
+          s().evalCondition('u1', { condition: 'ROSARY_LAPSE', thresholdDays: 3 }, 'UTC'),
+        ).resolves.toEqual({});
+
+        // COMEBACK: sem abrir há 4 dias, limiar custom 5 → ainda não
+        await expect(
+          s().evalCondition('u1', { condition: 'COMEBACK', thresholdDays: 5 }, 'UTC'),
+        ).resolves.toBeNull();
       });
     });
   });

@@ -2,12 +2,26 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { NotificationsSendService } from './notifications-send.service';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  NotificationSettingsService,
+} from './notification-settings.service';
+import {
+  ActiveBand,
+  UserNotificationProfileService,
+} from './user-notification-profile.service';
+import { NotificationVariantsService } from './notification-variants.service';
+import { NotificationContextService } from './notification-context.service';
 
 const DAY = 24 * 60 * 60 * 1000;
 
 // Catálogo fixo de regras — semeadas por `key`. QUANDO/PRA QUEM é código
 // (o `condition`); o texto/hora são editáveis no admin. Regras fora deste
 // catálogo são removidas no boot (ex.: liturgia/Angelus antigas).
+// `thresholdDays`/`band` são os valores-semente dos knobs da Fase 2: o
+// `onModuleInit` preenche as regras que ainda estão com `null` (sem tocar
+// no que o admin editou). `thresholdDays: null` = a condição não usa
+// janela de "parado há N dias". `band` é a faixa de horário preferida.
 const DEFAULT_RULES = [
   {
     key: 'ROSARY_UNFINISHED',
@@ -16,6 +30,8 @@ const DEFAULT_RULES = [
     url: '/oratio/rosary',
     hour: 18,
     condition: 'ROSARY_UNFINISHED' as string | null,
+    thresholdDays: null as number | null,
+    band: 'AFTERNOON' as string | null,
   },
   {
     key: 'STREAK_AT_RISK',
@@ -24,6 +40,8 @@ const DEFAULT_RULES = [
     url: null as string | null, // basta abrir o app — sem redirecionamento
     hour: 20,
     condition: 'STREAK_AT_RISK' as string | null,
+    thresholdDays: null as number | null,
+    band: 'EVENING' as string | null,
   },
   {
     key: 'BIBLE_RESUME',
@@ -32,6 +50,8 @@ const DEFAULT_RULES = [
     url: '/oratio/biblia',
     hour: 9,
     condition: 'BIBLE_RESUME' as string | null,
+    thresholdDays: 3 as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'CATECHISM_RESUME',
@@ -40,6 +60,8 @@ const DEFAULT_RULES = [
     url: '/oratio/catecismo',
     hour: 9,
     condition: 'CATECHISM_RESUME' as string | null,
+    thresholdDays: 4 as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'ROSARY_LAPSE',
@@ -48,6 +70,8 @@ const DEFAULT_RULES = [
     url: '/oratio/rosary',
     hour: 17,
     condition: 'ROSARY_LAPSE' as string | null,
+    thresholdDays: 7 as number | null,
+    band: 'AFTERNOON' as string | null,
   },
   {
     key: 'COMEBACK',
@@ -56,6 +80,8 @@ const DEFAULT_RULES = [
     url: null as string | null, // basta abrir o app — sem redirecionamento
     hour: 10,
     condition: 'COMEBACK' as string | null,
+    thresholdDays: 3 as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'SUNDAY_MASS',
@@ -64,6 +90,8 @@ const DEFAULT_RULES = [
     url: '/oratio/liturgia-completa',
     hour: 8,
     condition: 'SUNDAY' as string | null,
+    thresholdDays: null as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'VOX_INTRO',
@@ -72,6 +100,8 @@ const DEFAULT_RULES = [
     url: '/oratio/vox',
     hour: 11,
     condition: 'VOX_INTRO' as string | null,
+    thresholdDays: null as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'EXAMEN_NIGHT',
@@ -80,6 +110,8 @@ const DEFAULT_RULES = [
     url: '/oratio/confissao',
     hour: 21,
     condition: null as string | null,
+    thresholdDays: null as number | null,
+    band: 'EVENING' as string | null,
   },
 ];
 
@@ -105,6 +137,8 @@ type RuleRow = {
   url: string | null;
   hour: number | null;
   condition: string | null;
+  thresholdDays: number | null;
+  band: string | null;
 };
 
 // null = condição não bateu (não envia). Objeto = envia, opcionalmente com
@@ -115,17 +149,19 @@ type FireCtx = { url?: string; vars?: Record<string, string> } | null;
 export class NotificationsScheduler implements OnModuleInit {
   private readonly logger = new Logger(NotificationsScheduler.name);
 
-  private readonly QUIET_END = 7;            // não incomodar antes disso (hora local)
-  private readonly QUIET_START = 22;         // nem a partir disso
-  private readonly MAX_PER_DAY = 2;          // teto de automáticas por pessoa por dia
-  private readonly MAX_NUDGES_PER_DAY = 1;   // teto de "convites" (não-urgentes) por dia
-  private readonly URGENT_THRESHOLD = 80;    // priority >= isso = urgente
-  private readonly SPACING_MS = 6 * 60 * 60 * 1000; // 6h entre duas automáticas
+  // Os parâmetros do funil (quiet hours, tetos, espaçamento, limiar de
+  // urgência, rest gap) agora vêm de `NotificationSettings` via
+  // `NotificationSettingsService` — editáveis no admin sem deploy. Os
+  // defaults do serviço reproduzem os valores que eram constantes aqui.
   private readonly HISTORY_DAYS = 35;        // janela pra olhar o histórico recente
 
   constructor(
     private prisma: PrismaService,
     private send: NotificationsSendService,
+    private settings: NotificationSettingsService,
+    private profiles: UserNotificationProfileService,
+    private variants: NotificationVariantsService,
+    private context: NotificationContextService,
   ) {}
 
   // Reconcilia o catálogo: cria as regras que faltam (sem sobrescrever o que
@@ -150,11 +186,29 @@ export class NotificationsScheduler implements OnModuleInit {
           .update({ where: { key: r.key }, data: { url: r.url } })
           .catch(() => {});
       }
+
+      // Backfill dos knobs da Fase 2: preenche `band`/`thresholdDays` só
+      // quando a regra ainda está com `null` (banco que existia antes das
+      // colunas). Nunca reescreve um valor que o admin já definiu.
+      const backfill: { band?: string | null; thresholdDays?: number | null } = {};
+      if (exists.band == null && r.band != null) backfill.band = r.band;
+      if (exists.thresholdDays == null && r.thresholdDays != null) {
+        backfill.thresholdDays = r.thresholdDays;
+      }
+      if (Object.keys(backfill).length > 0) {
+        await this.prisma.notificationRule
+          .update({ where: { key: r.key }, data: backfill })
+          .catch(() => {});
+      }
     }
 
     await this.prisma.notificationRule
       .deleteMany({ where: { key: { notIn: keys } } })
       .catch(() => {});
+
+    // Depois de o catálogo estar reconciliado: garante 1 variante de texto
+    // por regra (Fase 4). Idempotente.
+    await this.variants.seedMissing().catch(() => {});
   }
 
   /*
@@ -162,17 +216,34 @@ export class NotificationsScheduler implements OnModuleInit {
   marcada em diante (fica "na fila" o dia todo até um slot liberar), sempre
   fora do quiet hours. Pública para teste unitário.
   */
-  shouldFireAtHour(hours: number, ruleHour: number): boolean {
-    if (hours < this.QUIET_END || hours >= this.QUIET_START) return false;
+  shouldFireAtHour(
+    hours: number,
+    ruleHour: number,
+    quietEnd: number = DEFAULT_NOTIFICATION_SETTINGS.quietEnd,
+    quietStart: number = DEFAULT_NOTIFICATION_SETTINGS.quietStart,
+  ): boolean {
+    if (hours < quietEnd || hours >= quietStart) return false;
     return hours >= ruleHour;
+  }
+
+  /*
+  A faixa do usuário casa com a da regra? `ANY` de qualquer lado (ou
+  regra sem `band` definida) sempre casa — aí vale só a hora, como antes.
+  */
+  bandMatches(userBand: ActiveBand, ruleBand: string | null): boolean {
+    if (!ruleBand || ruleBand === 'ANY' || userBand === 'ANY') return true;
+    return userBand === ruleBand;
   }
 
   private priority(key: string): number {
     return RULE_META[key]?.priority ?? 50;
   }
 
-  private isUrgent(key: string): boolean {
-    return this.priority(key) >= this.URGENT_THRESHOLD;
+  private isUrgent(
+    key: string,
+    threshold: number = DEFAULT_NOTIFICATION_SETTINGS.urgentThreshold,
+  ): boolean {
+    return this.priority(key) >= threshold;
   }
 
   private cooldownOk(lastAt: number | undefined, key: string, now: number): boolean {
@@ -227,6 +298,8 @@ export class NotificationsScheduler implements OnModuleInit {
     })) as RuleRow[];
     if (rules.length === 0) return;
 
+    const cfg = await this.settings.get();
+
     // um fuso por usuário (o do primeiro aparelho encontrado)
     const subs = await this.prisma.pushSubscription.findMany({
       select: { userId: true, timezone: true },
@@ -241,7 +314,11 @@ export class NotificationsScheduler implements OnModuleInit {
     for (const [userId, tz] of tzByUser) {
       try {
         const { hours, dateStr: todayStr } = this.nowInZone(tz);
-        if (hours < this.QUIET_END || hours >= this.QUIET_START) continue; // quiet hours
+        if (hours < cfg.quietEnd || hours >= cfg.quietStart) continue; // quiet hours
+
+        // Faixa horária do usuário (cacheada ~7 dias no perfil). ANY =
+        // sem dados suficientes ⇒ elegível o dia todo, como antes.
+        const userBand = await this.profiles.getBand(userId);
 
         const hist = await this.prisma.notification.findMany({
           where: {
@@ -249,18 +326,18 @@ export class NotificationsScheduler implements OnModuleInit {
             source: 'RULE',
             createdAt: { gte: new Date(now - this.HISTORY_DAYS * DAY) },
           },
-          select: { createdAt: true, ruleKey: true },
+          select: { createdAt: true, ruleKey: true, variantId: true },
           orderBy: { createdAt: 'desc' },
         });
 
         const sentToday = hist.filter((n) => this.dateInZone(n.createdAt, tz) === todayStr);
-        if (sentToday.length >= this.MAX_PER_DAY) continue; // teto do dia
+        if (sentToday.length >= cfg.maxPerDay) continue; // teto do dia
 
         const lastAt = hist[0]?.createdAt?.getTime();
-        if (lastAt && now - lastAt < this.SPACING_MS) continue; // espaçamento 6h
+        if (lastAt && now - lastAt < cfg.spacingHours * 60 * 60 * 1000) continue; // espaçamento
 
         const nudgesToday = sentToday.filter(
-          (n) => !n.ruleKey || !this.isUrgent(n.ruleKey),
+          (n) => !n.ruleKey || !this.isUrgent(n.ruleKey, cfg.urgentThreshold),
         ).length;
 
         // Gap de descanso: não notificar todo dia. As SUPLEMENTARES só
@@ -269,7 +346,8 @@ export class NotificationsScheduler implements OnModuleInit {
         // ignoram esse gap (passam na frente mesmo em dia de folga).
         const yesterdayStr = this.dateInZone(new Date(now - DAY), tz);
         const lastDay = hist[0] ? this.dateInZone(hist[0].createdAt, tz) : null;
-        const inRestGap = lastDay === todayStr || lastDay === yesterdayStr;
+        const inRestGap =
+          cfg.restGapEnabled && (lastDay === todayStr || lastDay === yesterdayStr);
 
         // última vez de cada regra (cooldown + justiça)
         const lastByRule = new Map<string, number>();
@@ -279,11 +357,12 @@ export class NotificationsScheduler implements OnModuleInit {
           }
         }
 
-        // candidatas: hora chegou + cooldown ok
+        // candidatas: hora chegou + faixa casa + cooldown ok
         const candidates = rules.filter(
           (r) =>
             r.hour != null &&
-            this.shouldFireAtHour(hours, r.hour) &&
+            this.shouldFireAtHour(hours, r.hour, cfg.quietEnd, cfg.quietStart) &&
+            this.bandMatches(userBand, r.band) &&
             this.cooldownOk(lastByRule.get(r.key), r.key, now),
         );
         if (candidates.length === 0) continue;
@@ -296,13 +375,29 @@ export class NotificationsScheduler implements OnModuleInit {
           return (lastByRule.get(a.key) ?? 0) - (lastByRule.get(b.key) ?? 0);
         });
 
+        // variantIds já recebidos por regra (mais recente → mais antigo),
+        // pro rodízio de variantes na entrega
+        const recentVariantsByRule = new Map<string, (string | null)[]>();
+        for (const n of hist) {
+          if (!n.ruleKey) continue;
+          const list = recentVariantsByRule.get(n.ruleKey) ?? [];
+          list.push(n.variantId ?? null);
+          recentVariantsByRule.set(n.ruleKey, list);
+        }
+
         // dispara a primeira permitida cuja condição bate
         for (const rule of candidates) {
-          // convite (não-urgente) só se ainda houver cota de convite no dia
-          if (!this.isUrgent(rule.key) && nudgesToday >= this.MAX_NUDGES_PER_DAY) {
+          // convite (não-urgente): só se ainda houver cota de convite no dia
+          // E não estivermos no gap de descanso (nenhuma notificação hoje
+          // nem ontem). As urgentes ignoram os dois.
+          if (
+            !this.isUrgent(rule.key, cfg.urgentThreshold) &&
+            (inRestGap || nudgesToday >= cfg.maxNudgesPerDay)
+          ) {
             continue;
           }
-          if (await this.tryFire(userId, rule, tz)) break;
+          const recent = recentVariantsByRule.get(rule.key) ?? [];
+          if (await this.tryFire(userId, rule, tz, recent)) break;
         }
       } catch (e: any) {
         this.logger.error(`regra falhou p/ ${userId}: ${e?.message}`);
@@ -311,14 +406,29 @@ export class NotificationsScheduler implements OnModuleInit {
   }
 
   // Avalia a condição e, se bater, entrega. Retorna se disparou.
-  private async tryFire(userId: string, rule: RuleRow, tz: string): Promise<boolean> {
-    const ctx = await this.evalCondition(userId, rule.condition, tz);
+  // `recentVariantIds` = variantes já recebidas por este usuário nesta
+  // regra (mais recente → mais antigo), pro rodízio de textos.
+  private async tryFire(
+    userId: string,
+    rule: RuleRow,
+    tz: string,
+    recentVariantIds: (string | null)[] = [],
+  ): Promise<boolean> {
+    const ctx = await this.evalCondition(userId, rule, tz);
     if (!ctx) return false;
-    await this.deliver(userId, rule, ctx);
+    await this.deliver(userId, rule, ctx, recentVariantIds);
     return true;
   }
 
-  private async evalCondition(userId: string, cond: string | null, tz: string): Promise<FireCtx> {
+  // `rule` (não só `rule.condition`) porque as condições de janela agora
+  // leem o limiar do registro (`thresholdDays`); `null` cai no default de
+  // código de sempre.
+  private async evalCondition(
+    userId: string,
+    rule: Pick<RuleRow, 'condition' | 'thresholdDays'>,
+    tz: string,
+  ): Promise<FireCtx> {
+    const cond = rule.condition;
     switch (cond) {
       case 'ROSARY_UNFINISHED':
         return (await this.rosaryUnfinished(userId)) ? {} : null;
@@ -327,13 +437,13 @@ export class NotificationsScheduler implements OnModuleInit {
         return s >= 2 ? { vars: { count: String(s) } } : null;
       }
       case 'BIBLE_RESUME':
-        return this.readingResume(userId, 'BIBLE', 3);
+        return this.readingResume(userId, 'BIBLE', rule.thresholdDays ?? 3);
       case 'CATECHISM_RESUME':
-        return this.readingResume(userId, 'CATECHISM', 4);
+        return this.readingResume(userId, 'CATECHISM', rule.thresholdDays ?? 4);
       case 'ROSARY_LAPSE':
-        return (await this.rosaryLapse(userId)) ? {} : null;
+        return (await this.rosaryLapse(userId, rule.thresholdDays ?? 7)) ? {} : null;
       case 'COMEBACK':
-        return (await this.comeback(userId)) ? {} : null;
+        return (await this.comeback(userId, rule.thresholdDays ?? 3)) ? {} : null;
       case 'SUNDAY':
         return this.nowInZone(tz).weekday === 'Sun' ? {} : null;
       case 'VOX_INTRO':
@@ -344,26 +454,53 @@ export class NotificationsScheduler implements OnModuleInit {
         // `condition` não reconhecido (typo, regra custom mal configurada):
         // nunca dispara sozinho — do contrário caía aqui e virava "sempre
         // elegível", disparando todo dia sem que ninguém tenha pedido isso.
-        this.logger.warn(`condição de regra desconhecida: "${cond}" — regra não disparará`);
+        this.logger.warn(`condição de regra desconhecida: "${String(cond)}" — regra não disparará`);
         return null;
     }
   }
 
-  private async deliver(userId: string, rule: RuleRow, ctx: NonNullable<FireCtx>) {
-    let body = rule.body ?? undefined;
-    if (body && ctx.vars) {
-      for (const [k, v] of Object.entries(ctx.vars)) {
-        body = body.split(`{${k}}`).join(v);
-      }
-    }
+  private async deliver(
+    userId: string,
+    rule: RuleRow,
+    ctx: NonNullable<FireCtx>,
+    recentVariantIds: (string | null)[] = [],
+  ) {
+    // Escolhe a variante menos usada recentemente por este usuário. Sem
+    // variantes (ou serviço fora do ar) ⇒ cai no texto da própria regra,
+    // idêntico ao de antes.
+    const pool = await this.variants.listEnabledForRule(rule.key).catch(() => []);
+    const variant = this.variants.pickVariant(pool, recentVariantIds);
+
+    let title = variant?.title ?? rule.title;
+    let body = (variant?.body ?? rule.body) ?? undefined;
+
+    // Variáveis: as da condição ({count}/{label}) + as de contexto
+    // ({nome}/{santo}/{tempoLiturgico}) que aparecerem no texto.
+    const wanted = this.context.varsIn(`${title} ${body ?? ''}`);
+    const ctxVars = wanted.length
+      ? await this.context.resolve(userId, wanted).catch(() => ({}))
+      : {};
+    const vars = { ...ctxVars, ...ctx.vars };
+
+    title = this.interpolate(title, vars);
+    if (body) body = this.interpolate(body, vars);
 
     await this.send.deliverToUser(userId, {
-      title: rule.title,
+      title,
       body,
-      url: ctx.url ?? rule.url ?? undefined,
+      url: ctx.url ?? variant?.url ?? rule.url ?? undefined,
       source: 'RULE',
       ruleKey: rule.key,
+      variantId: variant?.id,
     });
+  }
+
+  private interpolate(text: string, vars: Record<string, string>): string {
+    let out = text;
+    for (const [k, v] of Object.entries(vars)) {
+      out = out.split(`{${k}}`).join(v);
+    }
+    return out;
   }
 
   /* ===== Condições ===== */
@@ -433,8 +570,8 @@ export class NotificationsScheduler implements OnModuleInit {
     return { url, vars: { label: r.label } };
   }
 
-  // Já rezava terço, mas nenhum concluído há >= 7 dias.
-  private async rosaryLapse(userId: string): Promise<boolean> {
+  // Já rezava terço, mas nenhum concluído há >= `minDays` dias.
+  private async rosaryLapse(userId: string, minDays = 7): Promise<boolean> {
     const stats = await this.prisma.spiritualStats.findUnique({
       where: { userId },
       select: { rosariesPrayed: true },
@@ -446,18 +583,19 @@ export class NotificationsScheduler implements OnModuleInit {
       select: { finishedAt: true },
     });
     const lastAt = lastDone?.finishedAt?.getTime() ?? 0;
-    return (Date.now() - lastAt) / DAY >= 7;
+    return (Date.now() - lastAt) / DAY >= minDays;
   }
 
-  // Sem abrir o app há 3–14 dias (janela de reengajamento; depois disso, para).
-  private async comeback(userId: string): Promise<boolean> {
+  // Sem abrir o app há `minDays`–14 dias (janela de reengajamento; o teto de
+  // 14 dias é fixo — "depois disso, para de incomodar", não é um knob).
+  private async comeback(userId: string, minDays = 3): Promise<boolean> {
     const s = await this.prisma.spiritualStats.findUnique({
       where: { userId },
       select: { lastLoginDate: true },
     });
     if (!s?.lastLoginDate) return false;
     const days = (Date.now() - s.lastLoginDate.getTime()) / DAY;
-    return days >= 3 && days <= 14;
+    return days >= minDays && days <= 14;
   }
 
   // Nunca usou o VoxAI e a conta já tem alguns dias.
