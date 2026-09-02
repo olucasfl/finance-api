@@ -6,13 +6,14 @@ import {
   DEFAULT_NOTIFICATION_SETTINGS,
   NotificationSettingsService,
 } from './notification-settings.service';
+import { UserNotificationProfileService } from './user-notification-profile.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('NotificationsScheduler.shouldFireAtHour', () => {
-  // shouldFireAtHour é puro (não toca prisma/send/settings), então dá pra
-  // instanciar com dependências vazias.
-  const scheduler = new NotificationsScheduler({} as any, {} as any, {} as any);
+  // shouldFireAtHour é puro (não toca prisma/send/settings/profiles), então
+  // dá pra instanciar com dependências vazias.
+  const scheduler = new NotificationsScheduler({} as any, {} as any, {} as any, {} as any);
 
   it('elegível da hora marcada em diante (fica na fila o dia todo)', () => {
     expect(scheduler.shouldFireAtHour(7, 7)).toBe(true);
@@ -42,6 +43,7 @@ describe('NotificationsScheduler', () => {
   let prisma: any;
   let send: { deliverToUser: jest.Mock };
   let settings: { get: jest.Mock; invalidate: jest.Mock };
+  let profiles: { getBand: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -65,6 +67,8 @@ describe('NotificationsScheduler', () => {
       get: jest.fn().mockResolvedValue({ ...DEFAULT_NOTIFICATION_SETTINGS }),
       invalidate: jest.fn(),
     };
+    // default ANY = comportamento de antes (elegível o dia todo)
+    profiles = { getBand: jest.fn().mockResolvedValue('ANY') };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -72,6 +76,7 @@ describe('NotificationsScheduler', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: NotificationsSendService, useValue: send },
         { provide: NotificationSettingsService, useValue: settings },
+        { provide: UserNotificationProfileService, useValue: profiles },
       ],
     }).compile();
 
@@ -428,6 +433,59 @@ describe('NotificationsScheduler', () => {
           expect.objectContaining({ ruleKey: 'EXAMEN_NIGHT' }),
         );
       });
+    });
+
+    describe('band matching (faixa do usuário × faixa da regra)', () => {
+      const setup = (userBand: string, ruleBand: string | null) => {
+        setUtcHour(10);
+        profiles.getBand.mockResolvedValue(userBand);
+        prisma.notificationRule.findMany.mockResolvedValue([
+          rule({ key: 'EXAMEN_NIGHT', hour: 9, condition: null, band: ruleBand }),
+        ]);
+        prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+        prisma.notification.findMany.mockResolvedValue([]);
+      };
+
+      it('delivers when the user band matches the rule band', async () => {
+        setup('MORNING', 'MORNING');
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+
+      it('suppresses a rule whose band does not match the user band', async () => {
+        setup('EVENING', 'MORNING');
+        await scheduler.tick();
+        expect(send.deliverToUser).not.toHaveBeenCalled();
+      });
+
+      it('a rule with band ANY reaches every user', async () => {
+        setup('EVENING', 'ANY');
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+
+      it('a rule without a band falls back to hour-only (reaches everyone)', async () => {
+        setup('EVENING', null);
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+
+      it('a user classified ANY (not enough data) still gets banded rules', async () => {
+        setup('ANY', 'MORNING');
+        await scheduler.tick();
+        expect(send.deliverToUser).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('bandMatches', () => {
+    const s = () => scheduler as any;
+    it('matches on ANY (either side), on a null rule band, and on an exact band', () => {
+      expect(s().bandMatches('MORNING', 'MORNING')).toBe(true);
+      expect(s().bandMatches('MORNING', 'EVENING')).toBe(false);
+      expect(s().bandMatches('ANY', 'EVENING')).toBe(true);
+      expect(s().bandMatches('EVENING', 'ANY')).toBe(true);
+      expect(s().bandMatches('EVENING', null)).toBe(true);
     });
   });
 

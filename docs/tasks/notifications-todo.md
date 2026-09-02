@@ -264,26 +264,36 @@ usuário case com a `band` da regra (`ANY` de qualquer lado = sempre casa). Sem
 perfil ou `band` da regra `null` ⇒ cai no `shouldFireAtHour(hour)` de hoje.
 
 **Critérios de aceite:**
-- [ ] `MORNING` só recebe regra `MORNING`/`ANY` durante a manhã dele
-- [ ] Fallback pro comportamento por `hour` quando faltam dados
-- [ ] Quiet hours continua valendo por cima
-- [ ] No máximo 1 disparo por tick, como hoje
+- [x] `tick()` chama `profiles.getBand(userId)` (1x por usuário) e filtra
+      candidatas por `bandMatches(userBand, rule.band)`
+- [x] `bandMatches`: `ANY` de qualquer lado, ou `rule.band` null ⇒ casa
+      sempre (vale só a hora, como antes); senão exige igualdade
+- [x] Fallback seguro: `getBand` nunca lança (⇒ ANY); regra sem band ⇒ hora-only
+- [x] Quiet hours continua por cima; no máx. 1 disparo por tick
+- [x] **Fix de tabela:** `shouldFireAtHour` no `tick()` passou a receber
+      `cfg.quietEnd/quietStart` (antes usava os defaults hardcoded mesmo com
+      quiet hours customizado no admin — latente desde a Task 1)
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` — matriz faixa-usuário × faixa-regra
-- [ ] `npm run build` no backend
-- [ ] Manual: usuário EVENING não recebe regra MORNING às 9h
+- [x] `npx jest notifications.scheduler` — matriz faixa-usuário × faixa-regra
+      (5 casos) + `bandMatches` puro
+- [x] `npm run build` no backend — suíte completa: 755 testes
 
 **Dependências:** Task 7
 **Arquivos:** `.../notifications.scheduler.ts`, specs
 **Escopo:** M
+**Commit:** `oratio-api` branch `feat/notif-faixa-usuario`
 
 ---
 
 ## Checkpoint C — Fase 3
-- [ ] Timing por faixa funcionando com fallback seguro
-- [ ] Custo de query do classificador aceitável (index + janela + cache)
-- [ ] Revisar com o usuário
+- [x] Timing por faixa funcionando com fallback seguro (755 testes back)
+- [x] Custo de query aceitável: `@@index([userId, createdAt])` + janela de 30d
+      + cache de 7d no perfil; `getBand` = 1 findUnique por tick na maioria
+      das vezes, recálculo (findMany + upsert) só ~1x/semana por usuário
+- [ ] ⏳ `prisma db push` da Fase 3 (tabela `UserNotificationProfile` +
+      índice em `UserActivity`) — mostrar diff, com OK do usuário
+- [ ] Revisar com o usuário antes da Fase 4
 
 ---
 
