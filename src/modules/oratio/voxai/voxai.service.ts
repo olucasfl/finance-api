@@ -6,7 +6,7 @@ import type { Request, Response } from "express"
 import { PrismaService } from "src/prisma/prisma.service"
 
 import { VoxAiDto } from "./dto/voxai.dto"
-import { VOX_IDENTITY, resolveVoxProfile } from "./prompts/vox.prompt"
+import { VOX_IDENTITY, VOX_PROFILES, VOX_PROFILE_KEYS, resolveVoxProfile } from "./prompts/vox.prompt"
 import { contentFilter } from "./filters/vox.content-filter"
 import { VoxRateLimiter } from "./guards/vox.rate-limiter"
 import { LiturgicalCalendarService } from "./services/liturgical-calendar.service"
@@ -218,7 +218,49 @@ Frase: "${message}"`
    orderBy:{ updatedAt:"desc" }
   })
 
-  return { active, conversations }
+  const user = await this.prisma.user.findUnique({
+   where:{ id: userId },
+   select:{ voxProfile:true, voxOnboardingSeenAt:true }
+  })
+
+  return {
+   active,
+   conversations,
+   profile: user?.voxProfile ?? null,
+   // card de novidade só enquanto a pessoa nunca escolheu perfil E nunca
+   // dispensou o onboarding — escolher ou dispensar carimba a data
+   showVoxIntro: !user?.voxProfile && !user?.voxOnboardingSeenAt
+  }
+ }
+
+ /* =========================
+    PERFIS DE RESPOSTA DO VOX
+ ========================= */
+
+ // Metadados dos perfis para o frontend (cards + visão detalhada).
+ // Nunca devolve systemAppend nem maxTokens — são internos.
+ listProfiles(){
+  return VOX_PROFILE_KEYS.map(key => {
+   const { label, short, details, examples } = VOX_PROFILES[key]
+   return { key, label, short, details, examples }
+  })
+ }
+
+ async setProfile(userId: string, profile: string){
+  await this.prisma.user.update({
+   where:{ id: userId },
+   // escolher um perfil também encerra o onboarding
+   data:{ voxProfile: profile, voxOnboardingSeenAt: new Date() }
+  })
+  return { profile }
+ }
+
+ async markIntroSeen(userId: string){
+  await this.prisma.user.update({
+   where:{ id: userId },
+   data:{ voxOnboardingSeenAt: new Date() }
+  })
+  return { ok: true }
  }
 
  /* =========================
@@ -376,11 +418,15 @@ ${liturgySummarized}
    /* =========================
       🧠 PROMPT FINAL
 
-      profileKey vem null nesta fase (perfil por usuário entra na Fase B2);
-      resolveVoxProfile devolve o DEFAULT, que já é o Padrão "destravado".
+      Perfil de resposta do usuário (null → DEFAULT "Padrão"). Define o
+      systemAppend colado no fim do prompt e o teto de tokens da resposta.
    ========================= */
 
-   const profileKey: string | null = null
+   const voxUser = await this.prisma.user.findUnique({
+    where:{ id: userId },
+    select:{ voxProfile:true }
+   })
+   const profileKey = voxUser?.voxProfile ?? null
    const profile = resolveVoxProfile(profileKey)
 
    const systemPrompt = this.buildSystemPrompt({
@@ -673,8 +719,11 @@ ${liturgySummarized}
 `
    }
 
-   // profileKey null nesta fase (perfil por usuário entra na Fase B2).
-   const profileKey: string | null = null
+   const voxUser = await this.prisma.user.findUnique({
+    where:{ id: userId },
+    select:{ voxProfile:true }
+   })
+   const profileKey = voxUser?.voxProfile ?? null
    const profile = resolveVoxProfile(profileKey)
 
    const systemPrompt = this.buildSystemPrompt({

@@ -12,6 +12,9 @@ describe('VoxAiController', () => {
     getOrCreateActiveConversation: jest.Mock;
     deleteConversation: jest.Mock;
     renameConversation: jest.Mock;
+    listProfiles: jest.Mock;
+    setProfile: jest.Mock;
+    markIntroSeen: jest.Mock;
   };
   let prisma: {
     conversation: { findMany: jest.Mock; findUnique: jest.Mock };
@@ -28,6 +31,9 @@ describe('VoxAiController', () => {
       getOrCreateActiveConversation: jest.fn(),
       deleteConversation: jest.fn(),
       renameConversation: jest.fn(),
+      listProfiles: jest.fn(),
+      setProfile: jest.fn(),
+      markIntroSeen: jest.fn(),
     };
 
     prisma = {
@@ -81,6 +87,32 @@ describe('VoxAiController', () => {
     await controller.getBootstrap(req('user-1'));
 
     expect(voxAiService.getBootstrap).toHaveBeenCalledWith('user-1');
+  });
+
+  it('getProfiles() returns the profile catalog from the service', () => {
+    voxAiService.listProfiles.mockReturnValue([{ key: 'DEFAULT' }]);
+
+    const result = controller.getProfiles();
+
+    expect(result).toEqual([{ key: 'DEFAULT' }]);
+  });
+
+  it('setProfile() forwards the userId and the validated profile key', async () => {
+    voxAiService.setProfile.mockResolvedValue({ profile: 'STUDY' });
+
+    const result = await controller.setProfile({ profile: 'STUDY' } as any, req('user-1'));
+
+    expect(voxAiService.setProfile).toHaveBeenCalledWith('user-1', 'STUDY');
+    expect(result).toEqual({ profile: 'STUDY' });
+  });
+
+  it('markIntroSeen() forwards just the userId', async () => {
+    voxAiService.markIntroSeen.mockResolvedValue({ ok: true });
+
+    const result = await controller.markIntroSeen(req('user-1'));
+
+    expect(voxAiService.markIntroSeen).toHaveBeenCalledWith('user-1');
+    expect(result).toEqual({ ok: true });
   });
 
   it('getActiveConversation() delegates to getOrCreateActiveConversation', async () => {
