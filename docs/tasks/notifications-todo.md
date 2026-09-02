@@ -395,9 +395,11 @@ desativar/remover a última ativa.
 - [x] Variantes editáveis ponta a ponta; rotação LRU por usuário no `deliver`
 - [x] Piso de 1 variante ativa garantido na API (400) e refletido na UI
 - [x] 1 variante só / serviço fora do ar ⇒ texto da regra, idêntico a antes
-- [ ] ⏳ `prisma db push` da Fase 4 (`NotificationRuleVariant` +
-      `Notification.variantId`) — mostrar diff, com OK do usuário
-- [ ] Revisar com o usuário antes da Fase 5 (última — variáveis de contexto)
+- [x] `prisma db push` da Fase 4 aplicado em produção (2026-09-02, com OK do
+      usuário) — `Notification.variantId` + tabela `NotificationRuleVariant`
+      + índice + FK; `migrate diff` pós-push = vazio. Seed de 1 variante/regra
+      roda no próximo boot do backend.
+- [x] Revisado — seguir pra Fase 5 (última: variáveis de contexto)
 
 ---
 
