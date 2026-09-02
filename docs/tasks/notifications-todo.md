@@ -291,9 +291,10 @@ perfil ou `band` da regra `null` ⇒ cai no `shouldFireAtHour(hour)` de hoje.
 - [x] Custo de query aceitável: `@@index([userId, createdAt])` + janela de 30d
       + cache de 7d no perfil; `getBand` = 1 findUnique por tick na maioria
       das vezes, recálculo (findMany + upsert) só ~1x/semana por usuário
-- [ ] ⏳ `prisma db push` da Fase 3 (tabela `UserNotificationProfile` +
-      índice em `UserActivity`) — mostrar diff, com OK do usuário
-- [ ] Revisar com o usuário antes da Fase 4
+- [x] `prisma db push` da Fase 3 aplicado em produção (2026-09-02, com OK do
+      usuário) — `UserNotificationProfile` + índice `UserActivity(userId,createdAt)`
+      + FK; `migrate diff` pós-push = vazio
+- [x] Revisado — seguir pra Fase 4
 
 ---
 
