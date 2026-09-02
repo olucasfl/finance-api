@@ -81,6 +81,9 @@ export class NotificationsService {
         createdAt: true,
         seenAt: true,
         source: true,
+        // qual regra disparou (BIBLE_RESUME, STREAK_AT_RISK, ...) — o front usa
+        // para dar ícone/cor por categoria. null em campanhas.
+        ruleKey: true,
       },
     });
 

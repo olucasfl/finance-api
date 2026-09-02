@@ -134,6 +134,13 @@ describe('NotificationsService', () => {
       expect(args.skip).toBeUndefined();
     });
 
+    it('selects ruleKey so the client can show a category per notification', async () => {
+      await service.getInbox('user-1');
+
+      const args = prisma.notification.findMany.mock.calls[0][0];
+      expect(args.select).toMatchObject({ ruleKey: true, source: true });
+    });
+
     it('adds cursor/skip when a cursor is given', async () => {
       await service.getInbox('user-1', 'row-10');
 
