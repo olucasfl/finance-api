@@ -132,45 +132,52 @@ funil, com salvar explícito e feedback de erro de validação.
 `DEFAULT_RULES` na reconciliação de boot (sem sobrescrever edição do admin).
 
 **Critérios de aceite:**
-- [ ] `thresholdDays Int?` e `band String?` (`"MORNING"|"AFTERNOON"|"EVENING"|"ANY"`)
-      no model, aditivos
-- [ ] `onModuleInit` preenche os valores nas regras que ainda estão `null`,
-      mapeando o `hour` atual → faixa (ex.: 9→MORNING, 17/18→AFTERNOON, 20/21→EVENING)
-      e o `minDays` de hoje → `thresholdDays` (BIBLE=3, CATECHISM=4, LAPSE=7…)
-- [ ] Não mexe em regra cujo `band`/`thresholdDays` o admin já definiu
+- [x] `thresholdDays Int?` e `band String?` no model, aditivos e nullable
+- [x] Valores-semente ficam no próprio catálogo `DEFAULT_RULES` (explícito >
+      heurística por hora): MORNING pra 8–11h, AFTERNOON pra ROSARY_UNFINISHED/
+      ROSARY_LAPSE, EVENING pra STREAK/EXAMEN. `thresholdDays`: BIBLE=3,
+      CATECHISM=4, ROSARY_LAPSE=7, COMEBACK=3; `null` nas condições sem janela
+- [x] `onModuleInit` faz backfill só onde a regra está `null` (banco pré-colunas);
+      nunca reescreve valor que o admin definiu
+- [x] Regra criada do zero já nasce com os dois campos (`create({ data: r })`)
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` (bloco `onModuleInit`) passa
-- [ ] `npm run build` no backend
-- [ ] Manual: após boot, `GET /rules` mostra `band`/`thresholdDays` preenchidos
+- [x] `npx jest notifications.scheduler` (bloco `onModuleInit`, +3 casos) passa
+- [x] `npm run build` no backend
+- [ ] Manual: após boot, `GET /rules` mostra `band`/`thresholdDays` — depende
+      do `prisma db push`
 
 **Dependências:** Checkpoint A
 **Arquivos:** `oratio-api/prisma/schema.prisma`, `.../notifications.scheduler.ts`
 (catálogo + reconcile), specs
 **Escopo:** M
+**Commit:** `oratio-api` branch `feat/notif-regra-knobs`
 
 ---
 
 ### Task 5: `evalCondition()` lê `thresholdDays` do registro
 **Descrição:** Trocar os `minDays` hardcoded (`readingResume`, `rosaryLapse`,
-`comeback`, `rosaryUnfinished` janela) pelo valor do registro da regra, com o
-valor de hoje como default quando `thresholdDays` for `null`.
+`comeback`) pelo valor do registro da regra, com o valor de hoje como default
+quando `thresholdDays` for `null`.
 
 **Critérios de aceite:**
-- [ ] `readingResume`, `rosaryLapse`, `comeback` recebem o limiar da regra
-- [ ] `null` ⇒ mantém o número de hoje
-- [ ] `streakAtRisk()` **não muda** (condição intocada — só herda band/textos)
-- [ ] Condição desconhecida continua **não disparando** (sem fallback)
+- [x] `evalCondition(userId, rule, tz)` (recebe a regra inteira, não só a
+      condição); `readingResume`/`rosaryLapse`/`comeback` usam `rule.thresholdDays ?? <default>`
+- [x] `null` ⇒ mantém o número de hoje (3/4/7/3)
+- [x] `streakAtRisk()` e `rosaryUnfinished()` **intocados** (janelas fixas na
+      condição, não são "parado há N dias"); `voxIntro` idem (idade da conta)
+- [x] Condição desconhecida continua **não disparando** (sem fallback)
+- [x] Teto de 14 dias do `comeback` fica fixo (não é knob)
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` — casos "limiar custom encurta/alonga a
-      janela" e "sem limiar = comportamento atual"
-- [ ] `npm run build` no backend
-- [ ] Manual: baixar `thresholdDays` de BIBLE_RESUME pra 1 e ver disparar antes
+- [x] `npx jest notifications.scheduler` — "limiar custom encurta a janela",
+      "sem limiar = comportamento atual", ROSARY_LAPSE/COMEBACK
+- [x] `npm run build` no backend — suíte completa: 740 testes passando
 
 **Dependências:** Task 4
 **Arquivos:** `.../notifications.scheduler.ts`, specs
 **Escopo:** S
+**Commit:** junto da Task 4 (colunas inúteis sem quem leia)
 
 ---
 

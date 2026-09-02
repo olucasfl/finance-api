@@ -12,6 +12,10 @@ const DAY = 24 * 60 * 60 * 1000;
 // Catálogo fixo de regras — semeadas por `key`. QUANDO/PRA QUEM é código
 // (o `condition`); o texto/hora são editáveis no admin. Regras fora deste
 // catálogo são removidas no boot (ex.: liturgia/Angelus antigas).
+// `thresholdDays`/`band` são os valores-semente dos knobs da Fase 2: o
+// `onModuleInit` preenche as regras que ainda estão com `null` (sem tocar
+// no que o admin editou). `thresholdDays: null` = a condição não usa
+// janela de "parado há N dias". `band` é a faixa de horário preferida.
 const DEFAULT_RULES = [
   {
     key: 'ROSARY_UNFINISHED',
@@ -20,6 +24,8 @@ const DEFAULT_RULES = [
     url: '/oratio/rosary',
     hour: 18,
     condition: 'ROSARY_UNFINISHED' as string | null,
+    thresholdDays: null as number | null,
+    band: 'AFTERNOON' as string | null,
   },
   {
     key: 'STREAK_AT_RISK',
@@ -28,6 +34,8 @@ const DEFAULT_RULES = [
     url: null as string | null, // basta abrir o app — sem redirecionamento
     hour: 20,
     condition: 'STREAK_AT_RISK' as string | null,
+    thresholdDays: null as number | null,
+    band: 'EVENING' as string | null,
   },
   {
     key: 'BIBLE_RESUME',
@@ -36,6 +44,8 @@ const DEFAULT_RULES = [
     url: '/oratio/biblia',
     hour: 9,
     condition: 'BIBLE_RESUME' as string | null,
+    thresholdDays: 3 as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'CATECHISM_RESUME',
@@ -44,6 +54,8 @@ const DEFAULT_RULES = [
     url: '/oratio/catecismo',
     hour: 9,
     condition: 'CATECHISM_RESUME' as string | null,
+    thresholdDays: 4 as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'ROSARY_LAPSE',
@@ -52,6 +64,8 @@ const DEFAULT_RULES = [
     url: '/oratio/rosary',
     hour: 17,
     condition: 'ROSARY_LAPSE' as string | null,
+    thresholdDays: 7 as number | null,
+    band: 'AFTERNOON' as string | null,
   },
   {
     key: 'COMEBACK',
@@ -60,6 +74,8 @@ const DEFAULT_RULES = [
     url: null as string | null, // basta abrir o app — sem redirecionamento
     hour: 10,
     condition: 'COMEBACK' as string | null,
+    thresholdDays: 3 as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'SUNDAY_MASS',
@@ -68,6 +84,8 @@ const DEFAULT_RULES = [
     url: '/oratio/liturgia-completa',
     hour: 8,
     condition: 'SUNDAY' as string | null,
+    thresholdDays: null as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'VOX_INTRO',
@@ -76,6 +94,8 @@ const DEFAULT_RULES = [
     url: '/oratio/vox',
     hour: 11,
     condition: 'VOX_INTRO' as string | null,
+    thresholdDays: null as number | null,
+    band: 'MORNING' as string | null,
   },
   {
     key: 'EXAMEN_NIGHT',
@@ -84,6 +104,8 @@ const DEFAULT_RULES = [
     url: '/oratio/confissao',
     hour: 21,
     condition: null as string | null,
+    thresholdDays: null as number | null,
+    band: 'EVENING' as string | null,
   },
 ];
 
@@ -109,6 +131,8 @@ type RuleRow = {
   url: string | null;
   hour: number | null;
   condition: string | null;
+  thresholdDays: number | null;
+  band: string | null;
 };
 
 // null = condição não bateu (não envia). Objeto = envia, opcionalmente com
@@ -151,6 +175,20 @@ export class NotificationsScheduler implements OnModuleInit {
       if (exists.url === '/oratio/home' && r.url !== '/oratio/home') {
         await this.prisma.notificationRule
           .update({ where: { key: r.key }, data: { url: r.url } })
+          .catch(() => {});
+      }
+
+      // Backfill dos knobs da Fase 2: preenche `band`/`thresholdDays` só
+      // quando a regra ainda está com `null` (banco que existia antes das
+      // colunas). Nunca reescreve um valor que o admin já definiu.
+      const backfill: { band?: string | null; thresholdDays?: number | null } = {};
+      if (exists.band == null && r.band != null) backfill.band = r.band;
+      if (exists.thresholdDays == null && r.thresholdDays != null) {
+        backfill.thresholdDays = r.thresholdDays;
+      }
+      if (Object.keys(backfill).length > 0) {
+        await this.prisma.notificationRule
+          .update({ where: { key: r.key }, data: backfill })
           .catch(() => {});
       }
     }
@@ -331,13 +369,21 @@ export class NotificationsScheduler implements OnModuleInit {
 
   // Avalia a condição e, se bater, entrega. Retorna se disparou.
   private async tryFire(userId: string, rule: RuleRow, tz: string): Promise<boolean> {
-    const ctx = await this.evalCondition(userId, rule.condition, tz);
+    const ctx = await this.evalCondition(userId, rule, tz);
     if (!ctx) return false;
     await this.deliver(userId, rule, ctx);
     return true;
   }
 
-  private async evalCondition(userId: string, cond: string | null, tz: string): Promise<FireCtx> {
+  // `rule` (não só `rule.condition`) porque as condições de janela agora
+  // leem o limiar do registro (`thresholdDays`); `null` cai no default de
+  // código de sempre.
+  private async evalCondition(
+    userId: string,
+    rule: Pick<RuleRow, 'condition' | 'thresholdDays'>,
+    tz: string,
+  ): Promise<FireCtx> {
+    const cond = rule.condition;
     switch (cond) {
       case 'ROSARY_UNFINISHED':
         return (await this.rosaryUnfinished(userId)) ? {} : null;
@@ -346,13 +392,13 @@ export class NotificationsScheduler implements OnModuleInit {
         return s >= 2 ? { vars: { count: String(s) } } : null;
       }
       case 'BIBLE_RESUME':
-        return this.readingResume(userId, 'BIBLE', 3);
+        return this.readingResume(userId, 'BIBLE', rule.thresholdDays ?? 3);
       case 'CATECHISM_RESUME':
-        return this.readingResume(userId, 'CATECHISM', 4);
+        return this.readingResume(userId, 'CATECHISM', rule.thresholdDays ?? 4);
       case 'ROSARY_LAPSE':
-        return (await this.rosaryLapse(userId)) ? {} : null;
+        return (await this.rosaryLapse(userId, rule.thresholdDays ?? 7)) ? {} : null;
       case 'COMEBACK':
-        return (await this.comeback(userId)) ? {} : null;
+        return (await this.comeback(userId, rule.thresholdDays ?? 3)) ? {} : null;
       case 'SUNDAY':
         return this.nowInZone(tz).weekday === 'Sun' ? {} : null;
       case 'VOX_INTRO':
@@ -363,7 +409,7 @@ export class NotificationsScheduler implements OnModuleInit {
         // `condition` não reconhecido (typo, regra custom mal configurada):
         // nunca dispara sozinho — do contrário caía aqui e virava "sempre
         // elegível", disparando todo dia sem que ninguém tenha pedido isso.
-        this.logger.warn(`condição de regra desconhecida: "${cond}" — regra não disparará`);
+        this.logger.warn(`condição de regra desconhecida: "${String(cond)}" — regra não disparará`);
         return null;
     }
   }
@@ -452,8 +498,8 @@ export class NotificationsScheduler implements OnModuleInit {
     return { url, vars: { label: r.label } };
   }
 
-  // Já rezava terço, mas nenhum concluído há >= 7 dias.
-  private async rosaryLapse(userId: string): Promise<boolean> {
+  // Já rezava terço, mas nenhum concluído há >= `minDays` dias.
+  private async rosaryLapse(userId: string, minDays = 7): Promise<boolean> {
     const stats = await this.prisma.spiritualStats.findUnique({
       where: { userId },
       select: { rosariesPrayed: true },
@@ -465,18 +511,19 @@ export class NotificationsScheduler implements OnModuleInit {
       select: { finishedAt: true },
     });
     const lastAt = lastDone?.finishedAt?.getTime() ?? 0;
-    return (Date.now() - lastAt) / DAY >= 7;
+    return (Date.now() - lastAt) / DAY >= minDays;
   }
 
-  // Sem abrir o app há 3–14 dias (janela de reengajamento; depois disso, para).
-  private async comeback(userId: string): Promise<boolean> {
+  // Sem abrir o app há `minDays`–14 dias (janela de reengajamento; o teto de
+  // 14 dias é fixo — "depois disso, para de incomodar", não é um knob).
+  private async comeback(userId: string, minDays = 3): Promise<boolean> {
     const s = await this.prisma.spiritualStats.findUnique({
       where: { userId },
       select: { lastLoginDate: true },
     });
     if (!s?.lastLoginDate) return false;
     const days = (Date.now() - s.lastLoginDate.getTime()) / DAY;
-    return days >= 3 && days <= 14;
+    return days >= minDays && days <= 14;
   }
 
   // Nunca usou o VoxAI e a conta já tem alguns dias.
