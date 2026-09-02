@@ -166,7 +166,28 @@ describe('VoxAiService', () => {
         { role: 'assistant', content: 'Olá!' },
       ]);
       expect((payload as any).messages.at(-1)).toEqual({ role: 'user', content: 'Tudo bem?' });
-      expect((payload as any).max_tokens).toBe(2000);
+      // DEFAULT profile budget (era 2000 fixo pra todos)
+      expect((payload as any).max_tokens).toBe(1500);
+    });
+
+    it('builds the system prompt from the identity plus the active profile style block', async () => {
+      await service.chat({ message: 'Oi', conversationId: 'c1' } as any, 'user-1');
+
+      const [, payload] = mockedAxios.post.mock.calls[0];
+      const systemContent = (payload as any).messages[0].content as string;
+
+      expect(systemContent).toContain('# Identidade');
+      expect(systemContent).toContain('# Estilo de resposta ativo: Padrão');
+      // the style block is the last instruction in the prompt
+      expect(systemContent.trimEnd().endsWith('a menos que a pergunta peça.')).toBe(true);
+    });
+
+    it('tags the token log with the active profile', async () => {
+      const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
+
+      await service.chat({ message: 'Oi', conversationId: 'c1' } as any, 'user-1');
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('profile=DEFAULT'));
     });
 
     it('persists both the user and assistant messages, and logs VoxAI activity', async () => {
