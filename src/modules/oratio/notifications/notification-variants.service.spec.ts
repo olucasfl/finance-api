@@ -1,6 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { NotificationVariantsService, VariantRow } from './notification-variants.service';
+import {
+  DEFAULT_VARIANTS,
+  NotificationVariantsService,
+  VariantRow,
+} from './notification-variants.service';
 
 const v = (over: Partial<VariantRow> = {}): VariantRow => ({
   id: 'v1',
@@ -44,28 +48,58 @@ describe('NotificationVariantsService', () => {
   });
 
   describe('seedMissing', () => {
-    it('creates exactly one variant per rule that has none', async () => {
+    it('seeds the full DEFAULT_VARIANTS pool for a catalog rule with no variants', async () => {
       prisma.notificationRule.findMany.mockResolvedValue([
-        { key: 'A', title: 'Ta', body: 'Ba', url: '/a' },
-        { key: 'B', title: 'Tb', body: null, url: null },
+        { key: 'EXAMEN_NIGHT', title: 'T', body: 'B', url: '/x' },
       ]);
       prisma.notificationRuleVariant.count.mockResolvedValue(0);
 
       await service.seedMissing();
 
-      expect(prisma.notificationRuleVariant.create).toHaveBeenCalledTimes(2);
+      const pool = DEFAULT_VARIANTS.EXAMEN_NIGHT;
+      expect(pool.length).toBeGreaterThanOrEqual(2);
+      expect(prisma.notificationRuleVariant.create).toHaveBeenCalledTimes(pool.length);
       expect(prisma.notificationRuleVariant.create).toHaveBeenCalledWith({
-        data: { ruleKey: 'A', title: 'Ta', body: 'Ba', url: '/a', order: 0 },
+        data: { ruleKey: 'EXAMEN_NIGHT', title: pool[0].title, body: pool[0].body, url: '/x', order: 0 },
+      });
+      expect(prisma.notificationRuleVariant.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ order: pool.length - 1 }) }),
+      );
+    });
+
+    it('seeds a single variant from the rule text for a custom (non-catalog) rule', async () => {
+      prisma.notificationRule.findMany.mockResolvedValue([
+        { key: 'CUSTOM_X', title: 'Ta', body: 'Ba', url: '/a' },
+      ]);
+      prisma.notificationRuleVariant.count.mockResolvedValue(0);
+
+      await service.seedMissing();
+
+      expect(prisma.notificationRuleVariant.create).toHaveBeenCalledTimes(1);
+      expect(prisma.notificationRuleVariant.create).toHaveBeenCalledWith({
+        data: { ruleKey: 'CUSTOM_X', title: 'Ta', body: 'Ba', url: '/a', order: 0 },
       });
     });
 
-    it('does not seed a rule that already has a variant (idempotent)', async () => {
-      prisma.notificationRule.findMany.mockResolvedValue([{ key: 'A', title: 'T', body: 'B', url: null }]);
+    it('does not touch a rule that already has variants (idempotent — admin owns the list)', async () => {
+      prisma.notificationRule.findMany.mockResolvedValue([
+        { key: 'EXAMEN_NIGHT', title: 'T', body: 'B', url: null },
+      ]);
       prisma.notificationRuleVariant.count.mockResolvedValue(1);
 
       await service.seedMissing();
 
       expect(prisma.notificationRuleVariant.create).not.toHaveBeenCalled();
+    });
+
+    it('every catalog rule ships at least 2 non-empty variants', () => {
+      for (const pool of Object.values(DEFAULT_VARIANTS)) {
+        expect(pool.length).toBeGreaterThanOrEqual(2);
+        for (const v of pool) {
+          expect(v.title.trim().length).toBeGreaterThan(0);
+          expect(v.body.trim().length).toBeGreaterThan(0);
+        }
+      }
     });
   });
 
