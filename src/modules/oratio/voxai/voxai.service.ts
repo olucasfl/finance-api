@@ -6,7 +6,7 @@ import type { Request, Response } from "express"
 import { PrismaService } from "src/prisma/prisma.service"
 
 import { VoxAiDto } from "./dto/voxai.dto"
-import { VOX_SYSTEM_PROMPT } from "./prompts/vox.prompt"
+import { VOX_IDENTITY, resolveVoxProfile } from "./prompts/vox.prompt"
 import { contentFilter } from "./filters/vox.content-filter"
 import { VoxRateLimiter } from "./guards/vox.rate-limiter"
 import { LiturgicalCalendarService } from "./services/liturgical-calendar.service"
@@ -94,6 +94,34 @@ ${segunda?.texto?.slice(0, 300) || ""}
 ${evangelho?.texto?.slice(0, 800)}
 `
 }
+
+ /* =========================
+    MONTAGEM DO SYSTEM PROMPT
+
+    Fonte única: chat() e chatStream() chamam este helper em vez de montar
+    a string cada um por conta própria. A identidade (VOX_IDENTITY) é fixa;
+    o systemAppend do perfil (quando existe) vai POR ÚLTIMO, como a
+    instrução mais recente sobre formato/tom. A identidade continua valendo.
+ ========================= */
+ private buildSystemPrompt(args: {
+  profileKey: string | null
+  brazilToday: string
+  liturgySection: string
+ }): string {
+
+  const profile = resolveVoxProfile(args.profileKey)
+
+  const base = `${VOX_IDENTITY}
+
+Data atual (Brasil): ${args.brazilToday}
+${args.liturgySection}`
+
+  return profile.systemAppend
+   ? `${base}
+
+${profile.systemAppend}`
+   : base
+ }
 
  /* =========================
     🧠 EXTRAIR DATA COM IA (fallback quando o parser local não reconhece)
@@ -347,12 +375,19 @@ ${liturgySummarized}
 
    /* =========================
       🧠 PROMPT FINAL
+
+      profileKey vem null nesta fase (perfil por usuário entra na Fase B2);
+      resolveVoxProfile devolve o DEFAULT, que já é o Padrão "destravado".
    ========================= */
 
-   const systemPrompt = `${VOX_SYSTEM_PROMPT}
+   const profileKey: string | null = null
+   const profile = resolveVoxProfile(profileKey)
 
-Data atual (Brasil): ${brazilToday}
-${liturgySection}`
+   const systemPrompt = this.buildSystemPrompt({
+    profileKey,
+    brazilToday,
+    liturgySection
+   })
 
    const response = await axios.post(
     this.url,
@@ -363,7 +398,7 @@ ${liturgySection}`
       ...history,
       { role:"user", content: data.message }
      ],
-     max_tokens: 2000
+     max_tokens: profile.maxTokens
     },
     {
      headers: this.headers,
@@ -384,7 +419,7 @@ ${liturgySection}`
 
    if(usage){
     this.logger.log(
-     `[tokens] conversation=${data.conversationId} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
+     `[tokens] conversation=${data.conversationId} profile=${profile.key} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
     )
    }
 
@@ -638,10 +673,15 @@ ${liturgySummarized}
 `
    }
 
-   const systemPrompt = `${VOX_SYSTEM_PROMPT}
+   // profileKey null nesta fase (perfil por usuário entra na Fase B2).
+   const profileKey: string | null = null
+   const profile = resolveVoxProfile(profileKey)
 
-Data atual (Brasil): ${brazilToday}
-${liturgySection}`
+   const systemPrompt = this.buildSystemPrompt({
+    profileKey,
+    brazilToday,
+    liturgySection
+   })
 
    const requestPayload = {
     model: this.model,
@@ -650,7 +690,7 @@ ${liturgySection}`
      ...history,
      { role:"user", content: data.message }
     ],
-    max_tokens: 2000,
+    max_tokens: profile.maxTokens,
     stream: true
    }
 
@@ -741,7 +781,7 @@ ${liturgySection}`
 
    if(usage){
     this.logger.log(
-     `[tokens] conversation=${data.conversationId} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
+     `[tokens] conversation=${data.conversationId} profile=${profile.key} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
     )
    }
 

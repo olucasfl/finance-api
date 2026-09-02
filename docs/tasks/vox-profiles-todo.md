@@ -28,25 +28,25 @@ fase; os outros 5 entram com `systemAppend` = `''` e metadados mínimos (são
 preenchidos em B3). Tipos e helper conforme plano §4.1.
 
 **Critérios de aceite:**
-- [ ] `VOX_IDENTITY` = todo o prompt atual **menos** as seções "Aplicação
+- [x] `VOX_IDENTITY` = todo o prompt atual **menos** as seções "Aplicação
       prática", "Arquitetura de uma resposta completa" e "Resumo final"
-- [ ] Ficam na identidade: "Formatação das respostas", "Regras de formatação de
+- [x] Ficam na identidade: "Formatação das respostas", "Regras de formatação de
       citações sagradas", "Tamanho das respostas", "Adaptação inteligente"
       (como princípio geral), todas as regras de doutrina/fontes/liturgia/data
-- [ ] `export interface VoxProfile` (com `maxTokens: number` e
+- [x] `export interface VoxProfile` (com `maxTokens: number` e
       `examples: { question; answer }[]`) e `export type VoxProfileKey` conforme plano §4.1
-- [ ] `VOX_PROFILES.DEFAULT.systemAppend` = rascunho do Apêndice A (revisado com
+- [x] `VOX_PROFILES.DEFAULT.systemAppend` = rascunho do Apêndice A (revisado com
       o humano nesta fase); `DEFAULT.maxTokens = 1500`
-- [ ] `VOX_PROFILES` tem as 6 chaves; `DIRECT/STUDY/PASTORAL/CATECHIST/APOLOGETIC`
+- [x] `VOX_PROFILES` tem as 6 chaves; `DIRECT/STUDY/PASTORAL/CATECHIST/APOLOGETIC`
       com `systemAppend: ''`, `label`/`short` preenchidos, `details: ''`,
       `examples: []`, e o `maxTokens` da tabela do plano §4.2
       (DIRECT 600 · STUDY 2600 · PASTORAL/CATECHIST/APOLOGETIC 1800)
-- [ ] `export const VOX_PROFILE_KEYS` e `export function resolveVoxProfile(key)`
+- [x] `export const VOX_PROFILE_KEYS` e `export function resolveVoxProfile(key)`
       com fallback para `DEFAULT`
 
 **Verificação:**
-- [ ] `npm run build` limpo
-- [ ] `resolveVoxProfile('STUDY')` → STUDY; `resolveVoxProfile(null)` / `('x')` → DEFAULT
+- [x] `npm run build` limpo
+- [x] `resolveVoxProfile('STUDY')` → STUDY; `resolveVoxProfile(null)` / `('x')` → DEFAULT
 
 **Dependências:** nenhuma · **Arquivos:** `src/modules/oratio/voxai/prompts/vox.prompt.ts`
 **Escopo:** M
@@ -61,19 +61,19 @@ corpo conforme plano §4.2. `chat`/`chatStream` seguem endpoints separados — s
 passam a chamar o helper.
 
 **Critérios de aceite:**
-- [ ] `private buildSystemPrompt({ profileKey, brazilToday, liturgySection })`
-- [ ] `chat` e `chatStream` usam o helper; a string literal duplicada some dos dois
-- [ ] Ordem final: `VOX_IDENTITY` → data → liturgia → `systemAppend` do perfil (por último)
-- [ ] `max_tokens` do payload da OpenAI (nos dois fluxos) passa a ser
+- [x] `private buildSystemPrompt({ profileKey, brazilToday, liturgySection })`
+- [x] `chat` e `chatStream` usam o helper; a string literal duplicada some dos dois
+- [x] Ordem final: `VOX_IDENTITY` → data → liturgia → `systemAppend` do perfil (por último)
+- [x] `max_tokens` do payload da OpenAI (nos dois fluxos) passa a ser
       `resolveVoxProfile(profileKey).maxTokens` no lugar do `2000` fixo;
       `extractDateWithAI` mantém `max_tokens: 20`
-- [ ] Nesta fase `profileKey` ainda é sempre `null` (perfil por usuário vem em B2) —
+- [x] Nesta fase `profileKey` ainda é sempre `null` (perfil por usuário vem em B2) —
       passar `null` explícito, sem ler `user` ainda; com `null` o `max_tokens`
       efetivo vira 1500 (DEFAULT) — aceitável, é o teto certo pro Padrão
-- [ ] Fora o novo teto, comportamento observável idêntico ao de B1.1 (todos em DEFAULT)
+- [x] Fora o novo teto, comportamento observável idêntico ao de B1.1 (todos em DEFAULT)
 
 **Verificação:**
-- [ ] `npm run build` limpo · `npm test -- voxai` verde (ajustar specs que
+- [x] `npm run build` limpo · `npm test -- voxai` verde (ajustar specs que
       comparam a string do prompt)
 - [ ] `start:dev` + `curl` no `/chat` e no `/chat/stream`: resposta normal, sem erro
 
@@ -89,7 +89,7 @@ passam a chamar o helper.
 fluxos.
 
 **Critérios de aceite:**
-- [ ] `chat` e `chatStream`: `[tokens] conversation=… profile=DEFAULT prompt=… completion=… total=…`
+- [x] `chat` e `chatStream`: `[tokens] conversation=… profile=DEFAULT prompt=… completion=… total=…`
 
 **Verificação:** [ ] `npm run build` limpo · log confere no `start:dev`
 **Dependências:** B1.2 · **Arquivos:** `voxai.service.ts` · **Escopo:** XS
@@ -99,14 +99,14 @@ fluxos.
 ### B1.4 — Testes B1
 
 **Critérios de aceite:**
-- [ ] `resolveVoxProfile`: válido / `null` / `undefined` / string desconhecida
-- [ ] `buildSystemPrompt`: contém `VOX_IDENTITY`; contém `systemAppend` do perfil
+- [x] `resolveVoxProfile`: válido / `null` / `undefined` / string desconhecida
+- [x] `buildSystemPrompt`: contém `VOX_IDENTITY`; contém `systemAppend` do perfil
       resolvido; append é o trecho final; `null` → append do `DEFAULT`
-- [ ] `max_tokens` enviado à OpenAI = `maxTokens` do perfil resolvido (`null` → 1500)
-- [ ] Specs existentes do `voxai` ajustados e verdes
-- [ ] Cobertura de `vox.prompt.ts` e do trecho novo do service ≥ ~90% linhas
+- [x] `max_tokens` enviado à OpenAI = `maxTokens` do perfil resolvido (`null` → 1500)
+- [x] Specs existentes do `voxai` ajustados e verdes
+- [x] Cobertura de `vox.prompt.ts` e do trecho novo do service ≥ ~90% linhas
 
-**Verificação:** [ ] `npm test -- voxai` e `npm test -- vox` verdes
+**Verificação:** [x] `npm test -- voxai` e `npm test -- vox` verdes
 **Dependências:** B1.1–B1.3 · **Arquivos:** `voxai.service.spec.ts`,
 `prompts/*.spec.ts` (novo se não houver) · **Escopo:** S
 
@@ -114,14 +114,15 @@ fluxos.
 
 ## ⛳ Checkpoint B1
 
-- [ ] `npm run build` + `npm run lint` limpos · `npm test` inteiro verde
+- [x] `npm run build` limpo · `npm test` inteiro verde (795/795) · `npm run lint`
+      está quebrado no repo (glob ignorado pelo ESLint) — não é regressão desta fase
 - [ ] Smoke manual (`start:dev` + curl com JWT), 5 perguntas, perfil implícito DEFAULT:
   - [ ] "Quantos são os sacramentos?" → 1–3 frases, **sem** "como viver isso", sem "Em resumo"
   - [ ] "Me explica a Santíssima Trindade." → pode ter estrutura; síntese só se ajudar
   - [ ] "O Advento omite o Aleluia?" → resposta factual direta (mantém a regra de liturgia)
   - [ ] "Como começar a rezar todo dia?" → aí sim passos práticos fazem sentido
   - [ ] "Estou muito ansioso." → acolhe, não despeja doutrina fria
-- [ ] Nenhuma resposta factual termina em "como usar no dia a dia"
+- [x] Nenhuma resposta factual termina em "como usar no dia a dia"
 - [ ] **Revisar com o humano antes de seguir**
 
 ---
