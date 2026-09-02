@@ -55,10 +55,23 @@ describe('vox.prompt', () => {
       expect(VOX_PROFILES.APOLOGETIC.maxTokens).toBe(1800);
     });
 
-    it('leaves the 5 dynamic profiles with an empty systemAppend until phase B3', () => {
-      for (const key of ['DIRECT', 'STUDY', 'PASTORAL', 'CATECHIST', 'APOLOGETIC'] as const) {
-        expect(VOX_PROFILES[key].systemAppend).toBe('');
+    it('every profile has a filled style block, details and exactly one example', () => {
+      for (const key of VOX_PROFILE_KEYS) {
+        const p = VOX_PROFILES[key];
+        expect(p.systemAppend).toContain('# Estilo de resposta ativo:');
+        expect(p.details.trim().length).toBeGreaterThan(0);
+        expect(p.examples).toHaveLength(1);
+        expect(p.examples[0].question.length).toBeGreaterThan(0);
+        expect(p.examples[0].answer.length).toBeGreaterThan(0);
       }
+    });
+
+    it('each dynamic profile carries its own distinct style block', () => {
+      expect(VOX_PROFILES.DIRECT.systemAppend).toContain('Direto ao ponto');
+      expect(VOX_PROFILES.STUDY.systemAppend).toContain('Profundo');
+      expect(VOX_PROFILES.PASTORAL.systemAppend).toContain('Pastoral');
+      expect(VOX_PROFILES.CATECHIST.systemAppend).toContain('Catequista');
+      expect(VOX_PROFILES.APOLOGETIC.systemAppend).toContain('Apologético');
     });
   });
 
