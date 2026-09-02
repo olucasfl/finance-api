@@ -2,13 +2,29 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } fro
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
 import { NotificationsSendService } from './notifications-send.service';
+import { NotificationSettingsService } from './notification-settings.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { CreateRuleDto, UpdateRuleDto } from './dto/rule.dto';
+import { UpdateSettingsDto } from './dto/settings.dto';
 
 @Controller('oratio/admin/notifications')
 @UseGuards(JwtAuthGuard, AdminGuard)
 export class AdminNotificationsController {
-  constructor(private readonly send: NotificationsSendService) {}
+  constructor(
+    private readonly send: NotificationsSendService,
+    private readonly settings: NotificationSettingsService,
+  ) {}
+
+  // Bloco de config do funil anti-spam (quiet hours, tetos, espaçamento…)
+  @Get('settings')
+  getSettings() {
+    return this.settings.getFull();
+  }
+
+  @Patch('settings')
+  updateSettings(@Body() body: UpdateSettingsDto) {
+    return this.settings.update(body);
+  }
 
   // Compor e enviar: Todos ou pessoas específicas
   @Post()

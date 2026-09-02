@@ -21,24 +21,34 @@ anti-spam e um serviço que a lê com cache curto. O scheduler passa a ler dela
 em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 
 **Critérios de aceite:**
-- [ ] Model `NotificationSettings` (id fixo `"default"`, colunas: `maxPerDay`
+- [x] Model `NotificationSettings` (id fixo `"default"`, colunas: `maxPerDay`
       Int @default(2), `maxNudgesPerDay` Int @default(1), `quietStart` Int
       @default(22), `quietEnd` Int @default(7), `spacingHours` Int @default(6),
       `restGapEnabled` Bool @default(true), `urgentThreshold` Int @default(80),
       `updatedAt`)
-- [ ] `NotificationSettingsService.get()` faz upsert-lazy da linha default e
-      cacheia por ~60s
-- [ ] `notifications.scheduler.ts` usa esses valores no lugar de `MAX_PER_DAY`,
+- [x] `NotificationSettingsService.get()` faz upsert-lazy da linha default e
+      cacheia por ~60s (+ `invalidate()` pro PATCH da Task 2; fallback pros
+      defaults se o banco falhar, sem cachear o fallback)
+- [x] `notifications.scheduler.ts` usa esses valores no lugar de `MAX_PER_DAY`,
       `MAX_NUDGES_PER_DAY`, `QUIET_START/END`, `SPACING_MS`, `URGENT_THRESHOLD`,
       `inRestGap`
-- [ ] Com o banco recém-criado (sem linha), o tick se comporta exatamente como
-      antes
+- [x] Com o banco recém-criado (sem linha), o tick se comporta exatamente como
+      antes — os defaults do serviço reproduzem as constantes antigas
+- [x] ⚠️ **Achado + fix:** `inRestGap` era variável morta (calculada, nunca
+      usada) — o "gap de descanso" nunca esteve ligado. Era a causa direta da
+      queixa do usuário (mesmas notificações a cada 1–2 dias). **Ligado nesta
+      fase** (decisão do usuário, 2026-09-02): notificação não-urgente só
+      dispara se não houve NENHUMA notificação hoje nem ontem; urgentes
+      (streak/terço não terminado) ignoram o gap. Sob a flag `restGapEnabled`
+      (default on, desligável pelo painel). Testes: `describe('rest gap')` em
+      `notifications.scheduler.spec.ts`.
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` passa (specs existentes + novos casos
-      "sem linha de settings" e "settings customizado muda o teto")
-- [ ] `npm run build` no backend
-- [ ] Manual: `GET` no banco mostra 1 linha `NotificationSettings` após o 1º tick
+- [x] `npx jest notifications.scheduler` passa (specs existentes + novos casos
+      "sem linha de settings", "maxPerDay customizado", "quiet hours ampliado")
+- [x] `npm run build` no backend — suíte completa: 728 testes passando
+- [ ] Manual: `GET` no banco mostra 1 linha `NotificationSettings` após o 1º
+      tick — depende do `prisma db push` em prod (Checkpoint, com OK do usuário)
 
 **Dependências:** Nenhuma
 **Arquivos:** `oratio-api/prisma/schema.prisma`,
@@ -53,19 +63,25 @@ em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 `AdminGuard`, reusando o `NotificationSettingsService`.
 
 **Critérios de aceite:**
-- [ ] `GET /oratio/admin/notifications/settings` devolve a linha atual
-- [ ] `PATCH /oratio/admin/notifications/settings` valida faixas (`quietStart/End`
-      0–23, `maxPerDay` 0–10, etc.) via DTO e invalida o cache
-- [ ] Só admin acessa (401/403 sem token/sem `isAdmin`)
+- [x] `GET /oratio/admin/notifications/settings` devolve a linha atual
+      (`getFull()`, upsert preguiçoso)
+- [x] `PATCH /oratio/admin/notifications/settings` valida faixas via
+      `UpdateSettingsDto` (`quietStart/End` 0–23, `maxPerDay`/`maxNudgesPerDay`
+      0–10, `spacingHours` 0–24, `urgentThreshold` 0–100, `restGapEnabled` bool)
+      e invalida o cache (`settings.update()` chama `invalidate()`)
+- [x] Só admin acessa — `@UseGuards(JwtAuthGuard, AdminGuard)` a nível de
+      classe já cobre as rotas novas
 
 **Verificação:**
-- [ ] `npx jest admin-notifications.controller` passa com casos novos
-- [ ] `npm run build` no backend
-- [ ] Manual: `curl` PATCH muda `maxPerDay` e o `GET` reflete
+- [x] `npx jest notification` passa com casos novos (getSettings/updateSettings
+      no controller; getFull/update no serviço)
+- [x] `npm run build` no backend — suíte completa: 733 testes passando
+- [ ] Manual: `curl` PATCH muda `maxPerDay` e o `GET` reflete — depende do
+      `prisma db push` em prod (Checkpoint, com OK do usuário)
 
 **Dependências:** Task 1
 **Arquivos:** `.../admin-notifications.controller.ts`, `.../dto/settings.dto.ts` (novo),
-`.../notifications-send.service.ts` ou service dedicado, specs
+`.../notification-settings.service.ts` (getFull/update), specs
 **Escopo:** S
 
 ---
@@ -75,26 +91,36 @@ em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 funil, com salvar explícito e feedback de erro de validação.
 
 **Critérios de aceite:**
-- [ ] Campos: máx por dia, quiet hours (início/fim), espaçamento (h), rest gap
-      (on/off), limiar de urgência
-- [ ] Carrega do `GET`, salva no `PATCH`, mostra estado salvando/salvo/erro
-- [ ] Texto curto explicando o efeito de cada campo
+- [x] Campos: máx por dia, máx convites por dia, quiet hours (início/fim),
+      intervalo mínimo (h), limiar de urgência, toggle do gap de descanso
+- [x] Carrega do `GET`, salva no `PATCH` (objeto inteiro), mostra estado
+      salvando/salvo/erro
+- [x] Texto curto (`.setHint`) explicando o efeito de cada campo
 
 **Verificação:**
-- [ ] `npx vitest run AdminNotifications` passa
-- [ ] `npm run build` no front
+- [x] `npx vitest run AdminNotifications` passa (14 testes, +3 novos)
+- [x] `npm run build` no front — suíte completa: 728 testes passando
 - [ ] Manual: mudar quiet hours no painel e confirmar persistência no reload
+      — depende do `prisma db push` (o endpoint 500 sem a tabela)
 
 **Dependências:** Task 2
 **Arquivos:** `oratio/src/components/AdminNotifications/AdminNotifications.tsx`,
 `.module.css`, `oratio/src/services/adminNotificationsService.ts`, test
 **Escopo:** M
+**Commit:** `oratio@cb1a7e1` (branch `feat/notificacoes-config`)
 
 ---
 
 ## Checkpoint A — Fase 1
-- [ ] Testes de backend e front passam; os dois buildam
-- [ ] Funil configurável ponta a ponta; sem config, comportamento idêntico ao atual
+- [x] Testes de backend (736) e front (728) passam; os dois buildam
+- [x] Funil configurável ponta a ponta; sem config/tabela, o scheduler se
+      comporta igual ao de antes (defaults do serviço = constantes antigas)
+- [x] Bônus (decisão do usuário): gap de descanso ligado — ataca direto a
+      queixa "mesmas notificações a cada 1–2 dias"
+- [ ] ⏳ **Pendente:** `npx prisma db push` + `generate` — schema fica à
+      frente do banco até o Checkpoint E (ou antes, com OK do usuário). Até
+      lá, `GET/PATCH .../settings` retorna 500 em prod; o scheduler segue
+      normal pelo fallback.
 - [ ] Revisar com o usuário antes da Fase 2
 
 ---

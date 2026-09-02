@@ -8,6 +8,7 @@ importa a delegação de cada rota pro NotificationsSendService.
 describe('AdminNotificationsController', () => {
   let controller: AdminNotificationsController;
   let send: Record<string, jest.Mock>;
+  let settings: Record<string, jest.Mock>;
 
   const req = (userId = 'admin-1') => ({ user: { userId } });
 
@@ -23,8 +24,23 @@ describe('AdminNotificationsController', () => {
       deleteAllCampaigns: jest.fn(),
       deleteCampaign: jest.fn(),
     };
+    settings = {
+      getFull: jest.fn().mockResolvedValue({ id: 'default', maxPerDay: 2 }),
+      update: jest.fn().mockResolvedValue({ id: 'default', maxPerDay: 3 }),
+    };
 
-    controller = new AdminNotificationsController(send as any);
+    controller = new AdminNotificationsController(send as any, settings as any);
+  });
+
+  it('getSettings() delegates to the settings service', async () => {
+    await controller.getSettings();
+    expect(settings.getFull).toHaveBeenCalled();
+  });
+
+  it('updateSettings() forwards the validated patch to the settings service', async () => {
+    const body = { maxPerDay: 3, quietStart: 21 } as any;
+    await controller.updateSettings(body);
+    expect(settings.update).toHaveBeenCalledWith(body);
   });
 
   it('create() defaults audience to ALL unless explicitly SPECIFIC', () => {
