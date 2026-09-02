@@ -8,14 +8,15 @@ import {
 } from './notification-settings.service';
 import { UserNotificationProfileService } from './user-notification-profile.service';
 import { NotificationVariantsService } from './notification-variants.service';
+import { NotificationContextService } from './notification-context.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('NotificationsScheduler.shouldFireAtHour', () => {
-  // shouldFireAtHour é puro (não toca prisma/send/settings/profiles/variants),
-  // então dá pra instanciar com dependências vazias.
+  // shouldFireAtHour é puro (não toca nas dependências), então dá pra
+  // instanciar com objetos vazios.
   const scheduler = new NotificationsScheduler(
-    {} as any, {} as any, {} as any, {} as any, {} as any,
+    {} as any, {} as any, {} as any, {} as any, {} as any, {} as any,
   );
 
   it('elegível da hora marcada em diante (fica na fila o dia todo)', () => {
@@ -52,6 +53,7 @@ describe('NotificationsScheduler', () => {
     listEnabledForRule: jest.Mock;
     pickVariant: jest.Mock;
   };
+  let context: { varsIn: jest.Mock; resolve: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -83,6 +85,8 @@ describe('NotificationsScheduler', () => {
       listEnabledForRule: jest.fn().mockResolvedValue([]),
       pickVariant: jest.fn().mockReturnValue(null),
     };
+    // default: nenhuma variável de contexto no texto
+    context = { varsIn: jest.fn().mockReturnValue([]), resolve: jest.fn().mockResolvedValue({}) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -92,6 +96,7 @@ describe('NotificationsScheduler', () => {
         { provide: NotificationSettingsService, useValue: settings },
         { provide: UserNotificationProfileService, useValue: profiles },
         { provide: NotificationVariantsService, useValue: variants },
+        { provide: NotificationContextService, useValue: context },
       ],
     }).compile();
 
@@ -556,6 +561,33 @@ describe('NotificationsScheduler', () => {
       expect(variants.pickVariant).toHaveBeenCalledWith(
         [{ id: 'a' }, { id: 'b' }],
         ['a', 'b'], // só as dessa regra, na ordem do histórico (desc)
+      );
+    });
+
+    it('resolve e interpola variáveis de contexto ({nome}) no título e no corpo', async () => {
+      setUtcHour(10);
+      prisma.notificationRule.findMany.mockResolvedValue([
+        {
+          key: 'EXAMEN_NIGHT',
+          title: 'Boa noite, {nome}',
+          body: 'Reze um pouco hoje, {nome}.',
+          url: null,
+          hour: 9,
+          condition: null,
+          band: null,
+        },
+      ]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+      prisma.notification.findMany.mockResolvedValue([]);
+      context.varsIn.mockReturnValue(['nome']);
+      context.resolve.mockResolvedValue({ nome: 'Lucas' });
+
+      await scheduler.tick();
+
+      expect(context.resolve).toHaveBeenCalledWith('u1', ['nome']);
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: 'Boa noite, Lucas', body: 'Reze um pouco hoje, Lucas.' }),
       );
     });
 

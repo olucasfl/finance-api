@@ -411,26 +411,55 @@ reusando os serviços de liturgia/santo já existentes, `{santo}` e
 `{tempoLiturgico}`. Disponível pra qualquer variante.
 
 **Critérios de aceite:**
-- [ ] `{nome}`, `{santo}`, `{tempoLiturgico}` resolvidos no `deliver()`
-- [ ] Variável sem valor ⇒ cai pra um texto neutro (nunca deixa `{x}` cru)
-- [ ] Sem chamada de rede nova no caminho crítico (usa cache/serviço interno)
+- [x] `NotificationContextService.resolve()` preenche `{nome}` (1º nome do
+      usuário) e `{santo}`/`{tempoLiturgico}` (do `data.liturgia` do
+      `LiturgicalCalendarService`, cache 24h + circuit breaker)
+- [x] `deliver()` detecta as vars de contexto no título+corpo (`varsIn`),
+      resolve só as necessárias e interpola em ambos; `{count}`/`{label}`
+      da condição continuam funcionando (mergeadas por cima)
+- [x] Sem valor ⇒ fallback neutro (`você` / `o santo de hoje` /
+      `este tempo litúrgico`); serviço fora do ar / user sem nome ⇒ nunca
+      lança, cai no fallback
+- [x] Sem rede nova no caminho crítico: nome = query barata, liturgia = cache
+      de 24h que o Vox já usa (2ª instância do serviço, cache próprio)
 
 **Verificação:**
-- [ ] `npx jest` — cada variável resolve; ausência não quebra o texto
-- [ ] `npm run build` no backend
-- [ ] Manual: variante com `{nome}, o santo de hoje é {santo}` renderiza certo
+- [x] `npx jest notification-context` (7) + `notifications.scheduler` (interpola
+      {nome} em título e corpo) passam
+- [x] `npm run build` no backend — suíte completa: 782 testes
+- [ ] Manual: criar variante com `{nome}` e ver renderizar — pós próximo boot
 
 **Dependências:** Checkpoint D
-**Arquivos:** `.../notifications/notification-context.service.ts` (novo),
-`.../notifications.scheduler.ts`, spec
+**Arquivos:** `.../notification-context.service.ts` (novo),
+`.../notifications.scheduler.ts` (`deliver`/`interpolate`),
+`.../notifications.module.ts`, spec
 **Escopo:** S
+**Commit:** `oratio-api` branch `feat/notif-contexto`
 
 ---
 
-## Checkpoint E — Revisão final
-- [ ] Todos os critérios de aceite batidos
-- [ ] `docs/ARCHITECTURE.md` (backend §5 e §7; front §3/§5/§9) atualizado
-- [ ] Memória `notification-overhaul-roadmap` atualizada (o que virou este plano,
-      o que ficou de fora)
-- [ ] `npx prisma db push` + `npx prisma generate` em produção **após OK do usuário**
-- [ ] Pendência manual: conferir `PUBLIC_API_URL` (herança da Etapa 0, se aplicável)
+## Checkpoint E — Revisão final ✅
+- [x] Todos os critérios de aceite batidos; 782 testes back + 735 front, os 2 buildam
+- [x] `oratio-api/docs/ARCHITECTURE.md` §7 (bullet de notifications) atualizado
+- [x] `oratio/docs/ARCHITECTURE.md` §6 (AdminNotifications) atualizado
+- [x] Memória `notifications-overhaul` atualizada (plano enxuto concluído)
+- [x] `prisma db push` + `generate` em produção — feito nas Fases 1/2, 3 e 4
+      (com OK do usuário a cada diff); Fase 5 não muda schema
+- [x] `PUBLIC_API_URL`: era pendência da Etapa 0 CANCELADA, não deste plano —
+      nada a fazer aqui
+
+### Resumo do que este plano entregou (em produção, na `develop`)
+- **Funil configurável no painel** sem deploy (`NotificationSettings`)
+- **Gap de descanso religado** — era código morto; causa direta da queixa
+  "mesmas notificações a cada 1–2 dias"
+- **Limiar + faixa de horário por regra** editáveis no dado
+- **Faixa de horário por usuário** — classificada pela atividade, cruzada com
+  a faixa da regra
+- **Pool de variantes de texto por regra** — rodízio LRU por usuário; editor
+  no painel com piso de 1 variante ativa
+- **Variáveis de contexto** `{nome}`/`{santo}`/`{tempoLiturgico}`
+
+### Fora de escopo (não feito, de propósito)
+Analytics/coorte, A/B, holdout, send-time por ML, compositor de campanhas
+recorrentes, segmentação, `NotificationEvent` funil-evento-a-evento,
+`EngagementTier` — tudo do roadmap grande CANCELADO.

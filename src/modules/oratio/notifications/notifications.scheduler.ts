@@ -11,6 +11,7 @@ import {
   UserNotificationProfileService,
 } from './user-notification-profile.service';
 import { NotificationVariantsService } from './notification-variants.service';
+import { NotificationContextService } from './notification-context.service';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -160,6 +161,7 @@ export class NotificationsScheduler implements OnModuleInit {
     private settings: NotificationSettingsService,
     private profiles: UserNotificationProfileService,
     private variants: NotificationVariantsService,
+    private context: NotificationContextService,
   ) {}
 
   // Reconcilia o catálogo: cria as regras que faltam (sem sobrescrever o que
@@ -469,21 +471,36 @@ export class NotificationsScheduler implements OnModuleInit {
     const pool = await this.variants.listEnabledForRule(rule.key).catch(() => []);
     const variant = this.variants.pickVariant(pool, recentVariantIds);
 
+    let title = variant?.title ?? rule.title;
     let body = (variant?.body ?? rule.body) ?? undefined;
-    if (body && ctx.vars) {
-      for (const [k, v] of Object.entries(ctx.vars)) {
-        body = body.split(`{${k}}`).join(v);
-      }
-    }
+
+    // Variáveis: as da condição ({count}/{label}) + as de contexto
+    // ({nome}/{santo}/{tempoLiturgico}) que aparecerem no texto.
+    const wanted = this.context.varsIn(`${title} ${body ?? ''}`);
+    const ctxVars = wanted.length
+      ? await this.context.resolve(userId, wanted).catch(() => ({}))
+      : {};
+    const vars = { ...ctxVars, ...ctx.vars };
+
+    title = this.interpolate(title, vars);
+    if (body) body = this.interpolate(body, vars);
 
     await this.send.deliverToUser(userId, {
-      title: variant?.title ?? rule.title,
+      title,
       body,
       url: ctx.url ?? variant?.url ?? rule.url ?? undefined,
       source: 'RULE',
       ruleKey: rule.key,
       variantId: variant?.id,
     });
+  }
+
+  private interpolate(text: string, vars: Record<string, string>): string {
+    let out = text;
+    for (const [k, v] of Object.entries(vars)) {
+      out = out.split(`{${k}}`).join(v);
+    }
+    return out;
   }
 
   /* ===== Condições ===== */
