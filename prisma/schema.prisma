@@ -39,6 +39,14 @@ model User {
   bibleMarks                    BibleMark[]
   bibleCollections              BibleCollection[]
   notificationProfile           UserNotificationProfile?
+
+  // Perfil de resposta do VoxAI (chave de VOX_PROFILE_KEYS, ex.: "STUDY").
+  // null = a pessoa nunca escolheu → comportamento = DEFAULT ("Padrão").
+  voxProfile          String?
+  // Carimbado quando a pessoa escolhe um perfil OU dispensa o card de
+  // novidade. O onboarding do Vox só aparece enquanto voxProfile E
+  // voxOnboardingSeenAt são ambos null.
+  voxOnboardingSeenAt DateTime?
 }
 
 model PushSubscription {
@@ -309,13 +317,13 @@ model Notification {
 // QUEM disparar é lógica de código, por `key`. Usa {count} no corpo pra
 // interpolar valores (ex.: dias de sequência).
 model NotificationRule {
-  key       String   @id @default(uuid())
-  enabled   Boolean  @default(true)
-  title     String
-  body      String?
-  url       String?
-  hour      Int? // hora local (0-23) das regras por horário
-  condition String? // "ROSARY_UNFINISHED" | "STREAK_AT_RISK" | null (=diária no horário)
+  key           String                    @id @default(uuid())
+  enabled       Boolean                   @default(true)
+  title         String
+  body          String?
+  url           String?
+  hour          Int? // hora local (0-23) das regras por horário
+  condition     String? // "ROSARY_UNFINISHED" | "STREAK_AT_RISK" | null (=diária no horário)
   // Knobs editáveis no admin (Fase 2). Aditivos e nullable: regra sem valor
   // usa o default de código de sempre, então banco antigo se comporta igual.
   // `thresholdDays` = "parado há N dias" das condições que usam janela
@@ -323,7 +331,7 @@ model NotificationRule {
   // preferida: "MORNING" | "AFTERNOON" | "EVENING" | "ANY".
   thresholdDays Int?
   band          String?
-  updatedAt     DateTime @updatedAt
+  updatedAt     DateTime                  @updatedAt
   variants      NotificationRuleVariant[]
 }
 

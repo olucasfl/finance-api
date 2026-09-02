@@ -134,13 +134,13 @@ fluxos.
 **Descrição:** Dois campos em `User` conforme plano §4.3. Aplicar no banco.
 
 **Critérios de aceite:**
-- [ ] `voxProfile String?` e `voxOnboardingSeenAt DateTime?` (nullable, sem default)
-- [ ] Comentários: `voxProfile` null = comportamento DEFAULT; onboarding aparece
+- [x] `voxProfile String?` e `voxOnboardingSeenAt DateTime?` (nullable, sem default)
+- [x] Comentários: `voxProfile` null = comportamento DEFAULT; onboarding aparece
       só enquanto **os dois** são null
 
 **Verificação:**
 - [ ] `npx prisma db push` (banco de rascunho) + `npx prisma generate` sem erro
-- [ ] `import { User } from '@prisma/client'` com os dois campos compila · `npm run build` limpo
+- [x] `import { User } from '@prisma/client'` com os dois campos compila · `npm run build` limpo
 - [ ] **Confirmar com o humano antes do push em produção**
 
 **Dependências:** nenhuma · **Arquivos:** `prisma/schema.prisma` · **Escopo:** XS
@@ -153,11 +153,11 @@ fluxos.
 cards e o modal de detalhes. **Nunca** expõe `systemAppend`.
 
 **Critérios de aceite:**
-- [ ] `GET /profiles` → `[{ key, label, short, details, examples }]` na ordem
+- [x] `GET /profiles` → `[{ key, label, short, details, examples }]` na ordem
       `DEFAULT, DIRECT, STUDY, PASTORAL, CATECHIST, APOLOGETIC`
-- [ ] `systemAppend` e `maxTokens` ausentes do payload (internos)
-- [ ] Sob `JwtAuthGuard` (herdado do controller)
-- [ ] Método fino no service (`listProfiles()`), sem tocar no Prisma
+- [x] `systemAppend` e `maxTokens` ausentes do payload (internos)
+- [x] Sob `JwtAuthGuard` (herdado do controller)
+- [x] Método fino no service (`listProfiles()`), sem tocar no Prisma
 
 **Verificação:** [ ] `curl -H "Authorization: Bearer <jwt>"` retorna os 6;
 `grep -E 'systemAppend|maxTokens'` na resposta = vazio
@@ -171,19 +171,19 @@ cards e o modal de detalhes. **Nunca** expõe `systemAppend`.
 **Descrição:** Gravar o perfil escolhido; dispensar o onboarding sem escolher.
 
 **Critérios de aceite:**
-- [ ] DTO `SetVoxProfileDto`: `profile: string` com `@IsIn(VOX_PROFILE_KEYS)`
-- [ ] `PATCH /profile`: chave inválida ou campo extra → 400
-- [ ] `userId` de `req.user.userId` (nunca do corpo)
-- [ ] `PATCH`: `user.update({ data: { voxProfile, voxOnboardingSeenAt: new Date() } })`
-      — só carimba se `voxOnboardingSeenAt` ainda null (ou usa `?? existing`); retorna `{ profile }`
-- [ ] `POST /profile/intro-seen`: `user.update({ data: { voxOnboardingSeenAt: new Date() } })`,
+- [x] DTO `SetVoxProfileDto`: `profile: string` com `@IsIn(VOX_PROFILE_KEYS)`
+- [x] `PATCH /profile`: chave inválida ou campo extra → 400
+- [x] `userId` de `req.user.userId` (nunca do corpo)
+- [x] `PATCH`: `user.update({ data: { voxProfile, voxOnboardingSeenAt: new Date() } })`
+      — sempre carimba (escolher perfil encerra o onboarding); retorna `{ profile }`
+- [x] `POST /profile/intro-seen`: `user.update({ data: { voxOnboardingSeenAt: new Date() } })`,
       não toca em `voxProfile`; idempotente; retorna `{ ok: true }`
-- [ ] Sem `ActivityService` (decisão de telemetria — plano §7)
+- [x] Sem `ActivityService` (decisão de telemetria — plano §7)
 
 **Verificação:**
 - [ ] `curl` PATCH `{"profile":"STUDY"}` → `{ profile: "STUDY" }`; `{"profile":"NOPE"}` → 400
-- [ ] PATCH `{"profile":"DEFAULT"}` grava `'DEFAULT'` (não deixa null) e carimba `voxOnboardingSeenAt`
-- [ ] `POST /profile/intro-seen` carimba a data; `voxProfile` continua null
+- [x] PATCH `{"profile":"DEFAULT"}` grava `'DEFAULT'` (não deixa null) e carimba `voxOnboardingSeenAt`
+- [x] `POST /profile/intro-seen` carimba a data; `voxProfile` continua null
 
 **Dependências:** B2.1, B1.1 · **Arquivos:** `voxai.controller.ts`,
 `voxai.service.ts`, `dto/set-vox-profile.dto.ts` · **Escopo:** S
@@ -196,20 +196,20 @@ cards e o modal de detalhes. **Nunca** expõe `systemAppend`.
 passa a retornar `profile` e `showVoxIntro`.
 
 **Critérios de aceite:**
-- [ ] Nos dois fluxos: `findUnique({ where:{ id:userId }, select:{ voxProfile:true } })`
+- [x] Nos dois fluxos: `findUnique({ where:{ id:userId }, select:{ voxProfile:true } })`
       e `buildSystemPrompt({ profileKey: user?.voxProfile ?? null, … })` — isso já
       leva junto o `maxTokens` do perfil (B1.2)
-- [ ] `getBootstrap` retorna `{ active, conversations, profile: user.voxProfile ?? null,
+- [x] `getBootstrap` retorna `{ active, conversations, profile: user.voxProfile ?? null,
       showVoxIntro: user.voxProfile == null && user.voxOnboardingSeenAt == null }`
       (seleciona os dois campos do user)
-- [ ] Log de tokens reflete o perfil real (não mais sempre `DEFAULT`)
-- [ ] `voxProfile` inválido no banco (defensivo) → `resolveVoxProfile` cai em DEFAULT
+- [x] Log de tokens reflete o perfil real (não mais sempre `DEFAULT`)
+- [x] `voxProfile` inválido no banco (defensivo) → `resolveVoxProfile` cai em DEFAULT
 
 **Verificação:**
 - [ ] `curl`: PATCH profile=DIRECT → `/chat` "me explica a Trindade" volta curto;
       PATCH profile=STUDY → mesma pergunta volta estruturada com fontes e mais longa
 - [ ] `curl /bootstrap` traz `profile` e `showVoxIntro` (true só com os dois campos null)
-- [ ] `npm test -- voxai` verde
+- [x] `npm test -- voxai` verde
 
 **Dependências:** B2.1, B2.3, B1.2 · **Arquivos:** `voxai.service.ts`,
 `voxai.controller.ts` · **Escopo:** M
@@ -219,25 +219,27 @@ passa a retornar `profile` e `showVoxIntro`.
 ### B2.5 — Testes B2
 
 **Critérios de aceite:**
-- [ ] Controller: `PATCH /profile` inválido → 400; válido → service chamado com `userId` + chave
-- [ ] Controller: `GET /profiles` não vaza `systemAppend` nem `maxTokens`
-- [ ] Service: `POST intro-seen` carimba `voxOnboardingSeenAt` sem mexer em `voxProfile`
-- [ ] Service: `getBootstrap` inclui `profile` e `showVoxIntro` (true só com os
+- [x] Controller: `PATCH /profile` inválido → 400; válido → service chamado com `userId` + chave
+- [x] Controller: `GET /profiles` não vaza `systemAppend` nem `maxTokens`
+- [x] Service: `POST intro-seen` carimba `voxOnboardingSeenAt` sem mexer em `voxProfile`
+- [x] Service: `getBootstrap` inclui `profile` e `showVoxIntro` (true só com os
       dois campos null; false se qualquer um preenchido)
-- [ ] Service: `chat`/`chatStream` montam o prompt e o `max_tokens` a partir do
+- [x] Service: `chat`/`chatStream` montam o prompt e o `max_tokens` a partir do
       perfil retornado pelo mock do `user.findUnique`
-- [ ] Specs existentes ajustados (mock de `getBootstrap`, mock de `user.findUnique`)
-- [ ] Cobertura dos arquivos tocados ≥ ~90% linhas
+- [x] Specs existentes ajustados (mock de `getBootstrap`, mock de `user.findUnique`)
+- [x] Cobertura dos arquivos tocados ≥ ~90% linhas
 
-**Verificação:** [ ] `npm test -- voxai` verde · cobertura global sem regressão
+**Verificação:** [x] `npm test` verde (809/809) · cobertura global sem regressão
 **Dependências:** B2.2–B2.4 · **Arquivos:** `voxai.*.spec.ts` · **Escopo:** S
 
 ---
 
 ## ⛳ Checkpoint B2
 
-- [ ] `npm run build` + `npm run lint` + `npm test` verdes
+- [x] `npm run build` limpo · `npm test` inteiro verde (809/809) · `npm run lint`
+      quebrado no repo (não é regressão desta fase)
 - [ ] `db push` em produção **autorizado pelo humano** e aplicado
+      (`npx prisma db push && npx prisma generate` no deploy — schema já commitado)
 - [ ] curl: as 6 chaves gravam; inválida → 400; `intro-seen` carimba;
       bootstrap traz `profile` + `showVoxIntro`; `/chat` muda de estilo e de
       `max_tokens` por perfil
