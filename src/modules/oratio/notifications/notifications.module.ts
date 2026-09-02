@@ -6,6 +6,7 @@ import { NotificationsSendService } from './notifications-send.service';
 import { NotificationsScheduler } from './notifications.scheduler';
 import { NotificationSettingsService } from './notification-settings.service';
 import { UserNotificationProfileService } from './user-notification-profile.service';
+import { NotificationVariantsService } from './notification-variants.service';
 import { PushService } from './push.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AdminGuard } from '../../auth/admin.guard';
@@ -18,6 +19,7 @@ import { AdminGuard } from '../../auth/admin.guard';
     NotificationsScheduler,
     NotificationSettingsService,
     UserNotificationProfileService,
+    NotificationVariantsService,
     PushService,
     PrismaService,
     AdminGuard,

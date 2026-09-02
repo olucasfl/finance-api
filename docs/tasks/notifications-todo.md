@@ -305,22 +305,26 @@ perfil ou `band` da regra `null` ⇒ cai no `shouldFireAtHour(hour)` de hoje.
 sino. Cada regra do catálogo ganha sua 1ª variante semeada do texto atual.
 
 **Critérios de aceite:**
-- [ ] Model `NotificationRuleVariant` (`id`, `ruleKey`, `title String?`,
-      `body String`, `url String?`, `enabled Bool @default(true)`, `order Int`)
-- [ ] `Notification.variantId String?` (aditivo, nullable)
-- [ ] Boot semeia 1 variante por regra a partir de `title`/`body`/`url` atuais
-      se a regra ainda não tem variante
+- [x] Model `NotificationRuleVariant` (`id`, `ruleKey` + relação FK cascade,
+      `title String?`, `body String?`, `url String?`, `enabled @default(true)`,
+      `order @default(0)`, timestamps, `@@index([ruleKey])`).
+      `body` ficou `String?` (espelha `NotificationRule.body` nullable) — o
+      piso de "1 variante ativa" é da API/UI, não do schema
+- [x] `Notification.variantId String?` (aditivo, nullable)
+- [x] `NotificationVariantsService.seedMissing()` cria 1 variante por regra
+      sem nenhuma, a partir de `title`/`body`/`url`; idempotente (checa `count`)
+- [x] Chamado no `onModuleInit` do scheduler DEPOIS do reconcile do catálogo
 
 **Verificação:**
-- [ ] `npx jest` — seed cria exatamente 1 variante por regra; rodar boot 2×
-      não duplica
-- [ ] `npm run build` no backend
-- [ ] Manual: `GET /rules` + variantes retorna o texto de hoje
+- [x] `npx jest notification-variants` (8) + `notifications.scheduler` (seed) passam
+- [x] `npm run build` no backend — suíte completa: 764 testes
 
 **Dependências:** Checkpoint C
-**Arquivos:** `oratio-api/prisma/schema.prisma`, `.../notifications.scheduler.ts`
-(seed), possível `.../notification-variants.service.ts`, specs
+**Arquivos:** `oratio-api/prisma/schema.prisma`,
+`.../notification-variants.service.ts` (novo), `.../notifications.scheduler.ts`
+(chamada do seed), `.../notifications.module.ts`, specs
 **Escopo:** M
+**Commit:** `oratio-api` branch `feat/notif-variantes`
 
 ---
 
@@ -330,19 +334,28 @@ que aquele usuário recebeu há mais tempo (ou nunca), a partir do histórico de
 `Notification` (que o tick já carrega). Gravar `variantId` no item criado.
 
 **Critérios de aceite:**
-- [ ] Variante nunca recebida tem prioridade; empate → menor `order`
-- [ ] Interpolação de `{count}`/`{label}`/`{nome}` continua funcionando
-- [ ] `variantId` gravado em toda `Notification` de origem `RULE`
-- [ ] 1 variante só ⇒ comportamento idêntico ao de hoje
+- [x] `pickVariant()` (no `NotificationVariantsService`): nunca-usada tem
+      prioridade (empate → menor `order`); todas usadas → a mais antiga;
+      pula `enabled:false`; 1 variante ⇒ devolve ela (idêntico a hoje)
+- [x] `deliver()` monta o `recentVariantIds` da regra a partir do `hist`
+      (agora com `variantId` no select) e usa `variant.title/body/url ??`
+      o da regra; interpolação de `{count}`/`{label}` intacta
+- [x] `variantId` gravado na `Notification` via `NotificationsSendService`
+      (`DeliverInput.variantId`)
+- [x] Serviço de variantes fora do ar ⇒ `catch` ⇒ texto da regra
 
 **Verificação:**
-- [ ] `npx jest notifications.scheduler` — "alterna A→B→A", "pula desativada"
-- [ ] `npm run build` no backend
-- [ ] Manual: forçar 3 disparos e ver os textos alternando
+- [x] `npx jest notification-variants` (rotação A→B→A, pula desativada) +
+      `notifications.scheduler` (deliver usa variante, grava variantId,
+      fallback) passam
+- [x] `npm run build` no backend — suíte completa: 767 testes
 
 **Dependências:** Task 9
-**Arquivos:** `.../notifications.scheduler.ts` (`deliver`/histórico), specs
+**Arquivos:** `.../notification-variants.service.ts` (`pickVariant`),
+`.../notifications.scheduler.ts` (`deliver`/histórico),
+`.../notifications-send.service.ts` (`variantId`), specs
 **Escopo:** S
+**Commit:** `oratio-api` branch `feat/notif-variantes`
 
 ---
 
@@ -352,27 +365,41 @@ lista de variantes (adicionar, editar, remover, ativar/desativar). Impede
 desativar/remover a última ativa.
 
 **Critérios de aceite:**
-- [ ] CRUD de variante por regra, com ordem visível
-- [ ] Não deixa a regra ficar sem nenhuma variante ativa
-- [ ] Endpoints admin correspondentes (`POST/PATCH/DELETE .../rules/:key/variants`)
+- [x] Componente `RuleVariants` no card de regra: lista as variantes (título
+      + corpo editáveis, toggle ativar, remover, "Adicionar variante"); os
+      campos únicos de título/corpo da regra saíram do card
+- [x] Piso de 1 variante ativa: backend recusa desativar/remover a última
+      ativa (400); a UI reflete o erro e reverte o toggle otimista
+- [x] Endpoints: `GET/POST /oratio/admin/notifications/rules/:key/variants`,
+      `PATCH/DELETE .../variants/:id` (todos sob `AdminGuard`)
+- [x] `saveRule` agora só manda os parâmetros da regra (enabled/url/hour/
+      band/thresholdDays) — título/corpo vivem nas variantes
 
 **Verificação:**
-- [ ] `npx vitest run AdminNotifications` + `npx jest` dos endpoints
-- [ ] `npm run build` nos dois repos
-- [ ] Manual: adicionar 2ª variante, ver alternar no disparo de teste
+- [x] `npx vitest run AdminNotifications` (21, +5) + `npx jest notification`
+      (172, endpoints + guards)
+- [x] `npm run build` nos dois repos
+- [ ] Manual: adicionar 2ª variante, ver alternar no disparo — pós `db push`
 
 **Dependências:** Task 10
 **Arquivos:** `oratio/src/components/AdminNotifications/*`,
 `oratio/src/services/adminNotificationsService.ts`,
-`oratio-api/.../admin-notifications.controller.ts`, `dto/`, specs/tests
+`oratio-api/.../admin-notifications.controller.ts`, `.../notification-variants.service.ts`,
+`.../dto/variant.dto.ts`, specs/tests
 **Escopo:** M
+**Commits:** `oratio-api@2619b05` (back) + `oratio` branch `feat/notif-variantes` (front)
 
 ---
 
 ## Checkpoint D — Fase 4
-- [ ] Variantes editáveis; rotação LRU por usuário funcionando
-- [ ] Piso de 1 variante ativa garantido na API e na UI
-- [ ] Revisar com o usuário
+- [x] Variantes editáveis ponta a ponta; rotação LRU por usuário no `deliver`
+- [x] Piso de 1 variante ativa garantido na API (400) e refletido na UI
+- [x] 1 variante só / serviço fora do ar ⇒ texto da regra, idêntico a antes
+- [x] `prisma db push` da Fase 4 aplicado em produção (2026-09-02, com OK do
+      usuário) — `Notification.variantId` + tabela `NotificationRuleVariant`
+      + índice + FK; `migrate diff` pós-push = vazio. Seed de 1 variante/regra
+      roda no próximo boot do backend.
+- [x] Revisado — seguir pra Fase 5 (última: variáveis de contexto)
 
 ---
 

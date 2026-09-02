@@ -11,6 +11,7 @@ type DeliverInput = {
   url?: string;
   source?: 'CAMPAIGN' | 'RULE';
   ruleKey?: string;
+  variantId?: string;
   campaignId?: string;
 };
 
@@ -48,6 +49,7 @@ export class NotificationsSendService {
         url: n.url ?? null,
         source: n.source ?? 'CAMPAIGN',
         ruleKey: n.ruleKey ?? null,
+        variantId: n.variantId ?? null,
         campaignId: n.campaignId ?? null,
         pushSent: sent > 0,
         expiresAt,

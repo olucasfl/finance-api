@@ -7,13 +7,16 @@ import {
   NotificationSettingsService,
 } from './notification-settings.service';
 import { UserNotificationProfileService } from './user-notification-profile.service';
+import { NotificationVariantsService } from './notification-variants.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe('NotificationsScheduler.shouldFireAtHour', () => {
-  // shouldFireAtHour é puro (não toca prisma/send/settings/profiles), então
-  // dá pra instanciar com dependências vazias.
-  const scheduler = new NotificationsScheduler({} as any, {} as any, {} as any, {} as any);
+  // shouldFireAtHour é puro (não toca prisma/send/settings/profiles/variants),
+  // então dá pra instanciar com dependências vazias.
+  const scheduler = new NotificationsScheduler(
+    {} as any, {} as any, {} as any, {} as any, {} as any,
+  );
 
   it('elegível da hora marcada em diante (fica na fila o dia todo)', () => {
     expect(scheduler.shouldFireAtHour(7, 7)).toBe(true);
@@ -44,6 +47,11 @@ describe('NotificationsScheduler', () => {
   let send: { deliverToUser: jest.Mock };
   let settings: { get: jest.Mock; invalidate: jest.Mock };
   let profiles: { getBand: jest.Mock };
+  let variants: {
+    seedMissing: jest.Mock;
+    listEnabledForRule: jest.Mock;
+    pickVariant: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -69,6 +77,12 @@ describe('NotificationsScheduler', () => {
     };
     // default ANY = comportamento de antes (elegível o dia todo)
     profiles = { getBand: jest.fn().mockResolvedValue('ANY') };
+    // default: sem variantes → deliver usa o texto da própria regra
+    variants = {
+      seedMissing: jest.fn().mockResolvedValue(undefined),
+      listEnabledForRule: jest.fn().mockResolvedValue([]),
+      pickVariant: jest.fn().mockReturnValue(null),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -77,6 +91,7 @@ describe('NotificationsScheduler', () => {
         { provide: NotificationsSendService, useValue: send },
         { provide: NotificationSettingsService, useValue: settings },
         { provide: UserNotificationProfileService, useValue: profiles },
+        { provide: NotificationVariantsService, useValue: variants },
       ],
     }).compile();
 
@@ -151,6 +166,14 @@ describe('NotificationsScheduler', () => {
       expect(prisma.notificationRule.deleteMany).toHaveBeenCalledWith({
         where: { key: { notIn: expect.arrayContaining(['ROSARY_UNFINISHED', 'EXAMEN_NIGHT']) } },
       });
+    });
+
+    it('seeds the missing text variants after reconciling the catalog', async () => {
+      prisma.notificationRule.findUnique.mockResolvedValue(null);
+
+      await scheduler.onModuleInit();
+
+      expect(variants.seedMissing).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -475,6 +498,79 @@ describe('NotificationsScheduler', () => {
         await scheduler.tick();
         expect(send.deliverToUser).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('rodízio de variantes (deliver)', () => {
+    afterEach(() => jest.useRealTimers());
+    function setUtcHour(hour: number) {
+      jest.useFakeTimers();
+      const now = new Date();
+      now.setUTCHours(hour, 0, 0, 0);
+      jest.setSystemTime(now);
+      return now;
+    }
+
+    const fireRule = () => {
+      setUtcHour(10);
+      prisma.notificationRule.findMany.mockResolvedValue([
+        {
+          key: 'EXAMEN_NIGHT',
+          title: 'Título da regra',
+          body: 'Corpo da regra',
+          url: '/oratio/confissao',
+          hour: 9,
+          condition: null,
+          band: null,
+        },
+      ]);
+      prisma.pushSubscription.findMany.mockResolvedValue([{ userId: 'u1', timezone: 'UTC' }]);
+    };
+
+    it('entrega o texto da variante escolhida e grava o variantId', async () => {
+      fireRule();
+      prisma.notification.findMany.mockResolvedValue([]);
+      variants.listEnabledForRule.mockResolvedValue([{ id: 'b', title: 'Título B', body: 'Corpo B', url: null }]);
+      variants.pickVariant.mockReturnValue({ id: 'b', title: 'Título B', body: 'Corpo B', url: null });
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: 'Título B', body: 'Corpo B', variantId: 'b' }),
+      );
+    });
+
+    it('passa pro pickVariant as variantes que o usuário já recebeu nessa regra (recente→antigo)', async () => {
+      fireRule();
+      prisma.notification.findMany.mockResolvedValue([
+        { createdAt: new Date(Date.now() - 3 * DAY_MS), ruleKey: 'EXAMEN_NIGHT', variantId: 'a' },
+        { createdAt: new Date(Date.now() - 9 * DAY_MS), ruleKey: 'EXAMEN_NIGHT', variantId: 'b' },
+        { createdAt: new Date(Date.now() - 5 * DAY_MS), ruleKey: 'OUTRA', variantId: 'z' },
+      ]);
+      variants.listEnabledForRule.mockResolvedValue([{ id: 'a' }, { id: 'b' }]);
+      variants.pickVariant.mockReturnValue({ id: 'b', title: null, body: null, url: null });
+
+      await scheduler.tick();
+
+      expect(variants.pickVariant).toHaveBeenCalledWith(
+        [{ id: 'a' }, { id: 'b' }],
+        ['a', 'b'], // só as dessa regra, na ordem do histórico (desc)
+      );
+    });
+
+    it('sem variante escolhida cai no texto da própria regra, sem variantId', async () => {
+      fireRule();
+      prisma.notification.findMany.mockResolvedValue([]);
+      variants.listEnabledForRule.mockResolvedValue([]);
+      variants.pickVariant.mockReturnValue(null);
+
+      await scheduler.tick();
+
+      expect(send.deliverToUser).toHaveBeenCalledWith(
+        'u1',
+        expect.objectContaining({ title: 'Título da regra', body: 'Corpo da regra', variantId: undefined }),
+      );
     });
   });
 

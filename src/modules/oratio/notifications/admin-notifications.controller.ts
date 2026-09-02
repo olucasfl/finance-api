@@ -3,9 +3,11 @@ import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 import { AdminGuard } from '../../auth/admin.guard';
 import { NotificationsSendService } from './notifications-send.service';
 import { NotificationSettingsService } from './notification-settings.service';
+import { NotificationVariantsService } from './notification-variants.service';
 import { CreateCampaignDto } from './dto/create-campaign.dto';
 import { CreateRuleDto, UpdateRuleDto } from './dto/rule.dto';
 import { UpdateSettingsDto } from './dto/settings.dto';
+import { CreateVariantDto, UpdateVariantDto } from './dto/variant.dto';
 
 @Controller('oratio/admin/notifications')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -13,6 +15,7 @@ export class AdminNotificationsController {
   constructor(
     private readonly send: NotificationsSendService,
     private readonly settings: NotificationSettingsService,
+    private readonly variants: NotificationVariantsService,
   ) {}
 
   // Bloco de config do funil anti-spam (quiet hours, tetos, espaçamento…)
@@ -70,6 +73,27 @@ export class AdminNotificationsController {
   @Delete('rules/:key')
   deleteRule(@Param('key') key: string) {
     return this.send.deleteRule(key);
+  }
+
+  // Variantes de texto de uma regra (Fase 4)
+  @Get('rules/:key/variants')
+  listVariants(@Param('key') key: string) {
+    return this.variants.listForRule(key);
+  }
+
+  @Post('rules/:key/variants')
+  createVariant(@Param('key') key: string, @Body() body: CreateVariantDto) {
+    return this.variants.createForRule(key, body);
+  }
+
+  @Patch('variants/:id')
+  updateVariant(@Param('id') id: string, @Body() body: UpdateVariantDto) {
+    return this.variants.update(id, body);
+  }
+
+  @Delete('variants/:id')
+  deleteVariant(@Param('id') id: string) {
+    return this.variants.remove(id);
   }
 
   // Apagar TODOS os envios de uma vez (declarado antes de :id de propósito)
