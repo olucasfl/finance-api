@@ -365,27 +365,39 @@ lista de variantes (adicionar, editar, remover, ativar/desativar). Impede
 desativar/remover a última ativa.
 
 **Critérios de aceite:**
-- [ ] CRUD de variante por regra, com ordem visível
-- [ ] Não deixa a regra ficar sem nenhuma variante ativa
-- [ ] Endpoints admin correspondentes (`POST/PATCH/DELETE .../rules/:key/variants`)
+- [x] Componente `RuleVariants` no card de regra: lista as variantes (título
+      + corpo editáveis, toggle ativar, remover, "Adicionar variante"); os
+      campos únicos de título/corpo da regra saíram do card
+- [x] Piso de 1 variante ativa: backend recusa desativar/remover a última
+      ativa (400); a UI reflete o erro e reverte o toggle otimista
+- [x] Endpoints: `GET/POST /oratio/admin/notifications/rules/:key/variants`,
+      `PATCH/DELETE .../variants/:id` (todos sob `AdminGuard`)
+- [x] `saveRule` agora só manda os parâmetros da regra (enabled/url/hour/
+      band/thresholdDays) — título/corpo vivem nas variantes
 
 **Verificação:**
-- [ ] `npx vitest run AdminNotifications` + `npx jest` dos endpoints
-- [ ] `npm run build` nos dois repos
-- [ ] Manual: adicionar 2ª variante, ver alternar no disparo de teste
+- [x] `npx vitest run AdminNotifications` (21, +5) + `npx jest notification`
+      (172, endpoints + guards)
+- [x] `npm run build` nos dois repos
+- [ ] Manual: adicionar 2ª variante, ver alternar no disparo — pós `db push`
 
 **Dependências:** Task 10
 **Arquivos:** `oratio/src/components/AdminNotifications/*`,
 `oratio/src/services/adminNotificationsService.ts`,
-`oratio-api/.../admin-notifications.controller.ts`, `dto/`, specs/tests
+`oratio-api/.../admin-notifications.controller.ts`, `.../notification-variants.service.ts`,
+`.../dto/variant.dto.ts`, specs/tests
 **Escopo:** M
+**Commits:** `oratio-api@2619b05` (back) + `oratio` branch `feat/notif-variantes` (front)
 
 ---
 
 ## Checkpoint D — Fase 4
-- [ ] Variantes editáveis; rotação LRU por usuário funcionando
-- [ ] Piso de 1 variante ativa garantido na API e na UI
-- [ ] Revisar com o usuário
+- [x] Variantes editáveis ponta a ponta; rotação LRU por usuário no `deliver`
+- [x] Piso de 1 variante ativa garantido na API (400) e refletido na UI
+- [x] 1 variante só / serviço fora do ar ⇒ texto da regra, idêntico a antes
+- [ ] ⏳ `prisma db push` da Fase 4 (`NotificationRuleVariant` +
+      `Notification.variantId`) — mostrar diff, com OK do usuário
+- [ ] Revisar com o usuário antes da Fase 5 (última — variáveis de contexto)
 
 ---
 
