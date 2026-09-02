@@ -29,6 +29,7 @@ describe('VoxAiService', () => {
       delete: jest.Mock;
     };
     message: { findMany: jest.Mock; findFirst: jest.Mock; deleteMany: jest.Mock; create: jest.Mock };
+    user: { findUnique: jest.Mock; update: jest.Mock };
     $transaction: jest.Mock;
   };
   let rateLimiter: { check: jest.Mock };
@@ -77,6 +78,10 @@ describe('VoxAiService', () => {
         deleteMany: jest.fn(),
         create: jest.fn(),
       },
+      user: {
+        findUnique: jest.fn().mockResolvedValue({ voxProfile: null, voxOnboardingSeenAt: null }),
+        update: jest.fn().mockResolvedValue({}),
+      },
       $transaction: jest.fn().mockResolvedValue([]),
     };
 
@@ -124,16 +129,82 @@ describe('VoxAiService', () => {
   });
 
   describe('getBootstrap', () => {
-    it('returns the active conversation together with the full list', async () => {
+    beforeEach(() => {
       prisma.conversation.findFirst.mockResolvedValue({ id: 'c1', hasMessages: false });
       prisma.conversation.findMany.mockResolvedValue([{ id: 'c1' }, { id: 'c2' }]);
+    });
+
+    it('returns the active conversation, the full list, the profile and the onboarding flag', async () => {
+      prisma.user.findUnique.mockResolvedValue({ voxProfile: null, voxOnboardingSeenAt: null });
 
       const result = await service.getBootstrap('user-1');
 
       expect(result).toEqual({
         active: { id: 'c1', hasMessages: false },
         conversations: [{ id: 'c1' }, { id: 'c2' }],
+        profile: null,
+        showVoxIntro: true,
       });
+    });
+
+    it('reports the chosen profile and hides the intro once a profile is set', async () => {
+      prisma.user.findUnique.mockResolvedValue({ voxProfile: 'STUDY', voxOnboardingSeenAt: new Date() });
+
+      const result = await service.getBootstrap('user-1');
+
+      expect(result).toMatchObject({ profile: 'STUDY', showVoxIntro: false });
+    });
+
+    it('hides the intro when the user dismissed it without choosing a profile', async () => {
+      prisma.user.findUnique.mockResolvedValue({ voxProfile: null, voxOnboardingSeenAt: new Date() });
+
+      const result = await service.getBootstrap('user-1');
+
+      expect(result).toMatchObject({ profile: null, showVoxIntro: false });
+    });
+  });
+
+  describe('listProfiles', () => {
+    it('returns the six profiles without leaking systemAppend or maxTokens', () => {
+      const profiles = service.listProfiles();
+
+      expect(profiles.map((p) => p.key)).toEqual([
+        'DEFAULT',
+        'DIRECT',
+        'STUDY',
+        'PASTORAL',
+        'CATECHIST',
+        'APOLOGETIC',
+      ]);
+      for (const p of profiles) {
+        expect(p).not.toHaveProperty('systemAppend');
+        expect(p).not.toHaveProperty('maxTokens');
+        expect(typeof p.label).toBe('string');
+      }
+    });
+  });
+
+  describe('setProfile', () => {
+    it('stores the profile and stamps the onboarding-seen date', async () => {
+      const result = await service.setProfile('user-1', 'PASTORAL');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { voxProfile: 'PASTORAL', voxOnboardingSeenAt: expect.any(Date) },
+      });
+      expect(result).toEqual({ profile: 'PASTORAL' });
+    });
+  });
+
+  describe('markIntroSeen', () => {
+    it('stamps the onboarding-seen date without touching the profile', async () => {
+      const result = await service.markIntroSeen('user-1');
+
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { voxOnboardingSeenAt: expect.any(Date) },
+      });
+      expect(result).toEqual({ ok: true });
     });
   });
 
@@ -166,7 +237,50 @@ describe('VoxAiService', () => {
         { role: 'assistant', content: 'Olá!' },
       ]);
       expect((payload as any).messages.at(-1)).toEqual({ role: 'user', content: 'Tudo bem?' });
-      expect((payload as any).max_tokens).toBe(2000);
+      // DEFAULT profile budget (era 2000 fixo pra todos)
+      expect((payload as any).max_tokens).toBe(1500);
+    });
+
+    it('builds the system prompt from the identity plus the active profile style block', async () => {
+      await service.chat({ message: 'Oi', conversationId: 'c1' } as any, 'user-1');
+
+      const [, payload] = mockedAxios.post.mock.calls[0];
+      const systemContent = (payload as any).messages[0].content as string;
+
+      expect(systemContent).toContain('# Identidade');
+      expect(systemContent).toContain('# Estilo de resposta ativo: Padrão');
+      // the style block is the last instruction in the prompt
+      expect(systemContent.trimEnd().endsWith('a menos que a pergunta peça.')).toBe(true);
+    });
+
+    it('tags the token log with the active profile', async () => {
+      const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
+
+      await service.chat({ message: 'Oi', conversationId: 'c1' } as any, 'user-1');
+
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('profile=DEFAULT'));
+    });
+
+    it("applies the user's chosen profile to the system prompt and the token budget", async () => {
+      prisma.user.findUnique.mockResolvedValue({ voxProfile: 'DIRECT' });
+      const logSpy = jest.spyOn((service as any).logger, 'log').mockImplementation(() => undefined);
+
+      await service.chat({ message: 'Oi', conversationId: 'c1' } as any, 'user-1');
+
+      const [, payload] = mockedAxios.post.mock.calls[0];
+      const systemContent = (payload as any).messages[0].content as string;
+      expect(systemContent).toContain('# Estilo de resposta ativo: Direto ao ponto');
+      expect((payload as any).max_tokens).toBe(600);
+      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('profile=DIRECT'));
+    });
+
+    it('falls back to DEFAULT when the stored profile key is unknown', async () => {
+      prisma.user.findUnique.mockResolvedValue({ voxProfile: 'LEGACY_GARBAGE' });
+
+      await service.chat({ message: 'Oi', conversationId: 'c1' } as any, 'user-1');
+
+      const [, payload] = mockedAxios.post.mock.calls[0];
+      expect((payload as any).max_tokens).toBe(1500);
     });
 
     it('persists both the user and assistant messages, and logs VoxAI activity', async () => {

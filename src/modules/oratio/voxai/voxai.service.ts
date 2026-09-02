@@ -6,7 +6,7 @@ import type { Request, Response } from "express"
 import { PrismaService } from "src/prisma/prisma.service"
 
 import { VoxAiDto } from "./dto/voxai.dto"
-import { VOX_SYSTEM_PROMPT } from "./prompts/vox.prompt"
+import { VOX_IDENTITY, VOX_PROFILES, VOX_PROFILE_KEYS, resolveVoxProfile } from "./prompts/vox.prompt"
 import { contentFilter } from "./filters/vox.content-filter"
 import { VoxRateLimiter } from "./guards/vox.rate-limiter"
 import { LiturgicalCalendarService } from "./services/liturgical-calendar.service"
@@ -94,6 +94,34 @@ ${segunda?.texto?.slice(0, 300) || ""}
 ${evangelho?.texto?.slice(0, 800)}
 `
 }
+
+ /* =========================
+    MONTAGEM DO SYSTEM PROMPT
+
+    Fonte única: chat() e chatStream() chamam este helper em vez de montar
+    a string cada um por conta própria. A identidade (VOX_IDENTITY) é fixa;
+    o systemAppend do perfil (quando existe) vai POR ÚLTIMO, como a
+    instrução mais recente sobre formato/tom. A identidade continua valendo.
+ ========================= */
+ private buildSystemPrompt(args: {
+  profileKey: string | null
+  brazilToday: string
+  liturgySection: string
+ }): string {
+
+  const profile = resolveVoxProfile(args.profileKey)
+
+  const base = `${VOX_IDENTITY}
+
+Data atual (Brasil): ${args.brazilToday}
+${args.liturgySection}`
+
+  return profile.systemAppend
+   ? `${base}
+
+${profile.systemAppend}`
+   : base
+ }
 
  /* =========================
     🧠 EXTRAIR DATA COM IA (fallback quando o parser local não reconhece)
@@ -190,7 +218,49 @@ Frase: "${message}"`
    orderBy:{ updatedAt:"desc" }
   })
 
-  return { active, conversations }
+  const user = await this.prisma.user.findUnique({
+   where:{ id: userId },
+   select:{ voxProfile:true, voxOnboardingSeenAt:true }
+  })
+
+  return {
+   active,
+   conversations,
+   profile: user?.voxProfile ?? null,
+   // card de novidade só enquanto a pessoa nunca escolheu perfil E nunca
+   // dispensou o onboarding — escolher ou dispensar carimba a data
+   showVoxIntro: !user?.voxProfile && !user?.voxOnboardingSeenAt
+  }
+ }
+
+ /* =========================
+    PERFIS DE RESPOSTA DO VOX
+ ========================= */
+
+ // Metadados dos perfis para o frontend (cards + visão detalhada).
+ // Nunca devolve systemAppend nem maxTokens — são internos.
+ listProfiles(){
+  return VOX_PROFILE_KEYS.map(key => {
+   const { label, short, details, examples } = VOX_PROFILES[key]
+   return { key, label, short, details, examples }
+  })
+ }
+
+ async setProfile(userId: string, profile: string){
+  await this.prisma.user.update({
+   where:{ id: userId },
+   // escolher um perfil também encerra o onboarding
+   data:{ voxProfile: profile, voxOnboardingSeenAt: new Date() }
+  })
+  return { profile }
+ }
+
+ async markIntroSeen(userId: string){
+  await this.prisma.user.update({
+   where:{ id: userId },
+   data:{ voxOnboardingSeenAt: new Date() }
+  })
+  return { ok: true }
  }
 
  /* =========================
@@ -347,12 +417,23 @@ ${liturgySummarized}
 
    /* =========================
       🧠 PROMPT FINAL
+
+      Perfil de resposta do usuário (null → DEFAULT "Padrão"). Define o
+      systemAppend colado no fim do prompt e o teto de tokens da resposta.
    ========================= */
 
-   const systemPrompt = `${VOX_SYSTEM_PROMPT}
+   const voxUser = await this.prisma.user.findUnique({
+    where:{ id: userId },
+    select:{ voxProfile:true }
+   })
+   const profileKey = voxUser?.voxProfile ?? null
+   const profile = resolveVoxProfile(profileKey)
 
-Data atual (Brasil): ${brazilToday}
-${liturgySection}`
+   const systemPrompt = this.buildSystemPrompt({
+    profileKey,
+    brazilToday,
+    liturgySection
+   })
 
    const response = await axios.post(
     this.url,
@@ -363,7 +444,7 @@ ${liturgySection}`
       ...history,
       { role:"user", content: data.message }
      ],
-     max_tokens: 2000
+     max_tokens: profile.maxTokens
     },
     {
      headers: this.headers,
@@ -384,7 +465,7 @@ ${liturgySection}`
 
    if(usage){
     this.logger.log(
-     `[tokens] conversation=${data.conversationId} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
+     `[tokens] conversation=${data.conversationId} profile=${profile.key} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
     )
    }
 
@@ -638,10 +719,18 @@ ${liturgySummarized}
 `
    }
 
-   const systemPrompt = `${VOX_SYSTEM_PROMPT}
+   const voxUser = await this.prisma.user.findUnique({
+    where:{ id: userId },
+    select:{ voxProfile:true }
+   })
+   const profileKey = voxUser?.voxProfile ?? null
+   const profile = resolveVoxProfile(profileKey)
 
-Data atual (Brasil): ${brazilToday}
-${liturgySection}`
+   const systemPrompt = this.buildSystemPrompt({
+    profileKey,
+    brazilToday,
+    liturgySection
+   })
 
    const requestPayload = {
     model: this.model,
@@ -650,7 +739,7 @@ ${liturgySection}`
      ...history,
      { role:"user", content: data.message }
     ],
-    max_tokens: 2000,
+    max_tokens: profile.maxTokens,
     stream: true
    }
 
@@ -741,7 +830,7 @@ ${liturgySection}`
 
    if(usage){
     this.logger.log(
-     `[tokens] conversation=${data.conversationId} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
+     `[tokens] conversation=${data.conversationId} profile=${profile.key} prompt=${usage.prompt_tokens} completion=${usage.completion_tokens} total=${usage.total_tokens}`
     )
    }
 

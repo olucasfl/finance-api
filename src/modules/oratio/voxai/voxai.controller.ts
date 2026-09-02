@@ -14,6 +14,7 @@ import type { Request, Response } from "express"
 
 import { VoxAiService } from "./voxai.service"
 import { VoxAiDto } from "./dto/voxai.dto"
+import { SetVoxProfileDto } from "./dto/set-vox-profile.dto"
 import { PrismaService } from "src/prisma/prisma.service"
 import { JwtAuthGuard } from "src/modules/auth/jwt-auth.guard"
 
@@ -66,6 +67,28 @@ export class VoxAiController{
   const userId = req.user.userId
 
   return this.voxAiService.getBootstrap(userId)
+ }
+
+ /* =========================
+    PERFIS DE RESPOSTA
+ ========================= */
+
+ @Get("profiles")
+ getProfiles(){
+
+  return this.voxAiService.listProfiles()
+ }
+
+ @Patch("profile")
+ async setProfile(@Body() body: SetVoxProfileDto, @Req() req){
+
+  return this.voxAiService.setProfile(req.user.userId, body.profile)
+ }
+
+ @Post("profile/intro-seen")
+ async markIntroSeen(@Req() req){
+
+  return this.voxAiService.markIntroSeen(req.user.userId)
  }
 
  /* =========================
