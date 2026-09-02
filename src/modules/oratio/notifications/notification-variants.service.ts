@@ -11,15 +11,71 @@ export type VariantRow = {
   order: number;
 };
 
+type SeedVariant = { title: string; body: string };
+
+// Pool inicial de textos de cada regra do catálogo. Semeado só quando a
+// regra ainda não tem NENHUMA variante — depois disso o admin é dono da
+// lista (adicionar/editar/desativar/remover pelo painel). `{count}` e
+// `{label}` são interpolados pelo scheduler como sempre.
+export const DEFAULT_VARIANTS: Record<string, SeedVariant[]> = {
+  ROSARY_UNFINISHED: [
+    { title: 'Volte para terminar seu Terço 📿', body: 'Você começou um terço e não terminou. Que tal concluir agora?' },
+    { title: 'Seu Terço ficou pela metade 📿', body: 'Faltam poucos mistérios. Reserve uns minutos e complete com calma.' },
+    { title: 'Retome seu Terço 📿', body: 'Nossa Senhora acolhe cada Ave-Maria. Termine o que você começou.' },
+  ],
+  STREAK_AT_RISK: [
+    { title: 'Não perca sua sequência 🔥', body: 'Você está com {count} dias seguidos de oração. Reze hoje para manter!' },
+    { title: '{count} dias rezando — continue 🔥', body: 'Seria uma pena parar agora. Um instante de oração garante mais um dia.' },
+    { title: 'Sua constância vale muito 🔥', body: 'São {count} dias seguidos com Deus. Não deixe hoje passar em branco.' },
+  ],
+  BIBLE_RESUME: [
+    { title: 'Continue sua leitura 📖', body: 'Você parou em {label}. Retome de onde ficou.' },
+    { title: 'A Palavra te espera 📖', body: 'Faz uns dias desde {label}. Que tal ler um trecho hoje?' },
+    { title: 'Volte para a Escritura 📖', body: 'Sua leitura parou em {label}. Uns minutos já fazem diferença.' },
+  ],
+  CATECHISM_RESUME: [
+    { title: 'Retome o Catecismo 📘', body: 'Você parou em {label}. Continue seu estudo.' },
+    { title: 'Seu estudo ficou em {label} 📘', body: 'Retomar agora mantém o fio da meada. Um ponto por dia já vale.' },
+    { title: 'Um pouco de doutrina hoje? 📘', body: 'Você parou em {label}. A fé também se aprende — continue de onde ficou.' },
+  ],
+  ROSARY_LAPSE: [
+    { title: 'Faz um tempo desde seu último Terço 📿', body: 'Que tal reservar alguns minutos para rezar hoje?' },
+    { title: 'Sua Mãe sente sua falta 📿', body: 'Faz dias desde o último terço. Volte a essa oração que já foi sua.' },
+    { title: 'Retome o hábito do Terço 📿', body: 'Uns minutos com o Rosário hoje podem recomeçar tudo.' },
+  ],
+  COMEBACK: [
+    { title: 'Sentimos sua falta 🙏', body: 'Que tal um momento de oração hoje? Estamos aqui por você.' },
+    { title: 'Deus não foi a lugar nenhum 🙏', body: 'Faz alguns dias que você não aparece. Volte quando quiser — Ele espera.' },
+    { title: 'Um instante com Deus hoje? 🙏', body: 'A porta continua aberta. Reserve um minuto para rezar.' },
+  ],
+  SUNDAY_MASS: [
+    { title: 'É domingo, dia do Senhor ✝️', body: 'Prepare o coração para a Santa Missa e as leituras de hoje.' },
+    { title: 'Domingo é dia de Missa ✝️', body: 'Chegue com o coração pronto. Veja as leituras antes de ir.' },
+    { title: 'O Dia do Senhor chegou ✝️', body: 'Reserve este domingo para a Eucaristia e o descanso em Deus.' },
+  ],
+  VOX_INTRO: [
+    { title: 'Uma dúvida de fé? ✨', body: 'Converse com o VoxAI, seu assistente espiritual católico.' },
+    { title: 'Pergunte ao VoxAI ✨', body: 'Dúvidas sobre a fé, a Missa, um santo? O VoxAI responde à luz da doutrina.' },
+    { title: 'Conheça o VoxAI ✨', body: 'Um assistente para tirar dúvidas de fé com base na Igreja. Experimente.' },
+  ],
+  EXAMEN_NIGHT: [
+    { title: 'Antes de dormir 🌙', body: 'Examine o seu dia com Deus — o que agradecer e o que confiar a Ele.' },
+    { title: 'Um exame de consciência 🌙', body: 'Repasse o dia: onde Deus esteve, onde você faltou, o que entregar a Ele.' },
+    { title: 'Feche o dia com Deus 🌙', body: 'Dois minutos de silêncio: gratidão pelo bem, perdão pelo resto.' },
+  ],
+};
+
 @Injectable()
 export class NotificationVariantsService {
   private readonly logger = new Logger(NotificationVariantsService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // Semeia 1 variante por regra a partir do title/body/url atuais, só pras
-  // regras que ainda não têm nenhuma. Idempotente — rodar no boot 2x não
-  // duplica. Chamado pelo scheduler DEPOIS de reconciliar o catálogo.
+  // Semeia o pool inicial de variantes de cada regra, SÓ pras regras que
+  // ainda não têm nenhuma. Regra do catálogo ganha o pool de `DEFAULT_VARIANTS`
+  // (2–3 textos); regra custom ganha 1 variante do próprio texto. Idempotente
+  // — depois que a regra tem ≥1 variante, o seed nunca mais mexe (o admin é
+  // dono da lista). Chamado pelo scheduler DEPOIS de reconciliar o catálogo.
   async seedMissing(): Promise<void> {
     const rules = await this.prisma.notificationRule.findMany({
       select: { key: true, title: true, body: true, url: true },
@@ -29,13 +85,25 @@ export class NotificationVariantsService {
         .count({ where: { ruleKey: r.key } })
         .catch(() => 1); // erro ⇒ não tenta semear
       if (count > 0) continue;
-      await this.prisma.notificationRuleVariant
-        .create({
-          data: { ruleKey: r.key, title: r.title, body: r.body, url: r.url, order: 0 },
-        })
-        .catch((e) =>
-          this.logger.warn(`seed de variante falhou p/ ${r.key}: ${e?.message}`),
-        );
+
+      const catalog = DEFAULT_VARIANTS[r.key];
+      const toCreate = catalog
+        ? catalog.map((v, i) => ({
+            ruleKey: r.key,
+            title: v.title ?? null,
+            body: v.body,
+            url: r.url,
+            order: i,
+          }))
+        : [{ ruleKey: r.key, title: r.title, body: r.body, url: r.url, order: 0 }];
+
+      for (const data of toCreate) {
+        await this.prisma.notificationRuleVariant
+          .create({ data })
+          .catch((e) =>
+            this.logger.warn(`seed de variante falhou p/ ${r.key}: ${e?.message}`),
+          );
+      }
     }
   }
 

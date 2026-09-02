@@ -13,6 +13,16 @@ Comandos de verificação (rodar dentro do repo respectivo):
 
 ---
 
+## Pós-plano
+
+- **2026-09-02 — pool inicial de variantes ampliado:** o `seedMissing` da
+  Task 9 semeava só 1 variante por regra. `DEFAULT_VARIANTS` agora traz **3
+  textos por regra** do catálogo (regra custom segue com 1, do próprio texto).
+  Semeado só quando a regra tem 0 variantes — depois disso o admin é dono da
+  lista. Sem mudança de schema. `oratio-api` branch `feat/notif-mais-variantes`.
+
+---
+
 ## Fase 1 — Bloco de configuração do funil
 
 ### Task 1: `NotificationSettings` singleton + leitura no scheduler
