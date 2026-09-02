@@ -187,28 +187,40 @@ quando `thresholdDays` for `null`.
 existe. `ruleTrigger()` passa a descrever com base nos valores reais.
 
 **Critérios de aceite:**
-- [ ] Select de faixa (Manhã/Tarde/Noite/Qualquer) por regra
-- [ ] Campo de "dias" só aparece pras condições que usam limiar
-- [ ] `updateRule` manda os campos novos; descrição do gatilho reflete o valor
-- [ ] Regras de sistema seguem sem botão de excluir
+- [x] Select de faixa (Manhã/Tarde/Noite/Qualquer) por regra (`.knobSelect`)
+- [x] Campo "Parado há … dias" só aparece pras condições de janela
+      (`THRESHOLD_CONDITIONS`: BIBLE/CATECHISM_RESUME, ROSARY_LAPSE, COMEBACK)
+- [x] `saveRule` manda `band`/`thresholdDays`; `ruleTrigger()` interpola o
+      limiar real ("parou a leitura da Bíblia há 3 dias")
+- [x] Regras de sistema seguem sem botão de excluir (comportamento não mexido)
+- [x] Backend: `UpdateRuleDto` valida `band`/`thresholdDays`; `updateRule`
+      repassa os dois
 
 **Verificação:**
-- [ ] `npx vitest run AdminNotifications` passa
-- [ ] `npm run build` no front
-- [ ] Manual: mudar faixa e limiar, recarregar, valores persistem
+- [x] `npx vitest run AdminNotifications` passa (16 testes, +2 novos)
+- [x] `npm run build` no front
+- [x] `npx jest notifications` no back (139) — suíte back completa: 741
+- [ ] Manual: mudar faixa e limiar, recarregar, valores persistem — depende
+      do `prisma db push`
 
 **Dependências:** Task 5
-**Arquivos:** `oratio/src/components/AdminNotifications/AdminNotifications.tsx`,
-`.module.css`, `oratio/src/services/adminNotificationsService.ts`, test;
-backend `dto/rule.dto.ts` + `updateRule` aceitando os campos
+**Arquivos:** `oratio/src/components/AdminNotifications/*`,
+`oratio/src/services/adminNotificationsService.ts`, test;
+`oratio-api/.../dto/rule.dto.ts` + `notifications-send.service.ts`
 **Escopo:** M
+**Commits:** `oratio-api@39666e2` (back) + `oratio` branch `feat/notif-regra-knobs` (front)
 
 ---
 
 ## Checkpoint B — Fase 2
-- [ ] Limiares e faixas editáveis pelo painel; defaults reproduzem o de hoje
-- [ ] `streakAtRisk` intocada (teste de regressão verde)
-- [ ] Revisar com o usuário
+- [x] Limiares e faixas editáveis pelo painel; defaults (catálogo + `?? <n>`)
+      reproduzem o comportamento de hoje
+- [x] `streakAtRisk` / `rosaryUnfinished` / `voxIntro` intocados — testes de
+      regressão verdes (741 back)
+- [x] O scheduler ainda NÃO filtra por `band` — só semeia e expõe no painel.
+      O uso do `band` no tick é a Fase 3 (Task 8).
+- [ ] ⏳ `prisma db push` segue pendente (agora +2 colunas em `NotificationRule`)
+- [ ] Revisar com o usuário antes da Fase 3
 
 ---
 
