@@ -171,10 +171,14 @@ streak, e-mail.
 
 **Perguntar antes** de qualquer mudança em `package.json`/`package-lock.json`.
 
-**Antes de usar um pacote que está no `package.json`, faça `grep` em `src/`.** Quatro deles não
-são importados em lugar nenhum (`ARCHITECTURE.md` §8): `@google/generative-ai`, `nodemailer`,
-`resend`, `@getbrevo/brevo`. O VoxAI chama a OpenAI por HTTP direto; o e-mail usa a API HTTP crua
-da Brevo, não o SDK. Não assuma que Gemini, SMTP, Resend ou o SDK da Brevo estão ligados.
+**Antes de usar um pacote que está no `package.json`, faça `grep` em `src/`.** Estar declarado
+não significa estar ligado — `@google/generative-ai`, `nodemailer`, `resend` e `@getbrevo/brevo`
+ficaram declarados por meses sem um único import, e foram removidos em 2026-09-04
+(`ARCHITECTURE.md` §8).
+
+O VoxAI chama a OpenAI **por HTTP direto** e o e-mail usa a **API HTTP crua** da Brevo, não o SDK.
+Trazer de volta qualquer um desses pacotes — ou adicionar um SDK equivalente — é decisão de
+arquitetura: **perguntar antes**.
 
 ---
 
