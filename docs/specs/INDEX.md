@@ -7,7 +7,7 @@ no mesmo commit — e `/docs-sync` confere se ela bate com a realidade.
 | Feature | Spec | Plano | Checklist | Frontend pareado | Status |
 |---|---|---|---|---|---|
 | Reformulação das notificações | — | `tasks/notifications-plan.md` | `tasks/notifications-todo.md` | `oratio/docs/tasks/notifications.md` (ponteiro) | ✅ concluída (Fases 1–5) |
-| Perfis de resposta do VoxAI | — *(não precisa: já entregue)* | `tasks/vox-profiles-plan.md` | `tasks/vox-profiles-todo.md` | `oratio/docs/tasks/vox-profiles-todo.md` | 🚧 código entregue; falta aceite dos 5 perfis, matriz 6×5 e `db push` de produção |
+| Perfis de resposta do VoxAI | — *(não precisa: já entregue)* | `tasks/vox-profiles-plan.md` | `tasks/vox-profiles-todo.md` | `oratio/docs/tasks/vox-profiles-todo.md` | ✅ **em produção** (`main`: 2 campos no schema, 6 perfis com `systemAppend`, 3 rotas; `db push` aplicado) |
 | Bíblia de Estudo | — *(não precisa: já entregue)* | `tasks/biblia-plan.md` | `tasks/biblia-todo.md` | `oratio/docs/tasks/biblia-*.md` | ✅ **em produção** (B1–B3 na `main`; `npx jest bible` → 4 suítes, 39 testes verdes) |
 
 ## Legenda de status
@@ -34,19 +34,14 @@ no mesmo commit — e `/docs-sync` confere se ela bate com a realidade.
 ## Pendências de execução humana registradas
 
 Estas não são tarefas de código; são passos que só o humano pode executar e que bloqueiam o
-fechamento de uma feature. Mantenha a lista curta e atual.
+fechamento de uma feature. Mantenha a lista curta e atual — **pendência resolvida e ainda
+listada é tão ruim quanto pendência não registrada.**
 
-- **`db push` de produção** do schema de perfis do VoxAI (`User.voxProfile`,
-  `User.voxOnboardingSeenAt`) — ver `tasks/vox-profiles-todo.md`, Checkpoint final backend.
-- **Aceite doutrinário** dos 5 perfis dinâmicos e a matriz 6 perfis × 5 perguntas
-  (`tasks/vox-profiles-todo.md`, Fase B3).
+- *(nenhuma no momento)*
 
-## Dívidas conhecidas (medidas em 2026-09-04)
-
-- **`notifications-todo.md` tem 11 itens abertos** que são verificação manual (`curl`, painel,
-  seed) e dois avisos de `db push` pendente — mas o `db push` da Fase 4 foi aplicado
-  (`1603429 docs(notif): db push da Fase 4 aplicado`) e o plano fechou no Checkpoint E. O
-  arquivo não reflete isso. Fica registrado; não foi reconciliado nesta rodada.
+O `db push` de produção do VoxAI e o aceite doutrinário dos perfis estavam listados aqui e
+**já haviam sido feitos** — o Vox roda em produção com os perfis desde antes desta auditoria.
+Removidos em 2026-09-04.
 
 ## Por que não há spec para as features existentes
 

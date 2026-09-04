@@ -5,7 +5,7 @@ description: Preflight obrigatório antes de escrever ou alterar o prompt do Vox
 
 # Guardrail de doutrina — `vox.prompt.ts`
 
-`src/modules/oratio/voxai/vox.prompt.ts` não é configuração. É **a doutrina que o app ensina**,
+`src/modules/oratio/voxai/prompts/vox.prompt.ts` não é configuração. É **a doutrina que o app ensina**,
 em escala: cada palavra ali se multiplica por toda resposta que o Vox dá a todo usuário.
 
 A divisão é deliberada e não pode ser borrada:

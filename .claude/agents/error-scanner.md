@@ -42,9 +42,11 @@ silêncio não conta como verificação.
    **alta**, mesmo que a mudança pareça cosmética.
 10. **`ALLOWED_ORIGINS` / CORS / header `X-App`** alterados sem a mudança correspondente do lado
     do frontend anotada na tarefa. Falha só aparece no navegador, em produção.
-11. **Pacote assumido sem estar em uso**: import novo de `@google/generative-ai`, `nodemailer`,
-    `resend` ou `@getbrevo/brevo`. Os quatro estão no `package.json` mas não são usados em `src/`
-    (`ARCHITECTURE.md` §8) — usar um deles é uma decisão de arquitetura, não um detalhe.
+11. **Integração nova entrando de lado**: import de `@google/generative-ai`, `nodemailer`,
+    `resend` ou `@getbrevo/brevo`. Os quatro foram **removidos** do `package.json` em 2026-09-04
+    por nunca terem sido usados (`ARCHITECTURE.md` §8) — o VoxAI fala com a OpenAI por HTTP
+    direto e o e-mail usa a API HTTP crua da Brevo. Reintroduzir qualquer um deles é decisão de
+    arquitetura, não detalhe de implementação. Vale para qualquer dependência nova, aliás.
 12. **Dado pessoal em texto**: e-mail real, nome real, intenção de oração ou conversa real do Vox
     dentro de teste, fixture, comentário, spec ou mensagem de commit. Convicção religiosa é dado
     sensível (LGPD, art. 5º, II).
