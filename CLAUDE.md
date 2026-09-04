@@ -54,12 +54,17 @@ given before, it belongs in one of the files above, not in the prompt.
 `/review-pr` · `/nova-branch` · `/docs-sync` · `/db-change`.
 Definitions in `.claude/commands/`; agents in `.claude/agents/`.
 
+Skills in `.claude/skills/` — `bug-research`, `oratio-testing`, and
+`doutrina-guardrail`, a **mandatory preflight** (not a suggestion) before any edit
+to `vox.prompt.ts`: `VOX_IDENTITY` is doctrine, `systemAppend` is tone only, and
+neither changes without explicit human sign-off recorded in the commit.
+
 ## `docs/tasks/` — current plans
 
 | Feature | Files | Status |
 |---|---|---|
 | **Reformulação das notificações** (torna regras/timing/textos configuráveis sem deploy) | `docs/tasks/notifications-plan.md` · `docs/tasks/notifications-todo.md` | Ativo. Plano-mestre cross-repo — o frontend tem só um ponteiro em `oratio/docs/tasks/notifications.md`. |
-| **Bíblia de Estudo** (backend: bible-marks, bible-collections) | `docs/tasks/biblia-plan.md` · `docs/tasks/biblia-todo.md` | Frontend em `oratio/docs/tasks/biblia-*.md` — ler os dois juntos. |
+| **Bíblia de Estudo** (backend: bible-marks, bible-collections) | `docs/tasks/biblia-plan.md` · `docs/tasks/biblia-todo.md` | ✅ **Concluída e em produção** (B1–B3 na `main`). Os dois arquivos são registro histórico, não trabalho pendente — o comportamento vivo está em `ARCHITECTURE.md` §4/§7. |
 | **Perfis de resposta do VoxAI** (identidade fixa + 6 perfis de estilo por usuário) | `docs/tasks/vox-profiles-plan.md` · `docs/tasks/vox-profiles-todo.md` | Código de B1–B3 e B-Fechamento entregue na `develop`. Falta só o que exige humano: aceite doutrinário perfil a perfil, a matriz 6×5, e o `prisma db push` de produção. Frontend em `oratio/docs/tasks/vox-profiles-todo.md`. |
 
 When you finish a task, tick it in its `*-todo.md` and, if behavior changed,

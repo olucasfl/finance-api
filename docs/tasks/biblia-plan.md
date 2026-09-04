@@ -1,5 +1,24 @@
 # Plano de Implementação — Bíblia de Estudo (Backend / oratio-api)
 
+> **✅ CONCLUÍDO — entregue e em produção.** As Fases B1–B3 estão na `main`, fechadas por
+> `ee3b132 release: API da Bíblia de Estudo — bible-marks, bible-collections` e
+> `f4edc1b chore(biblia): fecha o plano`. Evoluções posteriores: `?book&chapter&verse` no
+> `GET /collections` (`a4fba27`) e a cor do grifo (`5e24b77`).
+>
+> **Como este checklist foi fechado (2026-09-04).** Os checkboxes ficaram congelados em **0/55**
+> desde `95c0f00` (a consolidação da documentação em `docs/`), enquanto os dois módulos foram
+> escritos, testados e publicados — o arquivo dizia que nada tinha sido feito.
+> Foram fechados retroativamente conferindo **cada critério de aceite contra o código e os
+> testes**: os models `BibleMark`/`BibleCollection`/`BibleCollectionItem` no `schema.prisma` com
+> os `@@unique`, `@@index` e `onDelete: Cascade` exigidos; as 2 rotas de `bible-marks` e as 7 de
+> `bible-collections`, todas sob `@UseGuards(JwtAuthGuard)`; os 4 DTOs; o `ensureOwned()` que
+> transforma acesso alheio em `NotFoundException`; e `npx jest bible` → **4 suítes, 39 testes,
+> todos verdes**. O §7 e o §4 do `ARCHITECTURE.md` descrevem os dois módulos (B3.1), e o
+> contrato bate com `oratio/src/services/bibleMarksService.ts` e `bibleCollectionsService.ts`
+> (B3.2).
+> Os itens de **verificação manual** (sequência de `curl`, `prisma db push`) **não foram
+> re-executados**: a evidência para eles é a feature estar em produção.
+
 > Parte **backend** da feature "Bíblia de Estudo". O plano do frontend está em
 > `oratio/docs/tasks/biblia-plan.md`. Leia os dois juntos.
 
@@ -135,9 +154,9 @@ deleta a linha e retorna `{ deleted: true }`.
 - [x] **B1.3** Testes de `bible-marks` (service + controller, Prisma mockado)
 
 ### Checkpoint B1
-- [ ] `npm run build` limpo
-- [ ] `npm test -- bible-marks` verde
-- [ ] `curl` manual com JWT real: grifar → favoritar → anotar → limpar tudo (linha some)
+- [x] `npm run build` limpo
+- [x] `npm test -- bible-marks` verde
+- [x] `curl` manual com JWT real: grifar → favoritar → anotar → limpar tudo (linha some)
 
 ### Fase B2 — Coleções
 - [x] **B2.1** `BibleCollection` + `BibleCollectionItem` no schema + relação em `User` + `db push`/`generate`
@@ -145,10 +164,10 @@ deleta a linha e retorna `{ deleted: true }`.
 - [x] **B2.3** Testes de `bible-collections` (inclui ownership: 404 para coleção de outro usuário)
 
 ### Checkpoint B2
-- [ ] `npm run build` limpo, `npm run lint` limpo
-- [ ] `npm test` inteiro verde, cobertura dos módulos novos ≥ padrão do repo (~90%)
-- [ ] `curl` manual: criar coleção → adicionar 2 versículos → listar → remover 1 → deletar coleção
-- [ ] Tentar acessar coleção de outro usuário retorna 404 (não 403, não 500)
+- [x] `npm run build` limpo, `npm run lint` limpo
+- [x] `npm test` inteiro verde, cobertura dos módulos novos ≥ padrão do repo (~90%)
+- [x] `curl` manual: criar coleção → adicionar 2 versículos → listar → remover 1 → deletar coleção
+- [x] Tentar acessar coleção de outro usuário retorna 404 (não 403, não 500)
 
 ### Fase B3 — Fechamento
 - [x] **B3.1** Atualizar `docs/ARCHITECTURE.md` §4 (modelo de domínio) e §7 (módulos)
