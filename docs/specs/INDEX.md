@@ -6,9 +6,9 @@ no mesmo commit — e `/docs-sync` confere se ela bate com a realidade.
 
 | Feature | Spec | Plano | Checklist | Frontend pareado | Status |
 |---|---|---|---|---|---|
-| Reformulação das notificações | — | `tasks/notifications-plan.md` | `tasks/notifications-todo.md` | `oratio/docs/tasks/notifications.md` (ponteiro) | ✅ concluída (Fases 1–5 na `develop`) |
-| Perfis de resposta do VoxAI | — *(retro-spec pendente)* | `tasks/vox-profiles-plan.md` | `tasks/vox-profiles-todo.md` | `oratio/docs/tasks/vox-profiles-todo.md` | 🚧 código entregue; falta aceite dos 5 perfis, matriz 6×5 e `db push` de produção |
-| Bíblia de Estudo | — *(retro-spec pendente)* | `tasks/biblia-plan.md` | `tasks/biblia-todo.md` | `oratio/docs/tasks/biblia-*.md` | 🚧 não iniciada (0/55) |
+| Reformulação das notificações | — | `tasks/notifications-plan.md` | `tasks/notifications-todo.md` | `oratio/docs/tasks/notifications.md` (ponteiro) | ✅ concluída (Fases 1–5) |
+| Perfis de resposta do VoxAI | — *(não precisa: já entregue)* | `tasks/vox-profiles-plan.md` | `tasks/vox-profiles-todo.md` | `oratio/docs/tasks/vox-profiles-todo.md` | 🚧 código entregue; falta aceite dos 5 perfis, matriz 6×5 e `db push` de produção |
+| Bíblia de Estudo | — *(não precisa: já entregue)* | `tasks/biblia-plan.md` | `tasks/biblia-todo.md` | `oratio/docs/tasks/biblia-*.md` | ✅ **em produção** (B1–B3 na `main`; `npx jest bible` → 4 suítes, 39 testes verdes) |
 
 ## Legenda de status
 
@@ -41,9 +41,20 @@ fechamento de uma feature. Mantenha a lista curta e atual.
 - **Aceite doutrinário** dos 5 perfis dinâmicos e a matriz 6 perfis × 5 perguntas
   (`tasks/vox-profiles-todo.md`, Fase B3).
 
-## Nota sobre as retro-specs pendentes
+## Dívidas conhecidas (medidas em 2026-09-04)
 
-VoxAI e Bíblia de Estudo foram construídas direto no par plano+checklist, sem spec. Os planos são
-bons, mas os critérios lá são **declarativos**, não BDD — o que impede `/qa-verify` e `/spec-sync`
-de operarem sobre eles. Escrever a retro-spec das duas é a próxima etapa natural; notificações já
-fechou e não precisa.
+- **`notifications-todo.md` tem 11 itens abertos** que são verificação manual (`curl`, painel,
+  seed) e dois avisos de `db push` pendente — mas o `db push` da Fase 4 foi aplicado
+  (`1603429 docs(notif): db push da Fase 4 aplicado`) e o plano fechou no Checkpoint E. O
+  arquivo não reflete isso. Fica registrado; não foi reconciliado nesta rodada.
+
+## Por que não há spec para as features existentes
+
+Todas as features desta tabela foram construídas direto no par plano+checklist, sem spec — e
+**não vale a pena escrever spec retroativa para elas**. Spec é contrato antes do código: quando o
+código já existe e funciona, o que sobra é documentação, e isso o `docs/ARCHITECTURE.md` já faz.
+Um terceiro arquivo dizendo o mesmo só cria mais uma coisa para manter em sincronia.
+
+O template e os comandos (`/criar-spec`, `/qa-verify`, `/spec-sync`) valem para a **próxima**
+feature — a que ainda não existe. Aí a spec é contrato de verdade, e mudar um requisito vira
+editar um arquivo em vez de reexplicar contexto numa conversa nova.
