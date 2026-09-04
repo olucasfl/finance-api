@@ -91,7 +91,7 @@ quando for realmente preciso exercitar o caminho real, escrever o comando e pedi
 
 ## 4. Conteúdo doutrinário — `VOX_IDENTITY` e `VOX_PROFILES`
 
-`src/modules/oratio/voxai/vox.prompt.ts` não é configuração: é a **doutrina que o app ensina**.
+`src/modules/oratio/voxai/prompts/vox.prompt.ts` não é configuração: é a **doutrina que o app ensina**.
 `VOX_IDENTITY` fixa o que o Vox é; cada `systemAppend` de perfil ajusta só o estilo.
 
 **Nunca:**

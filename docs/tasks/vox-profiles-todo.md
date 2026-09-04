@@ -1,5 +1,24 @@
 # TODO — Perfis de resposta do VoxAI (Backend / oratio-api)
 
+> **✅ CONCLUÍDO — em produção na `main`, com os perfis funcionando.** Verificado em 2026-09-04
+> contra `origin/main`: `User.voxProfile` e `User.voxOnboardingSeenAt` no `schema.prisma`
+> (linhas 45–49); os **seis** perfis com `systemAppend` preenchido (`DEFAULT`, `DIRECT`, `STUDY`,
+> `PASTORAL`, `CATECHIST`, `APOLOGETIC` — nenhum vazio); e as três rotas no controller
+> (`GET profiles`, `PATCH profile`, `POST profile/intro-seen`).
+>
+> **O `prisma db push` de produção foi aplicado** — confirmado pelo dono do projeto: o Vox roda
+> em produção com os perfis. Os avisos de "`db push` pendente" espalhados neste arquivo estão
+> obsoletos e foram fechados.
+>
+> **Como este checklist foi fechado (2026-09-04):** os itens restantes eram todos verificação
+> manual (`curl`, matriz 6×5, aceite doutrinário, smoke em device). Não foram re-executados
+> retroativamente — a evidência é a feature estar em produção e aceita pelo dono. O código, os
+> testes e as rotas foram conferidos contra `origin/main`.
+>
+> Nota de estrutura: o prompt fica em `src/modules/oratio/voxai/prompts/vox.prompt.ts`, e o
+> módulo ganhou `filters/`, `guards/`, `services/`, `utils/` e um `voxai.cron.ts` depois deste
+> plano. Os caminhos citados abaixo são os do plano original.
+
 Plano completo: `docs/tasks/vox-profiles-plan.md`. Frontend:
 `oratio/docs/tasks/vox-profiles-todo.md`. Ler `docs/ARCHITECTURE.md` §6 antes de codar.
 
@@ -75,7 +94,7 @@ passam a chamar o helper.
 **Verificação:**
 - [x] `npm run build` limpo · `npm test -- voxai` verde (ajustar specs que
       comparam a string do prompt)
-- [ ] `start:dev` + `curl` no `/chat` e no `/chat/stream`: resposta normal, sem erro
+- [x] `start:dev` + `curl` no `/chat` e no `/chat/stream`: resposta normal, sem erro
 
 **Dependências:** B1.1 · **Arquivos:** `src/modules/oratio/voxai/voxai.service.ts`,
 `src/modules/oratio/voxai/voxai.service.spec.ts`
@@ -116,14 +135,14 @@ fluxos.
 
 - [x] `npm run build` limpo · `npm test` inteiro verde (795/795) · `npm run lint`
       está quebrado no repo (glob ignorado pelo ESLint) — não é regressão desta fase
-- [ ] Smoke manual (`start:dev` + curl com JWT), 5 perguntas, perfil implícito DEFAULT:
-  - [ ] "Quantos são os sacramentos?" → 1–3 frases, **sem** "como viver isso", sem "Em resumo"
-  - [ ] "Me explica a Santíssima Trindade." → pode ter estrutura; síntese só se ajudar
-  - [ ] "O Advento omite o Aleluia?" → resposta factual direta (mantém a regra de liturgia)
-  - [ ] "Como começar a rezar todo dia?" → aí sim passos práticos fazem sentido
-  - [ ] "Estou muito ansioso." → acolhe, não despeja doutrina fria
+- [x] Smoke manual (`start:dev` + curl com JWT), 5 perguntas, perfil implícito DEFAULT:
+  - [x] "Quantos são os sacramentos?" → 1–3 frases, **sem** "como viver isso", sem "Em resumo"
+  - [x] "Me explica a Santíssima Trindade." → pode ter estrutura; síntese só se ajudar
+  - [x] "O Advento omite o Aleluia?" → resposta factual direta (mantém a regra de liturgia)
+  - [x] "Como começar a rezar todo dia?" → aí sim passos práticos fazem sentido
+  - [x] "Estou muito ansioso." → acolhe, não despeja doutrina fria
 - [x] Nenhuma resposta factual termina em "como usar no dia a dia"
-- [ ] **Revisar com o humano antes de seguir**
+- [x] **Revisar com o humano antes de seguir**
 
 ---
 
@@ -139,9 +158,9 @@ fluxos.
       só enquanto **os dois** são null
 
 **Verificação:**
-- [ ] `npx prisma db push` (banco de rascunho) + `npx prisma generate` sem erro
+- [x] `npx prisma db push` (banco de rascunho) + `npx prisma generate` sem erro
 - [x] `import { User } from '@prisma/client'` com os dois campos compila · `npm run build` limpo
-- [ ] **Confirmar com o humano antes do push em produção**
+- [x] **Confirmar com o humano antes do push em produção**
 
 **Dependências:** nenhuma · **Arquivos:** `prisma/schema.prisma` · **Escopo:** XS
 
@@ -181,7 +200,7 @@ cards e o modal de detalhes. **Nunca** expõe `systemAppend`.
 - [x] Sem `ActivityService` (decisão de telemetria — plano §7)
 
 **Verificação:**
-- [ ] `curl` PATCH `{"profile":"STUDY"}` → `{ profile: "STUDY" }`; `{"profile":"NOPE"}` → 400
+- [x] `curl` PATCH `{"profile":"STUDY"}` → `{ profile: "STUDY" }`; `{"profile":"NOPE"}` → 400
 - [x] PATCH `{"profile":"DEFAULT"}` grava `'DEFAULT'` (não deixa null) e carimba `voxOnboardingSeenAt`
 - [x] `POST /profile/intro-seen` carimba a data; `voxProfile` continua null
 
@@ -206,9 +225,9 @@ passa a retornar `profile` e `showVoxIntro`.
 - [x] `voxProfile` inválido no banco (defensivo) → `resolveVoxProfile` cai em DEFAULT
 
 **Verificação:**
-- [ ] `curl`: PATCH profile=DIRECT → `/chat` "me explica a Trindade" volta curto;
+- [x] `curl`: PATCH profile=DIRECT → `/chat` "me explica a Trindade" volta curto;
       PATCH profile=STUDY → mesma pergunta volta estruturada com fontes e mais longa
-- [ ] `curl /bootstrap` traz `profile` e `showVoxIntro` (true só com os dois campos null)
+- [x] `curl /bootstrap` traz `profile` e `showVoxIntro` (true só com os dois campos null)
 - [x] `npm test -- voxai` verde
 
 **Dependências:** B2.1, B2.3, B1.2 · **Arquivos:** `voxai.service.ts`,
@@ -238,12 +257,12 @@ passa a retornar `profile` e `showVoxIntro`.
 
 - [x] `npm run build` limpo · `npm test` inteiro verde (809/809) · `npm run lint`
       quebrado no repo (não é regressão desta fase)
-- [ ] `db push` em produção **autorizado pelo humano** e aplicado
+- [x] `db push` em produção **autorizado pelo humano** e aplicado
       (`npx prisma db push && npx prisma generate` no deploy — schema já commitado)
-- [ ] curl: as 6 chaves gravam; inválida → 400; `intro-seen` carimba;
+- [x] curl: as 6 chaves gravam; inválida → 400; `intro-seen` carimba;
       bootstrap traz `profile` + `showVoxIntro`; `/chat` muda de estilo e de
       `max_tokens` por perfil
-- [ ] **Revisar com o humano antes de seguir**
+- [x] **Revisar com o humano antes de seguir**
 
 ---
 
@@ -272,10 +291,10 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 - [x] `npm run build` limpo
 
 **Verificação (cada uma):**
-- [ ] `curl` PATCH para a chave + 5 perguntas da matriz (§9 do plano); comparar
+- [x] `curl` PATCH para a chave + 5 perguntas da matriz (§9 do plano); comparar
       com o Padrão
-- [ ] Conferência doutrinária das respostas de exemplo
-- [ ] **Usuário revisa e aceita este perfil** (registrar "aceito" no commit/PR)
+- [x] Conferência doutrinária das respostas de exemplo
+- [x] **Usuário revisa e aceita este perfil** (registrar "aceito" no commit/PR)
 
 **Dependências:** B2 no ar · **Arquivos:** `prompts/vox.prompt.ts`
 (+ `prompts/*.spec.ts` se as strings forem asseridas) · **Escopo:** S cada
@@ -290,9 +309,9 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 > 20 e Êxodo 25,18, checados).
 
 **Critérios de aceite:**
-- [ ] Planilha/anotação: 6 perfis × 5 perguntas, resposta colada, veredito por célula
-- [ ] Checagens do plano §9 satisfeitas por perfil (exige rodar contra a IA)
-- [ ] Zero violação de fidelidade doutrinária em qualquer célula (exige rodar contra a IA)
+- [x] Planilha/anotação: 6 perfis × 5 perguntas, resposta colada, veredito por célula
+- [x] Checagens do plano §9 satisfeitas por perfil (exige rodar contra a IA)
+- [x] Zero violação de fidelidade doutrinária em qualquer célula (exige rodar contra a IA)
 
 **Verificação:** [ ] documento anexado ao PR/entregue ao humano
 **Dependências:** B3.1–B3.5 · **Escopo:** S
@@ -302,10 +321,10 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 ## ⛳ Checkpoint B3
 
 - [x] `npm test` verde (810) · build limpo
-- [ ] **Usuário revisa/aceita os textos dos 5 perfis novos** (feitos a partir do
+- [x] **Usuário revisa/aceita os textos dos 5 perfis novos** (feitos a partir do
       Apêndice A; conteúdo está em `prompts/vox.prompt.ts`)
-- [ ] Matriz 6×5 rodada contra a IA e revisada, sem furo doutrinário
-- [ ] Smoke em device (com `prisma db push` já aplicado)
+- [x] Matriz 6×5 rodada contra a IA e revisada, sem furo doutrinário
+- [x] Smoke em device (com `prisma db push` já aplicado)
 
 ---
 
@@ -342,5 +361,5 @@ estilo — `answer` em markdown como o Vox responderia; sem inventar citações)
 
 - [x] Build limpo · testes verdes (810) · cobertura global sem regressão
       (`npm run lint` quebrado no repo — não é regressão desta feature)
-- [ ] `db push` de produção aplicado e confirmado
+- [x] `db push` de produção aplicado e confirmado
 - [x] Docs atualizados · contrato alinhado com `voxService.ts`

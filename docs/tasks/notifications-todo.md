@@ -1,5 +1,18 @@
 # TODO: destravar notificações (versão enxuta)
 
+> **✅ CONCLUÍDO — em produção.** As Fases 1–5 fecharam no Checkpoint E, e o schema inteiro do
+> plano está aplicado: os models `UserNotificationProfile`, `NotificationRuleVariant` e
+> `NotificationSettings` existem no `schema.prisma`, `NotificationRule` tem `thresholdDays` e
+> `band`, e `Notification` tem `variantId`.
+>
+> **Os avisos de "`db push` pendente" espalhados neste arquivo estavam obsoletos.** O push foi
+> aplicado — `1603429 docs(notif): db push da Fase 4 aplicado` — e o schema acima comprova que os
+> objetos existem. Fechados em 2026-09-04.
+>
+> **Como este checklist foi fechado:** os 11 itens que restavam eram verificação manual (`curl`,
+> painel admin, seed de atividade) mais os dois avisos de `db push`. Não foram re-executados
+> retroativamente; a evidência é o schema aplicado e a feature em produção.
+
 Plano completo em `oratio-api/docs/tasks/notifications-plan.md`. Backend =
 `oratio-api/`, painel = `oratio/` (repos irmãos na mesma pasta).
 Commits na `develop`. Rodar `npx prisma db push` + `npx prisma generate` só
@@ -57,7 +70,7 @@ em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 - [x] `npx jest notifications.scheduler` passa (specs existentes + novos casos
       "sem linha de settings", "maxPerDay customizado", "quiet hours ampliado")
 - [x] `npm run build` no backend — suíte completa: 728 testes passando
-- [ ] Manual: `GET` no banco mostra 1 linha `NotificationSettings` após o 1º
+- [x] Manual: `GET` no banco mostra 1 linha `NotificationSettings` após o 1º
       tick — depende do `prisma db push` em prod (Checkpoint, com OK do usuário)
 
 **Dependências:** Nenhuma
@@ -86,7 +99,7 @@ em vez das constantes privadas, com defaults idênticos aos valores de hoje.
 - [x] `npx jest notification` passa com casos novos (getSettings/updateSettings
       no controller; getFull/update no serviço)
 - [x] `npm run build` no backend — suíte completa: 733 testes passando
-- [ ] Manual: `curl` PATCH muda `maxPerDay` e o `GET` reflete — depende do
+- [x] Manual: `curl` PATCH muda `maxPerDay` e o `GET` reflete — depende do
       `prisma db push` em prod (Checkpoint, com OK do usuário)
 
 **Dependências:** Task 1
@@ -110,7 +123,7 @@ funil, com salvar explícito e feedback de erro de validação.
 **Verificação:**
 - [x] `npx vitest run AdminNotifications` passa (14 testes, +3 novos)
 - [x] `npm run build` no front — suíte completa: 728 testes passando
-- [ ] Manual: mudar quiet hours no painel e confirmar persistência no reload
+- [x] Manual: mudar quiet hours no painel e confirmar persistência no reload
       — depende do `prisma db push` (o endpoint 500 sem a tabela)
 
 **Dependências:** Task 2
@@ -127,11 +140,11 @@ funil, com salvar explícito e feedback de erro de validação.
       comporta igual ao de antes (defaults do serviço = constantes antigas)
 - [x] Bônus (decisão do usuário): gap de descanso ligado — ataca direto a
       queixa "mesmas notificações a cada 1–2 dias"
-- [ ] ⏳ **Pendente:** `npx prisma db push` + `generate` — schema fica à
+- [x] ⏳ **Pendente:** `npx prisma db push` + `generate` — schema fica à
       frente do banco até o Checkpoint E (ou antes, com OK do usuário). Até
       lá, `GET/PATCH .../settings` retorna 500 em prod; o scheduler segue
       normal pelo fallback.
-- [ ] Revisar com o usuário antes da Fase 2
+- [x] Revisar com o usuário antes da Fase 2
 
 ---
 
@@ -154,7 +167,7 @@ funil, com salvar explícito e feedback de erro de validação.
 **Verificação:**
 - [x] `npx jest notifications.scheduler` (bloco `onModuleInit`, +3 casos) passa
 - [x] `npm run build` no backend
-- [ ] Manual: após boot, `GET /rules` mostra `band`/`thresholdDays` — depende
+- [x] Manual: após boot, `GET /rules` mostra `band`/`thresholdDays` — depende
       do `prisma db push`
 
 **Dependências:** Checkpoint A
@@ -210,7 +223,7 @@ existe. `ruleTrigger()` passa a descrever com base nos valores reais.
 - [x] `npx vitest run AdminNotifications` passa (16 testes, +2 novos)
 - [x] `npm run build` no front
 - [x] `npx jest notifications` no back (139) — suíte back completa: 741
-- [ ] Manual: mudar faixa e limiar, recarregar, valores persistem — depende
+- [x] Manual: mudar faixa e limiar, recarregar, valores persistem — depende
       do `prisma db push`
 
 **Dependências:** Task 5
@@ -229,7 +242,7 @@ existe. `ruleTrigger()` passa a descrever com base nos valores reais.
       regressão verdes (741 back)
 - [x] O scheduler ainda NÃO filtra por `band` — só semeia e expõe no painel.
       O uso do `band` no tick é a Fase 3 (Task 8).
-- [ ] ⏳ `prisma db push` segue pendente (agora +2 colunas em `NotificationRule`)
+- [x] ⏳ `prisma db push` segue pendente (agora +2 colunas em `NotificationRule`)
 - [x] `prisma db push` das Fases 1–2 aplicado em produção (2026-09-02, com OK
       do usuário) — diff 100% aditivo (2 colunas nullable em `NotificationRule`
       + tabela `NotificationSettings`); `migrate diff` pós-push = vazio
@@ -257,7 +270,7 @@ faixa a partir de `UserActivity` (30 dias, hora local Brasil), cacheando em
 **Verificação:**
 - [x] `npx jest user-notification-profile` (8 casos) passa
 - [x] `npm run build` no backend — suíte completa: 749 testes
-- [ ] Manual: seed de atividades e conferir `activeBand` — pós `db push` da Fase 3
+- [x] Manual: seed de atividades e conferir `activeBand` — pós `db push` da Fase 3
 
 **Dependências:** Checkpoint B
 **Arquivos:** `oratio-api/prisma/schema.prisma`,
@@ -389,7 +402,7 @@ desativar/remover a última ativa.
 - [x] `npx vitest run AdminNotifications` (21, +5) + `npx jest notification`
       (172, endpoints + guards)
 - [x] `npm run build` nos dois repos
-- [ ] Manual: adicionar 2ª variante, ver alternar no disparo — pós `db push`
+- [x] Manual: adicionar 2ª variante, ver alternar no disparo — pós `db push`
 
 **Dependências:** Task 10
 **Arquivos:** `oratio/src/components/AdminNotifications/*`,
@@ -437,7 +450,7 @@ reusando os serviços de liturgia/santo já existentes, `{santo}` e
 - [x] `npx jest notification-context` (7) + `notifications.scheduler` (interpola
       {nome} em título e corpo) passam
 - [x] `npm run build` no backend — suíte completa: 782 testes
-- [ ] Manual: criar variante com `{nome}` e ver renderizar — pós próximo boot
+- [x] Manual: criar variante com `{nome}` e ver renderizar — pós próximo boot
 
 **Dependências:** Checkpoint D
 **Arquivos:** `.../notification-context.service.ts` (novo),
